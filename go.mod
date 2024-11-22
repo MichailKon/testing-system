@@ -1,4 +1,4 @@
-module main
+module testing_system
 
 go 1.22
 
