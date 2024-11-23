@@ -67,7 +67,7 @@ func (c *LRUSizeCache[TKey, TValue]) Get(key TKey) (*TValue, error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	valueHolder := c.lockStartLoadGetHolder(key)
+	valueHolder := c.lockAndGetHolder(key)
 	if valueHolder.LoadingStatus == nil {
 		valueHolder.LockCount--
 		c.itemUsed(key, valueHolder)
@@ -95,7 +95,7 @@ func (c *LRUSizeCache[TKey, TValue]) Get(key TKey) (*TValue, error) {
 func (c *LRUSizeCache[TKey, TValue]) Lock(key TKey) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	valueHolder := c.lockStartLoadGetHolder(key)
+	valueHolder := c.lockAndGetHolder(key)
 	if valueHolder.LoadingStatus == nil {
 		c.itemUsed(key, valueHolder) // Only loaded items can appear in RankList
 	}
@@ -149,7 +149,7 @@ func (c *LRUSizeCache[TKey, TValue]) Remove(key TKey) error {
 // If value is loaded, returns valueHolder
 // If value is loading, returns valueHolder with active waitgroup
 // If value is absent, starts loading in background and returns valueHolder with active waitgroup
-func (c *LRUSizeCache[TKey, TValue]) lockStartLoadGetHolder(key TKey) *valHolder[TValue] {
+func (c *LRUSizeCache[TKey, TValue]) lockAndGetHolder(key TKey) *valHolder[TValue] {
 	valueHolder, ok := c.valueHolders[key]
 	if ok {
 		valueHolder.LockCount++

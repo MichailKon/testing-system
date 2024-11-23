@@ -23,5 +23,5 @@ type ErrItemNotLocked struct {
 }
 
 func (e *ErrItemNotLocked) Error() string {
-	return fmt.Sprintf("size_cache: item locked, key: %#v", e.key)
+	return fmt.Sprintf("size_cache: item not locked, key: %#v", e.key)
 }
