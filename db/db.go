@@ -4,7 +4,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"log/slog"
-	"main/db/models"
+	"testing_system/db/models"
 )
 
 func NewDb(config Config) (*gorm.DB, error) {
