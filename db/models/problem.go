@@ -4,5 +4,6 @@ import "gorm.io/gorm"
 
 type Problem struct {
 	gorm.Model
-	ProblemConfig
+	ProblemConfigId int
+	ProblemConfig   ProblemConfig
 }
