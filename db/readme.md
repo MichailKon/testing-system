@@ -41,20 +41,17 @@ conn.Find(&problems)  // все объекты
 
 https://gorm.io/docs/query.html
 
-### Продвинутые штуки
-
-Если просто вытащить задачу, то не вытащится ее конфиг. Для этого надо сделать join:
-
-``conn.Joins("ProblemConfig").Find(&problems)``
-
-Вообще gorm это какой-то полный пиздец. Например, чтобы вытащить все ICPC задачи, надо сделать так:
+### Условия
 
 ```go
-conn.
-    Model(&models.Problem{}).
-    InnerJoins("ProblemConfig", conn.Where(&models.ProblemConfig{ProblemType: models.ProblemType_ICPC})).
+// все IOI задачи
+conn.Where(models.Problem{ProblemType: models.ProblemType_IOI}).Find(&problems)
+conn.Find(&problems, "problem_type = ?", models.ProblemType_IOI)
+conn.Find(&problems, map[string]any{"problem_type": models.ProblemType_IOI})
+conn.Not("problem_type = ?", models.ProblemType_ICPC).Find(&problems)
+// все IOI задачи или с id == 1
+conn. 
+    Where("problem_type = ?", models.ProblemType_IOI).
+    Or(1).
     Find(&problems)
 ```
-
-Выглядит легко, но это одна из самых простых вещей...)
-Все равно придется писать запросы (наполовину) руками и молиться, чтобы оно работало

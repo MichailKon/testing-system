@@ -17,10 +17,6 @@ func NewDb(config Config) (*gorm.DB, error) {
 		slog.Error("Can't migrate TestingResult", "err", err)
 		return nil, err
 	}
-	if err = db.AutoMigrate(&models.ProblemConfig{}); err != nil {
-		slog.Error("Can't migrate ProblemConfig", "err", err)
-		return nil, err
-	}
 	if err = db.AutoMigrate(&models.Problem{}); err != nil {
 		slog.Error("Can't migrate Problem", "err", err)
 		return nil, err
