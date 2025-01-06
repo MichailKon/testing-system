@@ -1,11 +1,14 @@
 package models
 
-import "github.com/lib/pq"
+import (
+	"github.com/lib/pq"
+	"gorm.io/gorm"
+)
 
 type Verdict int
 
 const (
-	Verdict_OK int = iota
+	Verdict_OK Verdict = iota + 1
 	Verdict_WA
 	Verdict_TL
 	Verdict_ML
@@ -14,5 +17,6 @@ const (
 )
 
 type TestingResult struct {
+	gorm.Model
 	Verdicts pq.Int64Array `gorm:"type:int[]"`
 }
