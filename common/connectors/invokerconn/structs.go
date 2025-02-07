@@ -4,6 +4,8 @@ import (
 	models2 "testing_system/common/db/models"
 )
 
+// This will be changed in later commits
+
 const (
 	JobTypeCompile = iota
 	JobTypeTest

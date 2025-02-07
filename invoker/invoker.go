@@ -14,7 +14,7 @@ type Invoker struct {
 	Storage *storage.InvokerStorage
 	Testers []*tester.Tester
 
-	Queue        chan *models.Submission
+	Queue        chan *models.Submission // This will be changed in later commits
 	MaxQueueSize int
 }
 
