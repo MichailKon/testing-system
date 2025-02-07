@@ -4,52 +4,60 @@ import (
 	"fmt"
 	base_log "log"
 	"os"
-	"testing_system/lib/config"
+	"testing_system/common/config"
 )
 
 const (
-	LOG_LEVEL_TRACE = 0
-	LOG_LEVEL_DEBUG = 1
-	LOG_LEVEL_INFO  = 2
-	LOG_LEVEL_WARN  = 3
-	LOG_LEVEL_ERROR = 4
+	LogLevelTrace = 0
+	LogLevelDebug = 1
+	LogLevelInfo  = 2
+	LogLevelWarn  = 3
+	LogLevelError = 4
 )
 
 var (
-	logLevel = LOG_LEVEL_DEBUG
+	logLevel = LogLevelDebug
 	log      = base_log.New(os.Stdout, "", base_log.Ldate|base_log.Ltime)
 	logErr   = base_log.New(os.Stderr, "", base_log.Ldate|base_log.Ltime)
 )
 
 func Trace(format string, values ...interface{}) {
-	logPrint(LOG_LEVEL_TRACE, format, values...)
+	logPrint(LogLevelTrace, format, values...)
 }
 
 func Debug(format string, values ...any) {
-	logPrint(LOG_LEVEL_DEBUG, format, values...)
+	logPrint(LogLevelDebug, format, values...)
 }
 
 func Info(format string, values ...any) {
-	logPrint(LOG_LEVEL_INFO, format, values...)
+	logPrint(LogLevelInfo, format, values...)
 }
 
 func Warn(format string, values ...any) {
-	logPrint(LOG_LEVEL_WARN, format, values...)
+	logPrint(LogLevelWarn, format, values...)
 }
 
 func Error(format string, values ...any) error {
-	logPrint(LOG_LEVEL_ERROR, format, values...)
-	logErr.Printf(logErrPrefix()+format, values...)
+	logPrint(LogLevelError, format, values...)
+	logErr.Printf(logErrPrefix(0)+format, values...)
 	return fmt.Errorf(format, values...)
 }
 
-func Panic(format string, value ...any) {
-	logPrint(LOG_LEVEL_ERROR, format, value...)
-	logErr.Panicf(format, value...)
+func Panic(format string, values ...any) {
+	logPrint(LogLevelError, format, values...)
+	logErr.Printf(logErrPrefix(0)+format, values...)
+	panic(fmt.Errorf(format, values...))
+}
+
+// PanicLevel will output to log the code line which is reachable by level call depth. May be applied in some library code
+func PanicLevel(level int, format string, values ...any) {
+	logPrint(LogLevelError, format, values...)
+	logErr.Printf(logErrPrefix(level)+format, values...)
+	panic(fmt.Errorf(format, values...))
 }
 
 func InitLogger(config *config.Config) {
-	logLevel = LOG_LEVEL_INFO
+	logLevel = LogLevelInfo
 	if config.LogLevel != nil {
 		logLevel = *config.LogLevel
 	}

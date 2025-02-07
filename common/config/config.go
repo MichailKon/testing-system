@@ -14,8 +14,10 @@ type Config struct {
 	LogPath  *string `yaml:"LogPath,omitempty"`
 	LogLevel *int    `yaml:"LogLevel,omitempty"`
 
-	// TODO: Add all components here
+	Invoker *InvokerConfig `yaml:"Invoker,omitempty"`
+	// TODO: Add instances here
 
+	DB DBConfig `yaml:"DB"`
 	// if instance is set up on server, leave connection empty
 	MasterConnection  *Connection `yaml:"MasterConnection,omitempty"`
 	StorageConnection *Connection `yaml:"StorageConnection,omitempty"`

@@ -6,5 +6,5 @@ type Connection struct {
 }
 
 func fillInConnections(config *Config) {
-	// TODO: Add auto connection creation if master or storage are set up
+	// TODO: Add auto connection creation if master or storageconn are set up
 }

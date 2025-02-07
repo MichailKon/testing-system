@@ -2,12 +2,15 @@ package main
 
 import (
 	"os"
-	"testing_system/lib/common"
+	"testing_system/common"
+	"testing_system/invoker"
 )
 
 func main() {
 	configPath := os.Args[1]
 	ts := common.InitTestingSystem(configPath)
-	// TODO: Add all components initialisation
+	if ts.Config.Invoker != nil {
+		invoker.SetupInvoker(ts)
+	}
 	ts.Run()
 }

@@ -7,13 +7,13 @@ import (
 
 func levelString(level int) string {
 	switch level {
-	case LOG_LEVEL_DEBUG:
+	case LogLevelDebug:
 		return "[DEBUG]"
-	case LOG_LEVEL_INFO:
+	case LogLevelInfo:
 		return "[INFO]"
-	case LOG_LEVEL_WARN:
+	case LogLevelWarn:
 		return "[WARN]"
-	case LOG_LEVEL_ERROR:
+	case LogLevelError:
 		return "[ERROR]"
 	default:
 		return ""
@@ -26,8 +26,8 @@ func logPrint(level int, format string, value ...any) {
 	}
 }
 
-func logErrPrefix() string {
-	_, file, line, ok := runtime.Caller(2)
+func logErrPrefix(level int) string {
+	_, file, line, ok := runtime.Caller(level + 2)
 	if ok {
 		return fmt.Sprintf("%s:%d ", file, line)
 	} else {
