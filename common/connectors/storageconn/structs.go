@@ -66,14 +66,17 @@ type ResponseFiles struct {
 	Size      uint64
 }
 
-func (r *ResponseFiles) File() string {
-	return filepath.Join(r.R.BaseFolder, r.fileNames[0])
+func (r *ResponseFiles) File() (string, bool) {
+	if len(r.fileNames) == 0 {
+		return "", false
+	}
+	return filepath.Join(r.R.BaseFolder, r.fileNames[0]), true
 }
 
 func (r *ResponseFiles) Get(fileName string) (string, bool) {
 	for _, f := range r.fileNames {
 		if fileName == f {
-			return filepath.Join(r.R.BaseFolder, r.fileNames[0]), true
+			return filepath.Join(r.R.BaseFolder, f), true
 		}
 	}
 	return "", false

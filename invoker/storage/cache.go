@@ -6,6 +6,16 @@ import (
 	"testing_system/lib/logger"
 )
 
+// The main idea of cache is following: We have one cache of specific size to hold all types of files.
+// However, we have multiple file types so we must have different getter for each file.
+//
+// So we have single LRUSizeCache that holds all file types. Key for this cache is cacheKey, the internal struct with which we can determine the file type and it's keys.
+//
+// To access cache we have cacheGetter structs. Each cacheGetter responds for single file type.
+// Each cacheGetter accepts any number of uint64 that are transformed to cacheKey struct using cacheGetter.keyGen func.
+//
+// So to access files, we call methods of cacheGetter, that transforms our request to request for LRUSizeCache and LRUSizeCache then does all the cache work.
+
 type commonCache = cache.LRUSizeCache[cacheKey, storageconn.ResponseFiles]
 
 type cacheKey struct {
