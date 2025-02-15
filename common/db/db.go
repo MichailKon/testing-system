@@ -4,10 +4,11 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"log/slog"
-	"testing_system/db/models"
+	"testing_system/common/config"
+	"testing_system/common/db/models"
 )
 
-func NewDb(config Config) (*gorm.DB, error) {
+func NewDB(config config.DBConfig) (*gorm.DB, error) {
 	db, err := gorm.Open(postgres.Open(config.Dsn), &gorm.Config{})
 	if err != nil {
 		slog.Error("Can't open database", "dsn", config.Dsn, "err", err)
