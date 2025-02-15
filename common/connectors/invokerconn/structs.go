@@ -1,21 +1,23 @@
 package invokerconn
 
-import (
-	"testing_system/common/db/models"
-)
-
-// This will be changed in later commits
+type JobType int
 
 const (
-	JobTypeCompile = iota
-	JobTypeTest
+	Compile JobType = iota
+	Test
 )
 
 type Job struct {
-	SubmitID uint `json:"submitID" binding:"required"`
-	JobType  int  `json:"jobType" binding:"required"`
-	Test     int  `json:"test"`
+	ID       string  `json:"ID"`
+	SubmitID uint    `json:"SubmitID" binding:"required"`
+	Type     JobType `json:"JobType" binding:"required"`
+	Test     uint64  `json:"Test"`
 
-	Submit  *models.Submission `json:"submit,omitempty"`
-	Problem *models.Problem    `json:"problem,omitempty"`
+	// TODO: Add job dependency
+}
+
+type StatusResponse struct {
+	// TODO: add some information about invoker state
+	MaxNewJobs   uint64   `json:"MaxNewJobs"`
+	ActiveJobIDs []string `json:"ActiveJobIDs"`
 }

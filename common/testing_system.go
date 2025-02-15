@@ -10,6 +10,9 @@ import (
 	"sync"
 	"syscall"
 	"testing_system/common/config"
+	"testing_system/common/connectors/invokerconn"
+	"testing_system/common/connectors/masterconn"
+	"testing_system/common/connectors/storageconn"
 	"testing_system/common/db"
 	"testing_system/lib/logger"
 )
@@ -18,6 +21,10 @@ type TestingSystem struct {
 	Config *config.Config
 	Router *gin.Engine
 	DB     *gorm.DB
+
+	MasterConn  *masterconn.Connector
+	StorageConn *storageconn.Connector
+	InvokerConn *invokerconn.Connector
 
 	processes []func()
 	defers    []func()
@@ -39,6 +46,10 @@ func InitTestingSystem(configPath string) *TestingSystem {
 	if err != nil {
 		logger.Panic("Can not set up db connection, error: %s", err.Error())
 	}
+
+	ts.MasterConn = masterconn.NewConnector(ts.Config.MasterConnection)
+	ts.StorageConn = storageconn.NewConnector(ts.Config.StorageConnection)
+	ts.InvokerConn = invokerconn.NewConnector(ts.Config.InvokerConnection)
 
 	return ts
 }

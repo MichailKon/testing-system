@@ -1,21 +1,26 @@
 package invoker
 
 import (
+	"sync"
 	"testing_system/common"
-	"testing_system/common/db/models"
+	"testing_system/common/connectors/invokerconn"
+	"testing_system/invoker/compiler"
 	"testing_system/invoker/storage"
-	"testing_system/invoker/tester"
 	"testing_system/lib/logger"
 )
 
 type Invoker struct {
 	TS *common.TestingSystem
 
-	Storage *storage.InvokerStorage
-	Testers []*tester.Tester
+	Storage  *storage.InvokerStorage
+	Compiler *compiler.Compiler
 
-	Queue        chan *models.Submission // This will be changed in later commits
-	MaxQueueSize int
+	JobQueue chan *Job
+	RunQueue chan func()
+
+	ActiveJobs map[string]*Job
+	MaxJobs    uint64
+	Mutex      sync.Mutex
 }
 
 func SetupInvoker(ts *common.TestingSystem) {
@@ -24,36 +29,44 @@ func SetupInvoker(ts *common.TestingSystem) {
 		return
 	}
 	invoker := &Invoker{
-		TS:           ts,
-		MaxQueueSize: ts.Config.Invoker.Instances * *ts.Config.Invoker.QueueSize,
+		TS:         ts,
+		Storage:    storage.NewInvokerStorage(ts),
+		Compiler:   compiler.NewCompiler(ts),
+		RunQueue:   make(chan func(), ts.Config.Invoker.Threads),
+		ActiveJobs: make(map[string]*Job),
 	}
-	invoker.Queue = make(chan *models.Submission, invoker.MaxQueueSize)
-	invoker.Storage = storage.NewInvokerStorage(ts)
 
-	for i := range ts.Config.Invoker.Instances {
-		invoker.Testers = append(invoker.Testers, tester.NewTester(ts, i, invoker.Storage))
-		testerID := i
-		ts.AddProcess(func() { invoker.RunTesterThread(testerID) })
-		ts.AddDefer(invoker.Testers[i].Cleanup)
+	invoker.MaxJobs = ts.Config.Invoker.QueueSize + ts.Config.Invoker.Sandboxes
+	invoker.JobQueue = make(chan *Job, invoker.MaxJobs*2)
+
+	for i := range ts.Config.Invoker.Sandboxes {
+		jobExecutor := NewJobExecutor(ts, i)
+		ts.AddProcess(func() { invoker.RunJobExecutorThread(jobExecutor) })
+		ts.AddDefer(jobExecutor.Delete)
 	}
+
+	invoker.StartRunners()
 
 	r := ts.Router.Group("/invoker/")
-	r.GET("/ping", invoker.HandlePing)
-	r.POST("/test", invoker.HandleTest)
-	// TODO
+	r.GET("/status", invoker.HandleStatus)
+	r.POST("/job/new", invoker.HandleNewJob)
+
+	// TODO Add master initial connection and invoker keepalive thread
+
+	logger.Info("Configured invoker")
 }
 
-func (i *Invoker) RunTesterThread(id int) {
-	t := i.Testers[id]
-	defer t.Cleanup()
-	logger.Info("Starting invoker %d", id)
-	for {
-		select {
-		case <-i.TS.StopCtx.Done():
-			logger.Info("Stopped invoker %d", id)
-			break
-		case s := <-i.Queue:
-			t.Test(s)
-		}
+func (i *Invoker) getStatus() *invokerconn.StatusResponse {
+	i.Mutex.Lock()
+	defer i.Mutex.Unlock()
+	status := new(invokerconn.StatusResponse)
+	for jobId := range i.ActiveJobs {
+		status.ActiveJobIDs = append(status.ActiveJobIDs, jobId)
 	}
+	if uint64(len(status.ActiveJobIDs)) > i.MaxJobs {
+		status.MaxNewJobs = 0
+	} else {
+		status.MaxNewJobs = i.MaxJobs - uint64(len(status.ActiveJobIDs))
+	}
+	return status
 }
