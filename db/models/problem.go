@@ -12,4 +12,5 @@ const (
 type Problem struct {
 	gorm.Model
 	ProblemType ProblemType
+	TestsCount  uint64
 }
