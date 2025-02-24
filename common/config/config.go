@@ -16,6 +16,7 @@ type Config struct {
 
 	Invoker *InvokerConfig `yaml:"Invoker,omitempty"`
 	Master  *MasterConfig  `yaml:"Master,omitempty"`
+	Storage *StorageConfig `yaml:"Invoker,omitempty"`
 	// TODO: Add instances here
 
 	DB DBConfig `yaml:"DB"`
