@@ -15,6 +15,7 @@ type Config struct {
 	LogLevel *int    `yaml:"LogLevel,omitempty"`
 
 	Invoker *InvokerConfig `yaml:"Invoker,omitempty"`
+	Storage *StorageConfig `yaml:"Invoker,omitempty"`
 	// TODO: Add instances here
 
 	DB DBConfig `yaml:"DB"`
