@@ -3,8 +3,8 @@ package invokerconn
 type JobType int
 
 const (
-	Compile JobType = iota
-	Test
+	CompileJob JobType = iota
+	TestJob
 )
 
 type Job struct {

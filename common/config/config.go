@@ -21,7 +21,6 @@ type Config struct {
 	// if instance is set up on server, leave connection empty
 	MasterConnection  *Connection `yaml:"MasterConnection,omitempty"`
 	StorageConnection *Connection `yaml:"StorageConnection,omitempty"`
-	InvokerConnection *Connection `yaml:"InvokerConnection,omitempty"`
 }
 
 func ReadConfig(configPath string) *Config {

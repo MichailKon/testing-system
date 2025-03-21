@@ -26,10 +26,13 @@ func (i *Invoker) HandleNewJob(c *gin.Context) {
 		return
 	}
 	switch job.Type {
-	case invokerconn.Compile:
+	case invokerconn.CompileJob:
 		i.newCompileJob(c, job)
-	case invokerconn.Test:
+	case invokerconn.TestJob:
 		i.newTestJob(c, job)
+	default:
+		connector.RespErr(c, http.StatusBadRequest, "Can not parse job type %v", job.Type)
+		return
 	}
 	i.Mutex.Lock()
 	i.ActiveJobs[job.ID] = job

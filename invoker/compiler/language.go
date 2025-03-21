@@ -3,6 +3,7 @@ package compiler
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"testing_system/invoker/sandbox"
 	"text/template"
 )
@@ -10,7 +11,7 @@ import (
 type Language struct {
 	Name string `yaml:"-"`
 
-	TemplateValues map[string]string `yaml:"TemplateValues"`
+	TemplateValues map[string]interface{} `yaml:"TemplateValues"`
 
 	TemplateName *string            `yaml:"Template,omitempty"`
 	Limits       *sandbox.RunConfig `yaml:"Limits,omitempty"`
@@ -24,9 +25,7 @@ func (l *Language) GenerateScript(source string, binary string) ([]byte, error) 
 		"source": source,
 		"binary": binary,
 	}
-	for k, v := range l.TemplateValues {
-		values[k] = v // Go really does not have another way to do it!
-	}
+	maps.Copy(values, l.TemplateValues)
 
 	err := l.Template.Execute(&script, l.TemplateValues)
 	if err != nil {

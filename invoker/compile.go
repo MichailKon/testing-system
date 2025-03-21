@@ -80,8 +80,12 @@ func (j *compileJob) Prepare() error {
 	if err != nil {
 		return logger.Error("can not get source, error: %s", err.Error())
 	}
-	sourceName := "source_" + filepath.Base(source.File())
-	err = j.tester.CopyFileToSandbox(source.File(), sourceName, 0644)
+	sourceFile, ok := source.File()
+	if !ok {
+		return logger.Error("can not get source, file not found")
+	}
+	sourceName := "source_" + filepath.Base(sourceFile)
+	err = j.tester.CopyFileToSandbox(sourceFile, sourceName, 0644)
 	if err != nil {
 		return logger.Error("can not copy file to sandbox, error: %s", err.Error())
 	}
@@ -90,7 +94,7 @@ func (j *compileJob) Prepare() error {
 	if !ok {
 		return fmt.Errorf("language %s does not exist", j.submission.Language)
 	}
-	j.binaryName = bianaryName(sourceName)
+	j.binaryName = binaryName(sourceName)
 	script, err := lang.GenerateScript(sourceName, j.binaryName)
 	if err != nil {
 		logger.Warn("Can not generate compile script for submit %d, job %s, error: %s", j.submission.ID, j.job.ID, err.Error())
@@ -103,12 +107,12 @@ func (j *compileJob) Prepare() error {
 	return nil
 }
 
-func bianaryName(sourceName string) string {
-	binaryName := "solution"
-	if binaryName == sourceName {
-		binaryName += "_binary"
+func binaryName(sourceName string) string {
+	name := "solution"
+	if name == sourceName {
+		name += "_binary"
 	}
-	return binaryName
+	return name
 }
 
 func (j *compileJob) Execute() {
@@ -131,13 +135,13 @@ func (j *compileJob) Finish() error {
 		}
 	case verdict.TL:
 		j.runResult.Verdict = verdict.CE
-		outputReader = strings.NewReader(fmt.Sprintf("Compilation took more than %s time", j.language.Limits.TLstr))
+		outputReader = strings.NewReader(fmt.Sprintf("Compilation took more than %v time", j.language.Limits.TL))
 	case verdict.ML:
 		j.runResult.Verdict = verdict.CE
-		outputReader = strings.NewReader(fmt.Sprintf("Compilation took more than %s memory", j.language.Limits.MLstr))
+		outputReader = strings.NewReader(fmt.Sprintf("Compilation took more than %v memory", j.language.Limits.ML))
 	case verdict.WL:
 		j.runResult.Verdict = verdict.CE
-		outputReader = strings.NewReader(fmt.Sprintf("Compilation took more than %s wall time", j.language.Limits.WLstr))
+		outputReader = strings.NewReader(fmt.Sprintf("Compilation took more than %v wall time", j.language.Limits.WL))
 	case verdict.SE:
 		j.runResult.Verdict = verdict.CE
 		outputReader = strings.NewReader(fmt.Sprintf("Security violation"))

@@ -35,8 +35,9 @@ func (i *Invoker) RunJobExecutorThread(tester *JobExecutor) {
 			break
 		case job := <-i.JobQueue:
 			switch job.Type {
-			case invokerconn.Compile:
+			case invokerconn.CompileJob:
 				i.Compile(tester, job)
+				// TODO: Add TestJob
 			}
 		}
 	}
