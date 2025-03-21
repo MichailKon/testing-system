@@ -6,7 +6,7 @@ import (
 	"unicode"
 )
 
-func sepStr(str string) (uint64, string, error) {
+func separateStr(str string) (uint64, string, error) {
 	str = strings.ToLower(str)
 	pos := 0
 	for ; pos < len(str); pos++ {
