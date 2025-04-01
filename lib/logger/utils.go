@@ -7,6 +7,8 @@ import (
 
 func levelString(level int) string {
 	switch level {
+	case LogLevelTrace:
+		return "[TRACE]"
 	case LogLevelDebug:
 		return "[DEBUG]"
 	case LogLevelInfo:

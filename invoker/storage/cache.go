@@ -2,6 +2,7 @@ package storage
 
 import (
 	"testing_system/common/connectors/storageconn"
+	"testing_system/common/constants/resource"
 	"testing_system/lib/cache"
 	"testing_system/lib/logger"
 )
@@ -19,7 +20,7 @@ import (
 type commonCache = cache.LRUSizeCache[cacheKey, storageconn.ResponseFiles]
 
 type cacheKey struct {
-	Resource storageconn.ResourceType `json:"resource"`
+	Resource resource.Type `json:"resource"`
 
 	// If resource is part of problem, ProblemID is used
 	ProblemID uint64 `json:"problemID"`
@@ -50,7 +51,7 @@ func newSourceCache(commonCache *commonCache) *cacheGetter {
 	return &cacheGetter{
 		Cache: commonCache,
 		keyGen: func(vals ...uint64) cacheKey {
-			return submitKeyGen(storageconn.SourceCode, vals)
+			return submitKeyGen(resource.SourceCode, vals)
 		},
 	}
 }
@@ -59,7 +60,7 @@ func newBinaryCache(commonCache *commonCache) *cacheGetter {
 	return &cacheGetter{
 		Cache: commonCache,
 		keyGen: func(vals ...uint64) cacheKey {
-			return submitKeyGen(storageconn.CompiledBinary, vals)
+			return submitKeyGen(resource.CompiledBinary, vals)
 		},
 	}
 }
@@ -68,7 +69,7 @@ func newCheckerCache(commonCache *commonCache) *cacheGetter {
 	return &cacheGetter{
 		Cache: commonCache,
 		keyGen: func(vals ...uint64) cacheKey {
-			return problemIDKeyGen(storageconn.Checker, vals)
+			return problemIDKeyGen(resource.Checker, vals)
 		},
 	}
 }
@@ -77,7 +78,7 @@ func newInteractorCache(commonCache *commonCache) *cacheGetter {
 	return &cacheGetter{
 		Cache: commonCache,
 		keyGen: func(vals ...uint64) cacheKey {
-			return submitKeyGen(storageconn.Interactor, vals)
+			return submitKeyGen(resource.Interactor, vals)
 		},
 	}
 }
@@ -90,7 +91,7 @@ func newTestCache(commonCache *commonCache) *cacheGetter {
 				logger.PanicLevel(2, "wrong usage of storageconn cache, can not get problem tests for ids %v, exactly 2 ids should be passed", vals)
 			}
 			key := cacheKey{
-				Resource:  storageconn.Test,
+				Resource:  resource.Test,
 				ProblemID: vals[0],
 				TestID:    vals[1],
 			}
@@ -99,7 +100,7 @@ func newTestCache(commonCache *commonCache) *cacheGetter {
 	}
 }
 
-func problemIDKeyGen(resource storageconn.ResourceType, vals []uint64) cacheKey {
+func problemIDKeyGen(resource resource.Type, vals []uint64) cacheKey {
 	if len(vals) != 1 {
 		logger.PanicLevel(3, "wrong usage of storageconn cache, can not get problem %s for id %v, too many ids passed", resource.String(), vals)
 	}
@@ -110,7 +111,7 @@ func problemIDKeyGen(resource storageconn.ResourceType, vals []uint64) cacheKey 
 	return key
 }
 
-func submitKeyGen(resource storageconn.ResourceType, vals []uint64) cacheKey {
+func submitKeyGen(resource resource.Type, vals []uint64) cacheKey {
 	if len(vals) != 1 {
 		logger.PanicLevel(3, "wrong usage of storageconn cache, can not get submit %s for id %v, too many ids passed", resource.String(), vals)
 	}

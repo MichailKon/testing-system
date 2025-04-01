@@ -1,11 +1,14 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"gorm.io/gorm"
+	"testing_system/common/constants/verdict"
+)
 
 type Submission struct {
 	gorm.Model
-	ProblemID        uint64
-	ProblemVersionID uint64
-	TestingResultID  int
-	TestingResult    TestingResult
+	ProblemID uint64
+	Language  string
+
+	Verdict verdict.Verdict
 }

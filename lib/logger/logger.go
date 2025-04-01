@@ -16,7 +16,7 @@ const (
 )
 
 var (
-	logLevel = LogLevelDebug
+	logLevel = LogLevelInfo
 	log      = base_log.New(os.Stdout, "", base_log.Ldate|base_log.Ltime)
 	logErr   = base_log.New(os.Stderr, "", base_log.Ldate|base_log.Ltime)
 )
