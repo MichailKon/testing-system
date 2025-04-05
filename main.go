@@ -10,9 +10,14 @@ import (
 func main() {
 	configPath := os.Args[1]
 	ts := common.InitTestingSystem(configPath)
+
 	if ts.Config.Invoker != nil {
 		invoker.SetupInvoker(ts)
+	}
+
+	if ts.Config.Storage != nil {
 		storage.SetupStorage(ts)
 	}
+
 	ts.Run()
 }

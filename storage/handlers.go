@@ -43,7 +43,7 @@ func (s *Storage) HandleRemove(c *gin.Context) {
 
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to remove file"})
-		logger.Error("Failed to save file: id=%s, dataType=%s, filePath=%s\n %v", id, dataType, filepath, err)
+		logger.Error("Failed to remove file: id=%s, dataType=%s, filePath=%s\n %v", id, dataType, filepath, err)
 		return
 	}
 
@@ -51,18 +51,18 @@ func (s *Storage) HandleRemove(c *gin.Context) {
 }
 
 func (s *Storage) HandleGet(c *gin.Context) {
-	id, dataType, filepath, err := getInfo(c)
+	id, dataType, filePath, err := getInfo(c)
 
 	if err != nil {
 		return
 	}
 
-	filepath, err = s.filesystem.GetFilePath(dataType, id, filepath)
+	fullPath, err := s.filesystem.GetFilePath(dataType, id, filePath)
 
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to get file"})
 		return
 	}
 
-	c.File(filepath)
+	c.File(fullPath)
 }

@@ -17,10 +17,10 @@ func isValidDataType(dataType string) bool {
 	return exists
 }
 
-func getInfo(c *gin.Context) (string, string, string, error) {
-	id := c.Query("id")
-	dataType := c.Query("dataType")
-	filepath := c.Query("filepath")
+func getInfo(c *gin.Context) (id string, dataType string, filepath string, err error) {
+	id = c.Query("id")
+	dataType = c.Query("dataType")
+	filepath = c.Query("filepath")
 
 	if id == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing id"})
@@ -29,7 +29,7 @@ func getInfo(c *gin.Context) (string, string, string, error) {
 
 	if filepath == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing filepath"})
-		return "", "", "", fmt.Errorf("missing id")
+		return "", "", "", fmt.Errorf("missing filepath")
 	}
 
 	if !isValidDataType(dataType) {

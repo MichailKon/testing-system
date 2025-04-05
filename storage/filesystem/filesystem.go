@@ -30,8 +30,13 @@ func (filesystem *Filesystem) generatePathFromID(prefix string, id string) strin
 
 func (filesystem *Filesystem) SaveFile(prefix string, id string, filename string, file *multipart.FileHeader, c *gin.Context) error {
 	subpath := filesystem.generatePathFromID(prefix, id)
-	fmt.Println(filesystem.Basepath)
-	fullFilename := filepath.Join(filesystem.Basepath, subpath, filename)
+	fullDirPath := filepath.Join(filesystem.Basepath, subpath)
+	fullFilename := filepath.Join(fullDirPath, filename)
+
+	if err := os.MkdirAll(fullDirPath, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
 	return c.SaveUploadedFile(file, fullFilename)
 }
 

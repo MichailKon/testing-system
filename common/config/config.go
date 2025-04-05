@@ -15,7 +15,7 @@ type Config struct {
 	LogLevel *int    `yaml:"LogLevel,omitempty"`
 
 	Invoker *InvokerConfig `yaml:"Invoker,omitempty"`
-	Storage *StorageConfig `yaml:"Invoker,omitempty"`
+	Storage *StorageConfig `yaml:"Storage,omitempty"`
 	// TODO: Add instances here
 
 	DB DBConfig `yaml:"DB"`
@@ -47,4 +47,10 @@ func fillInConfig(config *Config) {
 	}
 
 	fillInConnections(config)
+	if config.Invoker != nil {
+		fillInInvokerConfig(config.Invoker)
+	}
+	if config.Storage != nil {
+		FillInStorageConfig(config.Storage)
+	}
 }

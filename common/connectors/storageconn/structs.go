@@ -1,29 +1,16 @@
 package storageconn
 
-//go:generate stringer -type=ResourceType
-
 import (
-	"fmt"
+	"io"
 	"os"
 	"path/filepath"
-	"strconv"
+	"testing_system/common/constants/resource"
 	"testing_system/lib/logger"
-)
-
-type ResourceType int
-
-const (
-	SourceCode ResourceType = iota
-	CompiledBinary
-	Test
-	Checker
-	Interactor
-	// Will be increased
 )
 
 type Request struct {
 	// Should be always specified
-	Resource ResourceType `json:"resource"`
+	Resource resource.Type `json:"resource"`
 
 	// If resource is part of problem, ProblemID is used
 	ProblemID uint64 `json:"problemID"`
@@ -35,24 +22,11 @@ type Request struct {
 	// For any download, BaseFolder should be specified. The files with original filenames will be placed there
 	BaseFolder string `json:"-"`
 
-	// For uploads, FilePath or FilePaths should be specified (depending on whether the resource is single-file or not).
-	// Filename will be taken from filename inside the path.
-	FilePath  string   `json:"-"`
-	FilePaths []string `json:"-"`
-}
+	// Specify a custom filename for the downloaded file
+	CustomFilename string `json:"-"`
 
-func (s *Request) FillBaseFolder(parent string) {
-	s.BaseFolder = filepath.Join(parent, s.Resource.String())
-	switch s.Resource {
-	case SourceCode, CompiledBinary:
-		s.BaseFolder = filepath.Join(s.BaseFolder, strconv.FormatUint(s.SubmitID, 10))
-	case Checker, Interactor:
-		s.BaseFolder = filepath.Join(s.BaseFolder, strconv.FormatUint(s.ProblemID, 10))
-	case Test:
-		s.BaseFolder = filepath.Join(s.BaseFolder, fmt.Sprintf("%d-%d", s.SubmitID, s.TestID))
-	default:
-		logger.Panic("Can not fill base folder for storageconn request of type %s", s.Resource)
-	}
+	// For uploads, Files should be specified. Filename is key in map, file data should be read from value
+	Files map[string]io.Reader `json:"-"`
 }
 
 type Response struct {
@@ -64,6 +38,14 @@ type ResponseFiles struct {
 	Response
 	fileNames []string
 	Size      uint64
+}
+
+func NewResponseFiles(request Request) *ResponseFiles {
+	return &ResponseFiles{
+		Response:  Response{R: request},
+		fileNames: []string{},
+		Size:      0,
+	}
 }
 
 func (r *ResponseFiles) File() (string, bool) {
