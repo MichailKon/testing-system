@@ -2,13 +2,13 @@ package storageconn
 
 import (
 	"fmt"
+	"mime"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing_system/common/config"
 	"testing_system/common/connectors"
 	"testing_system/common/constants/resource"
-
-	"github.com/go-resty/resty/v2"
 )
 
 type Connector struct {
@@ -22,115 +22,171 @@ func NewConnector(connection *config.Connection) *Connector {
 	return &Connector{connectors.NewConnectorBase(connection)}
 }
 
-func (s *Connector) Download(request *Request) *ResponseFiles {
+func (s *Connector) Download(request *Request) *FileResponse {
+	response := NewFileResponse(*request)
+
 	if err := os.MkdirAll(request.BaseFolder, 0775); err != nil {
-		return &ResponseFiles{Response: Response{R: *request, Error: fmt.Errorf("failed to create base folder: %v", err)}}
+		response.Error = fmt.Errorf("failed to create base folder: %v", err)
+		return response
 	}
 
-	path := fmt.Sprintf("/storage/get?id=%d&dataType=%s&filepath=%s",
-		getIDForResource(request),
-		getDataTypeForResource(request.Resource),
-		request.Resource.String(),
-	)
-
+	path := "/storage/get"
 	r := s.connection.R()
-	resp, err := r.Execute(resty.MethodGet, path)
+
+	params, err := getStorageParams(request)
+
 	if err != nil {
-		return &ResponseFiles{Response: Response{R: *request, Error: fmt.Errorf("failed to send request: %v", err)}}
+		response.Error = fmt.Errorf("failed to form storage request: %v", err)
+		return response
+	}
+
+	r.SetQueryParams(map[string]string{
+		"id":       params.id,
+		"dataType": params.dataType,
+		"filepath": params.filepath,
+	})
+
+	resp, err := r.Get(path)
+	if err != nil {
+		response.Error = fmt.Errorf("failed to send request: %v", err)
+		return response
 	}
 
 	if resp.IsError() {
-		return &ResponseFiles{Response: Response{R: *request, Error: fmt.Errorf("request failed with status: %v", resp.Status())}}
+		response.Error = fmt.Errorf("get request failed with status: %v", resp.Status())
+		return response
 	}
 
-	filename := request.Resource.String()
+	filename := ""
 	if request.CustomFilename != "" {
 		filename = request.CustomFilename
+	} else {
+		// Extract filename from Content-Disposition header
+		contentDisposition := resp.Header().Get("Content-Disposition")
+		if contentDisposition != "" {
+			_, params, err := mime.ParseMediaType(contentDisposition)
+			if err == nil && params["filename"] != "" {
+				filename = params["filename"]
+			}
+		}
 	}
 
-	filepath := filepath.Join(request.BaseFolder, filename)
-	err = os.WriteFile(filepath, resp.Body(), 0644)
+	if filename == "" {
+		response.Error = fmt.Errorf("can't extract filename from CustomFilename or Content-Disposition header")
+		return response
+	}
+
+	filePath := filepath.Join(request.BaseFolder, filename)
+	err = os.WriteFile(filePath, resp.Body(), 0644)
 	if err != nil {
-		return &ResponseFiles{Response: Response{R: *request, Error: fmt.Errorf("failed to write file: %v", err)}}
+		response.Error = fmt.Errorf("failed to write file: %v", err)
+		return response
 	}
 
-	responseFiles := NewResponseFiles(*request)
-	responseFiles.fileNames = []string{filename}
-	responseFiles.Size = uint64(len(resp.Body()))
-	return responseFiles
+	response.Filename = filename
+	response.BaseFolder = request.BaseFolder
+	response.Size = uint64(len(resp.Body()))
+	return response
 }
 
 func (s *Connector) Upload(request *Request) *Response {
-	if len(request.Files) == 0 {
-		return &Response{R: *request, Error: fmt.Errorf("no files to upload")}
+	response := &Response{R: *request}
+
+	if request.File == nil {
+		response.Error = fmt.Errorf("file for upload is not specified")
+		return response
 	}
 
-	path := fmt.Sprintf("/storage/upload?id=%d&dataType=%s&filepath=%s",
-		getIDForResource(request),
-		getDataTypeForResource(request.Resource),
-		request.Resource.String(),
-	)
-
+	path := "/storage/upload"
 	r := s.connection.R()
-	for filename, reader := range request.Files {
-		r.SetFileReader("file", filename, reader)
+
+	params, err := getStorageParams(request)
+
+	if err != nil {
+		response.Error = fmt.Errorf("failed to form storage request: %v", err)
+		return response
 	}
 
-	resp, err := r.Execute(resty.MethodPost, path)
+	r.SetFormData(map[string]string{
+		"id":       params.id,
+		"dataType": params.dataType,
+		"filepath": params.filepath,
+	})
+
+	r.SetFileReader("file", request.Filename, request.File)
+
+	resp, err := r.Post(path)
 	if err != nil {
-		return &Response{R: *request, Error: fmt.Errorf("failed to send request: %v", err)}
+		response.Error = fmt.Errorf("failed to send request: %v", err)
+		return response
 	}
 
 	if resp.IsError() {
-		return &Response{R: *request, Error: fmt.Errorf("request failed with status: %s, body: %s", resp.Status(), resp.String())}
+		response.Error = fmt.Errorf("upload failed with status: %v", resp.Status())
+		return response
 	}
 
-	return &Response{R: *request}
+	return response
 }
 
 func (s *Connector) Delete(request *Request) *Response {
-	path := fmt.Sprintf("/storage/remove?id=%d&dataType=%s&filepath=%s",
-		getIDForResource(request),
-		getDataTypeForResource(request.Resource),
-		request.Resource.String(),
-	)
+	response := &Response{R: *request}
 
+	path := "/storage/remove"
 	r := s.connection.R()
-	resp, err := r.Execute(resty.MethodDelete, path)
+
+	params, err := getStorageParams(request)
+
 	if err != nil {
-		return &Response{R: *request, Error: fmt.Errorf("failed to send request: %v", err)}
+		response.Error = fmt.Errorf("failed to form storage request: %v", err)
+		return response
+	}
+
+	r.SetFormData(map[string]string{
+		"id":       params.id,
+		"dataType": params.dataType,
+		"filepath": params.filepath,
+	})
+
+	resp, err := r.Delete(path)
+	if err != nil {
+		response.Error = fmt.Errorf("failed to send request: %v", err)
+		return response
 	}
 
 	if resp.IsError() {
-		return &Response{R: *request, Error: fmt.Errorf("request failed with status: %s, body: %s", resp.Status(), resp.String())}
+		response.Error = fmt.Errorf("delete failed with status: %v", resp.Status())
+		return response
 	}
 
-	return &Response{R: *request}
+	return response
 }
 
-func getIDForResource(request *Request) uint64 {
+type storageParams struct {
+	id       string
+	dataType string
+	filepath string
+}
+
+func getStorageParams(request *Request) (storageParams, error) {
+	params := storageParams{}
 	switch request.Resource {
-	case resource.SourceCode, resource.CompiledBinary, resource.CompileOutput:
-		return request.SubmitID
 	case resource.Checker, resource.Interactor:
-		return request.ProblemID
-	case resource.Test:
-		if request.TestID > 0 {
-			return request.TestID
-		}
-		return request.ProblemID
-	default:
-		return 0
-	}
-}
-
-func getDataTypeForResource(resourceType resource.Type) string {
-	switch resourceType {
+		params.dataType = "problem"
+		params.filepath = request.Resource.String()
+		params.id = strconv.FormatUint(request.ProblemID, 10)
+		return params, nil
 	case resource.SourceCode, resource.CompiledBinary, resource.CompileOutput:
-		return "submission"
-	case resource.Checker, resource.Interactor, resource.Test:
-		return "problem"
+		params.dataType = "submission"
+		params.filepath = request.Resource.String()
+		params.id = strconv.FormatUint(request.SubmitID, 10)
+		return params, nil
+	case resource.Test:
+		params.dataType = "problem"
+		params.filepath = "tests/" + strconv.FormatUint(request.TestID, 10)
+		params.id = strconv.FormatUint(request.ProblemID, 10)
+		return params, nil
 	default:
-		return "unknown"
+		return params, fmt.Errorf("unknown resource type: %s", request.Resource.String())
 	}
 }

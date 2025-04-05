@@ -2,7 +2,6 @@ package storage
 
 import (
 	"fmt"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
@@ -12,30 +11,35 @@ var validDataTypes = map[string]struct{}{
 	"problem":    {},
 }
 
+type fileInfo struct {
+	id       string `form:"id"`
+	dataType string `form:"dataType"`
+	filepath string `form:"filepath"`
+}
+
 func isValidDataType(dataType string) bool {
 	_, exists := validDataTypes[dataType]
 	return exists
 }
 
-func getInfo(c *gin.Context) (id string, dataType string, filepath string, err error) {
-	id = c.Query("id")
-	dataType = c.Query("dataType")
-	filepath = c.Query("filepath")
+func getInfo(c *gin.Context) (fileInfo, error) {
+	var info fileInfo
 
-	if id == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing id"})
-		return "", "", "", fmt.Errorf("missing id")
+	if err := c.ShouldBind(&info); err != nil {
+		return fileInfo{}, fmt.Errorf("invalid request parameters: %w", err)
 	}
 
-	if filepath == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing filepath"})
-		return "", "", "", fmt.Errorf("missing filepath")
+	if info.id == "" {
+		return fileInfo{}, fmt.Errorf("missing id")
 	}
 
-	if !isValidDataType(dataType) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid dataType"})
-		return "", "", "", fmt.Errorf("invalid dataType")
+	if info.filepath == "" {
+		return fileInfo{}, fmt.Errorf("missing filepath")
 	}
 
-	return id, dataType, filepath, nil
+	if !isValidDataType(info.dataType) {
+		return fileInfo{}, fmt.Errorf("invalid dataType")
+	}
+
+	return info, nil
 }

@@ -2,13 +2,14 @@ package invoker
 
 import (
 	"errors"
-	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 	"net/http"
 	"testing_system/common/connectors/invokerconn"
 	"testing_system/common/db/models"
 	"testing_system/lib/connector"
 	"testing_system/lib/logger"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func (i *Invoker) HandleStatus(c *gin.Context) {
