@@ -1,6 +1,7 @@
 package invoker
 
 import (
+	"fmt"
 	"sync"
 	"testing_system/common"
 	"testing_system/common/connectors/invokerconn"
@@ -23,10 +24,9 @@ type Invoker struct {
 	Mutex      sync.Mutex
 }
 
-func SetupInvoker(ts *common.TestingSystem) {
+func SetupInvoker(ts *common.TestingSystem) error {
 	if ts.Config.Invoker == nil {
-		logger.Info("Invoker is not configured, skipping invoker start")
-		return
+		return fmt.Errorf("invoker is not configured")
 	}
 	invoker := &Invoker{
 		TS:         ts,
@@ -54,6 +54,7 @@ func SetupInvoker(ts *common.TestingSystem) {
 	// TODO Add master initial connection and invoker keepalive thread
 
 	logger.Info("Configured invoker")
+	return nil
 }
 
 func (i *Invoker) getStatus() *invokerconn.StatusResponse {

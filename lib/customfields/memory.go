@@ -1,6 +1,7 @@
 package customfields
 
 import (
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"gopkg.in/yaml.v3"
@@ -13,7 +14,7 @@ func (m *MemoryLimit) Val() uint64 {
 }
 
 func (m *MemoryLimit) MarshalYAML() (interface{}, error) {
-	return nil, fmt.Errorf("MemoryLimit does not support marshalling")
+	return m.String(), nil
 }
 
 func (m *MemoryLimit) UnmarshalYAML(node *yaml.Node) error {
@@ -25,7 +26,7 @@ func (m *MemoryLimit) UnmarshalYAML(node *yaml.Node) error {
 }
 
 func (m *MemoryLimit) MarshalJSON() ([]byte, error) {
-	return nil, fmt.Errorf("MemoryLimit does not support marshalling")
+	return json.Marshal(m.String())
 }
 
 func (m *MemoryLimit) UnmarshalJSON(data []byte) error {
@@ -37,8 +38,24 @@ func (m *MemoryLimit) UnmarshalJSON(data []byte) error {
 	return m.FromStr(s)
 }
 
+func (m *MemoryLimit) Scan(value interface{}) error {
+	str, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("MemoryLimit must be a string")
+	}
+	return m.FromStr(str)
+}
+
+func (m *MemoryLimit) Value() (driver.Value, error) {
+	return m.String(), nil
+}
+
+func (m *MemoryLimit) GormDataType() string {
+	return "string"
+}
+
 func (m *MemoryLimit) FromStr(s string) error {
-	num, suf, err := sepStr(s)
+	num, suf, err := separateStr(s)
 	if err != nil {
 		return err
 	}
@@ -61,9 +78,6 @@ func (m *MemoryLimit) FromStr(s string) error {
 }
 
 func (m *MemoryLimit) String() string {
-	if m == nil {
-		return "<nil>"
-	}
 	v := m.Val()
 	suf := "b"
 	if v%1024 == 0 {

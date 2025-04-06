@@ -37,7 +37,10 @@ func (i *Invoker) RunJobExecutorThread(tester *JobExecutor) {
 			switch job.Type {
 			case invokerconn.CompileJob:
 				i.Compile(tester, job)
-				// TODO: Add TestJob
+			case invokerconn.TestJob:
+				i.Test(tester, job)
+			default:
+				logger.Panic("Unknown job type %d", job.Type)
 			}
 		}
 	}
@@ -58,6 +61,10 @@ func (t *JobExecutor) CopyFileToSandbox(src string, dst string, perm os.FileMode
 	return nil
 }
 
-func (t *JobExecutor) CreateSandboxFile(name string, perm os.FileMode, data []byte) error {
-	return os.WriteFile(filepath.Join(t.Sandbox.Dir(), name), data, perm)
+func (i *Invoker) limitedReader(r io.Reader) io.Reader {
+	if i.TS.Config.Invoker.SaveOutputHead == nil {
+		return r
+	} else {
+		return io.LimitReader(r, int64(*i.TS.Config.Invoker.SaveOutputHead))
+	}
 }

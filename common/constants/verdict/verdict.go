@@ -8,7 +8,7 @@ const (
 	PT Verdict = "PT" // Partial solution
 
 	WA Verdict = "WA" // Wrong answer
-	PE Verdict = "PE" // Presentation error
+	//PE Verdict = "PE" // Presentation error, we will treat it as Wrong Answer
 
 	RT Verdict = "RT" // Runtime error
 	ML Verdict = "PE" // Memory limit

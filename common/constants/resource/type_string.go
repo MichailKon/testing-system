@@ -11,14 +11,18 @@ func _() {
 	_ = x[SourceCode-0]
 	_ = x[CompiledBinary-1]
 	_ = x[CompileOutput-2]
-	_ = x[Test-3]
-	_ = x[Checker-4]
-	_ = x[Interactor-5]
+	_ = x[TestInput-3]
+	_ = x[TestAnswer-4]
+	_ = x[TestOutput-5]
+	_ = x[TestStderr-6]
+	_ = x[Checker-7]
+	_ = x[CheckerOutput-8]
+	_ = x[Interactor-9]
 }
 
-const _Type_name = "SourceCodeCompiledBinaryCompileOutputTestCheckerInteractor"
+const _Type_name = "SourceCodeCompiledBinaryCompileOutputTestInputTestAnswerTestOutputTestStderrCheckerCheckerOutputInteractor"
 
-var _Type_index = [...]uint8{0, 10, 24, 37, 41, 48, 58}
+var _Type_index = [...]uint8{0, 10, 24, 37, 46, 56, 66, 76, 83, 96, 106}
 
 func (i Type) String() string {
 	if i < 0 || i >= Type(len(_Type_index)-1) {

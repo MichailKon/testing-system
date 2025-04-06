@@ -16,8 +16,8 @@ type Compiler struct {
 }
 
 type Config struct {
-	DefaultLimits *sandbox.RunConfig   `yaml:"DefaultLimits"`
-	Languages     map[string]*Language `yaml:"Languages"`
+	DefaultLimits *sandbox.ExecuteConfig `yaml:"DefaultLimits"`
+	Languages     map[string]*Language   `yaml:"Languages"`
 }
 
 func NewCompiler(ts *common.TestingSystem) *Compiler {
@@ -27,26 +27,26 @@ func NewCompiler(ts *common.TestingSystem) *Compiler {
 		logger.Panic("Can not read compiler config at path %s, error: %s", configPath, err.Error())
 	}
 
-	var config Config
-	err = yaml.Unmarshal(configData, &config)
+	var languageConfig Config
+	err = yaml.Unmarshal(configData, &languageConfig)
 	if err != nil {
 		logger.Panic("Can not parse compiler config, error: %s", err.Error())
 	}
 
-	err = config.DefaultLimits.FillIn()
-	if err != nil {
-		logger.Panic("Can not parse default limits for compilation, error: %s", err.Error())
+	if languageConfig.DefaultLimits == nil {
+		languageConfig.DefaultLimits = &sandbox.ExecuteConfig{}
 	}
+	fillInCompileExecuteConfig(languageConfig.DefaultLimits)
 
 	c := &Compiler{
 		Languages: make(map[string]*Language),
 	}
-	for name, l := range config.Languages {
+	for name, l := range languageConfig.Languages {
 		l.Name = name
 		if l.Limits == nil {
-			l.Limits = config.DefaultLimits
+			l.Limits = languageConfig.DefaultLimits
 		} else {
-			err = l.Limits.FillIn()
+			fillInCompileExecuteConfig(l.Limits)
 			if err != nil {
 				logger.Panic("Can not parse limits for compilation of %s, error: %s", name, err.Error())
 			}

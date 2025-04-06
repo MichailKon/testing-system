@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"testing_system/common/connectors/storageconn"
 	"testing_system/common/constants/resource"
 	"testing_system/lib/cache"
 	"testing_system/lib/logger"
@@ -17,7 +16,7 @@ import (
 //
 // So to access files, we call methods of cacheGetter, that transforms our request to request for LRUSizeCache and LRUSizeCache then does all the cache work.
 
-type commonCache = cache.LRUSizeCache[cacheKey, storageconn.ResponseFiles]
+type commonCache = cache.LRUSizeCache[cacheKey, string]
 
 type cacheKey struct {
 	Resource resource.Type `json:"resource"`
@@ -35,7 +34,7 @@ type cacheGetter struct {
 	keyGen func(vals ...uint64) cacheKey
 }
 
-func (c *cacheGetter) Get(vals ...uint64) (*storageconn.ResponseFiles, error) {
+func (c *cacheGetter) Get(vals ...uint64) (*string, error) {
 	return c.Cache.Get(c.keyGen(vals...))
 }
 
@@ -83,26 +82,23 @@ func newInteractorCache(commonCache *commonCache) *cacheGetter {
 	}
 }
 
-func newTestCache(commonCache *commonCache) *cacheGetter {
+func newTestInputCache(commonCache *commonCache) *cacheGetter {
 	return &cacheGetter{
-		Cache: commonCache,
-		keyGen: func(vals ...uint64) cacheKey {
-			if len(vals) != 2 {
-				logger.PanicLevel(2, "wrong usage of storageconn cache, can not get problem tests for ids %v, exactly 2 ids should be passed", vals)
-			}
-			key := cacheKey{
-				Resource:  resource.Test,
-				ProblemID: vals[0],
-				TestID:    vals[1],
-			}
-			return key
-		},
+		Cache:  commonCache,
+		keyGen: func(vals ...uint64) cacheKey { return testKeyGen(resource.TestInput, vals) },
+	}
+}
+
+func newTestAnswerCache(commonCache *commonCache) *cacheGetter {
+	return &cacheGetter{
+		Cache:  commonCache,
+		keyGen: func(vals ...uint64) cacheKey { return testKeyGen(resource.TestAnswer, vals) },
 	}
 }
 
 func problemIDKeyGen(resource resource.Type, vals []uint64) cacheKey {
 	if len(vals) != 1 {
-		logger.PanicLevel(3, "wrong usage of storageconn cache, can not get problem %s for id %v, too many ids passed", resource.String(), vals)
+		logger.PanicLevel(3, "wrong usage of storage cache, can not get problem %s for id %v, too many ids passed", resource.String(), vals)
 	}
 	key := cacheKey{
 		Resource:  resource,
@@ -113,11 +109,23 @@ func problemIDKeyGen(resource resource.Type, vals []uint64) cacheKey {
 
 func submitKeyGen(resource resource.Type, vals []uint64) cacheKey {
 	if len(vals) != 1 {
-		logger.PanicLevel(3, "wrong usage of storageconn cache, can not get submit %s for id %v, too many ids passed", resource.String(), vals)
+		logger.PanicLevel(3, "wrong usage of storage cache, can not get submit %s for id %v, too many ids passed", resource.String(), vals)
 	}
 	key := cacheKey{
 		Resource: resource,
 		SubmitID: vals[0],
+	}
+	return key
+}
+
+func testKeyGen(resource resource.Type, vals []uint64) cacheKey {
+	if len(vals) != 2 {
+		logger.PanicLevel(2, "wrong usage of storage cache, can not get problem test for ids %v, exactly 2 ids should be passed", vals)
+	}
+	key := cacheKey{
+		Resource:  resource,
+		ProblemID: vals[0],
+		TestID:    vals[1],
 	}
 	return key
 }

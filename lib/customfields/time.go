@@ -1,6 +1,7 @@
 package customfields
 
 import (
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"gopkg.in/yaml.v3"
@@ -21,7 +22,7 @@ func (t *TimeLimit) Val() uint64 {
 }
 
 func (t *TimeLimit) MarshalYAML() (interface{}, error) {
-	return nil, fmt.Errorf("TimeLimit does not support marshalling")
+	return t.String(), nil
 }
 
 func (t *TimeLimit) UnmarshalYAML(node *yaml.Node) error {
@@ -33,7 +34,7 @@ func (t *TimeLimit) UnmarshalYAML(node *yaml.Node) error {
 }
 
 func (t *TimeLimit) MarshalJSON() ([]byte, error) {
-	return nil, fmt.Errorf("TimeLimit does not support marshalling")
+	return json.Marshal(t.String())
 }
 
 func (t *TimeLimit) UnmarshalJSON(data []byte) error {
@@ -44,8 +45,24 @@ func (t *TimeLimit) UnmarshalJSON(data []byte) error {
 	return t.FromStr(s)
 }
 
+func (t *TimeLimit) Scan(value interface{}) error {
+	str, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("TimeLimit must be a string")
+	}
+	return t.FromStr(str)
+}
+
+func (t *TimeLimit) Value() (driver.Value, error) {
+	return t.String(), nil
+}
+
+func (t *TimeLimit) GormDataType() string {
+	return "string"
+}
+
 func (t *TimeLimit) FromStr(s string) error {
-	num, suf, err := sepStr(s)
+	num, suf, err := separateStr(s)
 	if err != nil {
 		return err
 	}

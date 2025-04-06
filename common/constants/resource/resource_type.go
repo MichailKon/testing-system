@@ -8,8 +8,12 @@ const (
 	SourceCode Type = iota
 	CompiledBinary
 	CompileOutput
-	Test
+	TestInput
+	TestAnswer
+	TestOutput
+	TestStderr
 	Checker
+	CheckerOutput
 	Interactor
 	// Will be increased
 )
