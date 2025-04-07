@@ -49,7 +49,8 @@ func InitTestingSystem(configPath string) *TestingSystem {
 
 	ts.MasterConn = masterconn.NewConnector(ts.Config.MasterConnection)
 	ts.StorageConn = storageconn.NewConnector(ts.Config.StorageConnection)
-	ts.InvokerConn = invokerconn.NewConnector(ts.Config.InvokerConnection)
+	// TODO!!!
+	//ts.InvokerConn = invokerconn.NewConnector(ts.Config.InvokerConnection)
 
 	return ts
 }

@@ -17,20 +17,24 @@ When the submission status is finalized, it returns to the Master, which saves t
 */
 
 type IQueue interface {
-	// Processes a new submission
+	// Submit processes a new submission; you SHOULD NOT submit the same pointer twice
 	Submit(submission *SubmissionHolder) error
 
-	// Returns not nil if submission status is finalized
+	// JobCompleted returns not nil if submission status is finalized
 	JobCompleted(job *masterconn.InvokerJobResult) (submission *SubmissionHolder, err error)
 
-	// Puts job back into the queue in case of failure
+	// RescheduleJob puts job back into the queue in case of failure
 	RescheduleJob(jobID string) error
 
-	// Returns a new job or nil if no jobs are queued
+	// NextJob returns a new job or nil if no jobs to do; each job should be completed
 	NextJob() *invokerconn.Job
 }
 
 func NewQueue(ts *common.TestingSystem) IQueue {
-	// TODO
-	return nil
+	return &Queue{
+		ts:                       ts,
+		stringUUIDToInfo:         make(map[string]*taskInfo),
+		submissionHolderToJobIDs: make(map[*SubmissionHolder][]string),
+		givenTasks:               NewSet[string](),
+	}
 }

@@ -14,10 +14,10 @@ func NewDB(config config.DBConfig) (*gorm.DB, error) {
 		slog.Error("Can't open database", "dsn", config.Dsn, "err", err)
 		return nil, err
 	}
-	if err = db.AutoMigrate(&models.TestingResult{}); err != nil {
-		slog.Error("Can't migrate TestingResult", "err", err)
-		return nil, err
-	}
+	//if err = db.AutoMigrate(&models.TestingResult{}); err != nil {
+	//	slog.Error("Can't migrate TestingResult", "err", err)
+	//	return nil, err
+	//}
 	if err = db.AutoMigrate(&models.Problem{}); err != nil {
 		slog.Error("Can't migrate Problem", "err", err)
 		return nil, err

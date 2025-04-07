@@ -11,7 +11,7 @@ const (
 	//PE Verdict = "PE" // Presentation error, we will treat it as Wrong Answer
 
 	RT Verdict = "RT" // Runtime error
-	ML Verdict = "PE" // Memory limit
+	ML Verdict = "ML" // Memory limit
 	TL Verdict = "TL" // Time limit
 	WL Verdict = "WL" // Wall time limit
 	SE Verdict = "SE" // Security violation
