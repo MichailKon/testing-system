@@ -29,7 +29,7 @@ type compileJob struct {
 	compileConfig *sandbox.ExecuteConfig
 	compileResult *sandbox.RunResult
 
-	wg *sync.WaitGroup
+	wg sync.WaitGroup
 }
 
 func (i *Invoker) Compile(tester *JobExecutor, job *Job) {
@@ -53,7 +53,6 @@ func (i *Invoker) Compile(tester *JobExecutor, job *Job) {
 	}
 	logger.Trace("Prepared compilation of submit %d, job %s", job.Submission.ID, job.ID)
 
-	j.wg = new(sync.WaitGroup)
 	j.wg.Add(1)
 	i.RunQueue <- j.Execute
 	j.wg.Wait()

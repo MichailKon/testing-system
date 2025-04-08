@@ -3,6 +3,7 @@ package customfields
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"gopkg.in/yaml.v3"
 )
@@ -39,19 +40,20 @@ func (m *MemoryLimit) UnmarshalJSON(data []byte) error {
 }
 
 func (m *MemoryLimit) Scan(value interface{}) error {
-	str, ok := value.(string)
+	val, ok := value.(int64)
 	if !ok {
-		return fmt.Errorf("MemoryLimit must be a string")
+		return errors.New("MemoryLimit must be int64")
 	}
-	return m.FromStr(str)
+	*m = MemoryLimit(val)
+	return nil
 }
 
 func (m *MemoryLimit) Value() (driver.Value, error) {
-	return m.String(), nil
+	return int64(*m), nil
 }
 
 func (m *MemoryLimit) GormDataType() string {
-	return "string"
+	return "int64" // uint64 not supported by goorm
 }
 
 func (m *MemoryLimit) FromStr(s string) error {

@@ -46,19 +46,20 @@ func (t *TimeLimit) UnmarshalJSON(data []byte) error {
 }
 
 func (t *TimeLimit) Scan(value interface{}) error {
-	str, ok := value.(string)
+	val, ok := value.(int64)
 	if !ok {
-		return fmt.Errorf("TimeLimit must be a string")
+		return fmt.Errorf("TimeLimit must be a int64")
 	}
-	return t.FromStr(str)
+	*t = TimeLimit(val)
+	return nil
 }
 
 func (t *TimeLimit) Value() (driver.Value, error) {
-	return t.String(), nil
+	return int64(*t), nil
 }
 
 func (t *TimeLimit) GormDataType() string {
-	return "string"
+	return "int64" // uint64 not supported by goorm
 }
 
 func (t *TimeLimit) FromStr(s string) error {

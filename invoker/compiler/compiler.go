@@ -47,9 +47,6 @@ func NewCompiler(ts *common.TestingSystem) *Compiler {
 			l.Limits = languageConfig.DefaultLimits
 		} else {
 			fillInCompileExecuteConfig(l.Limits)
-			if err != nil {
-				logger.Panic("Can not parse limits for compilation of %s, error: %s", name, err.Error())
-			}
 		}
 		if l.TemplateName == nil {
 			l.TemplateName = pointer.String(name + ".sh.tmpl")

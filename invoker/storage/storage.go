@@ -79,7 +79,7 @@ func setRequestBaseFolder(request *storageconn.Request, parent string) {
 	case resource.Checker, resource.Interactor:
 		request.BaseFolder = filepath.Join(request.BaseFolder, strconv.FormatUint(request.ProblemID, 10))
 	case resource.TestInput, resource.TestAnswer:
-		request.BaseFolder = filepath.Join(request.BaseFolder, fmt.Sprintf("%d-%d", request.SubmitID, request.TestID))
+		request.BaseFolder = filepath.Join(request.BaseFolder, fmt.Sprintf("%d-%d", request.ProblemID, request.TestID))
 	default:
 		logger.Panic("Can not fill base folder for storageconn request of type %v", request.Resource)
 	}

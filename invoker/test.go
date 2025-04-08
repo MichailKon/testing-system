@@ -43,7 +43,7 @@ type testJob struct {
 
 	checkerOutputReader io.Reader
 
-	wg *sync.WaitGroup
+	wg sync.WaitGroup
 }
 
 func (i *Invoker) Test(tester *JobExecutor, job *Job) {
@@ -67,7 +67,6 @@ func (i *Invoker) Test(tester *JobExecutor, job *Job) {
 	}
 	logger.Trace("Prepared running of submit %d on problem %d test %d job %s", job.Submission.ID, job.Problem.ID, job.Test, job.ID)
 
-	j.wg = new(sync.WaitGroup)
 	j.wg.Add(1)
 	i.RunQueue <- j.RunOnTest
 	j.wg.Wait()
@@ -91,7 +90,7 @@ func (i *Invoker) Test(tester *JobExecutor, job *Job) {
 		j.invoker.FailJob(job, "can not prepare check of job %s, error: %s", job.ID, err.Error())
 		return
 	}
-	logger.Trace("Prepared checking of submit %d on problem %d test %d job %s", job.Submission.ID, job.Problem, job.Test, job.ID, job.ID)
+	logger.Trace("Prepared checking of submit %d on problem %d test %d job %s", job.Submission.ID, job.Problem, job.Test, job.ID)
 
 	j.wg.Add(1)
 	i.RunQueue <- j.RunChecker
@@ -321,7 +320,6 @@ func (j *testJob) ParseCheckerOutput() {
 	case "fail":
 		j.runResult.Verdict = verdict.CF
 	case "points", "relative-scoring":
-		j.runResult.Verdict = verdict.PT
 		if checkerResult.Points == nil {
 			j.runResult.Verdict = verdict.CF
 			j.checkerOutputReader = strings.NewReader(fmt.Sprintf("Checker exited with exit code %d and verdict %s, but no points specified", j.checkResult.Statistics.ExitCode, checkerResult.Outcome))
