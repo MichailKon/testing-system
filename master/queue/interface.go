@@ -31,10 +31,5 @@ type IQueue interface {
 }
 
 func NewQueue(ts *common.TestingSystem) IQueue {
-	return &Queue{
-		ts:                       ts,
-		stringUUIDToInfo:         make(map[string]*taskInfo),
-		submissionHolderToJobIDs: make(map[*SubmissionHolder][]string),
-		givenTasks:               NewSet[string](),
-	}
+	return &Queue{}
 }
