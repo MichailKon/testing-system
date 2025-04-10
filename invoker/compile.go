@@ -36,7 +36,11 @@ func (i *Invoker) Compile(tester *JobExecutor, job *Job) {
 	logger.Trace("Starting compilation of submit %d, job %s", job.Submission.ID, job.ID)
 	defer job.DeferFunc()
 
-	tester.Sandbox.Init()
+	err := tester.Sandbox.Init()
+	if err != nil {
+		logger.Error("Prepare sandbox %s for job %s error: %v", tester.Sandbox.Dir(), job.ID, err)
+		i.FailJob(job, "can not prepare sandbox for job %s, error: %s", job.ID, err)
+	}
 	defer tester.Sandbox.Cleanup()
 
 	j := compileJob{
@@ -45,7 +49,7 @@ func (i *Invoker) Compile(tester *JobExecutor, job *Job) {
 		job:     job,
 	}
 
-	err := j.Prepare()
+	err = j.Prepare()
 	if err != nil {
 		logger.Error("Compilation of submit %d in job %s prepare error: %s", job.Submission.ID, job.ID, err.Error())
 		j.invoker.FailJob(job, "can not prepare compilation of job %s, error: %s", job.ID, err.Error())

@@ -1,7 +1,7 @@
 package sandbox
 
 type ISandbox interface {
-	Init()
+	Init() error
 	Dir() string
 	Run(config *ExecuteConfig) *RunResult
 	Cleanup()

@@ -3,6 +3,7 @@ package invoker
 import (
 	"encoding/xml"
 	"fmt"
+	"golang.org/x/net/html/charset"
 	"io"
 	"os"
 	"path/filepath"
@@ -50,7 +51,11 @@ func (i *Invoker) Test(tester *JobExecutor, job *Job) {
 	logger.Trace("Starting testing of submit %d, test %d, job %s", job.Submission.ID, job.Test, job.ID)
 	defer job.DeferFunc()
 
-	tester.Sandbox.Init()
+	err := tester.Sandbox.Init()
+	if err != nil {
+		logger.Error("Prepare sandbox %s for job %s error: %v", tester.Sandbox.Dir(), job.ID, err)
+		i.FailJob(job, "can not prepare sandbox for job %s, error: %s", job.ID, err)
+	}
 	defer tester.Sandbox.Cleanup()
 
 	j := testJob{
@@ -59,10 +64,10 @@ func (i *Invoker) Test(tester *JobExecutor, job *Job) {
 		job:     job,
 	}
 
-	err := j.PrepareRun()
+	err = j.PrepareRun()
 	if err != nil {
 		logger.Error("Prepare running of submit %v on problem %v test %d job %s fail, error: %s",
-			job.Submission.ID, job.Problem, job.Test, job.ID, err.Error())
+			job.Submission.ID, job.Problem.ID, job.Test, job.ID, err.Error())
 		j.invoker.FailJob(job, "can not prepare run of job %s, error: %s", job.ID, err.Error())
 		return
 	}
@@ -224,7 +229,7 @@ func (j *testJob) PrepareCheck() error {
 	}
 	j.checkConfig.Command = CheckerFile
 
-	testAnswer, err := j.invoker.Storage.TestAnswer.Get(uint64(j.job.Problem.ID))
+	testAnswer, err := j.invoker.Storage.TestAnswer.Get(uint64(j.job.Problem.ID), j.job.Test)
 	if err != nil {
 		return fmt.Errorf("can not get test answer, error: %s", err.Error())
 	}
@@ -313,7 +318,7 @@ func (j *testJob) UploadOutput(fileName string, resourceType resource.Type) erro
 }
 
 func (j *testJob) ParseCheckerOutput() {
-	checkResultData, err := os.ReadFile(filepath.Join(j.tester.Sandbox.Dir(), CheckResultFile))
+	checkResultReader, err := os.Open(filepath.Join(j.tester.Sandbox.Dir(), CheckResultFile))
 	if err != nil {
 		j.runResult.Verdict = verdict.CF
 		j.checkerOutputReader = strings.NewReader(
@@ -321,14 +326,19 @@ func (j *testJob) ParseCheckerOutput() {
 				j.checkResult.Statistics.ExitCode))
 		return
 	}
+	defer checkResultReader.Close()
+
 	var checkerResult CheckerResultXML
-	err = xml.Unmarshal(checkResultData, &checkerResult)
+	xmlReader := xml.NewDecoder(checkResultReader)
+	xmlReader.CharsetReader = charset.NewReaderLabel
+	err = xmlReader.Decode(&checkerResult)
 	if err != nil {
 		j.runResult.Verdict = verdict.CF
 		j.checkerOutputReader = strings.NewReader(
 			fmt.Sprintf("Can not parse checker result xml file in appes mode: %s", err.Error()))
 		return
 	}
+
 	j.checkerOutputReader = strings.NewReader(checkerResult.Value)
 	switch checkerResult.Outcome {
 	case "accepted":

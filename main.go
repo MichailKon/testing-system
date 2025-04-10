@@ -14,7 +14,7 @@ func main() {
 	if ts.Config.Invoker != nil {
 		err := invoker.SetupInvoker(ts)
 		if err != nil {
-			logger.Panic(err.Error())
+			logger.Panic("Can not setup invoker, error: %v", err.Error())
 		}
 	} else {
 		logger.Info("Invoker is not configured, skipping invoker component")

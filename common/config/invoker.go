@@ -5,6 +5,9 @@ type InvokerConfig struct {
 	Sandboxes uint64 `yaml:"Sandboxes"`
 	QueueSize uint64 `yaml:"QueueSize"`
 
+	SandboxType     string `yaml:"SandboxType"`
+	SandboxHomePath string `yaml:"SandboxHomePath"`
+
 	CacheSize uint64 `yaml:"CacheSize"`
 	CachePath string `yaml:"CachePath"`
 
@@ -15,7 +18,7 @@ type InvokerConfig struct {
 	CheckerLimits *RunConfig `yaml:"CheckerLimits,omitempty"`
 }
 
-func fillInInvokerConfig(config *InvokerConfig) {
+func FillInInvokerConfig(config *InvokerConfig) {
 	if config.Threads == 0 {
 		config.Threads = 1
 	}
@@ -25,6 +28,17 @@ func fillInInvokerConfig(config *InvokerConfig) {
 	}
 	if config.QueueSize == 0 {
 		config.QueueSize = 10
+	}
+	if config.SandboxType == "" {
+		config.SandboxType = "simple"
+	}
+	if config.SandboxHomePath == "" {
+		switch config.SandboxType {
+		case "simple":
+			panic("No sandbox home path specified")
+		default:
+			// TODO: Support other sandbox types
+		}
 	}
 	if len(config.CachePath) == 0 {
 		panic("No invoker cache path specified")

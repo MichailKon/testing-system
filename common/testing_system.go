@@ -51,7 +51,6 @@ func InitTestingSystem(configPath string) *TestingSystem {
 	ts.MasterConn = masterconn.NewConnector(ts.Config.MasterConnection)
 	ts.StorageConn = storageconn.NewConnector(ts.Config.StorageConnection)
 	// TODO!!!
-	//ts.InvokerConn = invokerconn.NewConnector(ts.Config.InvokerConnection)
 
 	return ts
 }
@@ -108,6 +107,7 @@ func (ts *TestingSystem) Go(f func()) {
 }
 
 func (ts *TestingSystem) runProcess(f func()) {
+	ts.stopWG.Add(1)
 	defer func() {
 		v := recover()
 		if v != nil {

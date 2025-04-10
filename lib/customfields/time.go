@@ -85,10 +85,7 @@ func (t *Time) FromStr(s string) error {
 	return nil
 }
 
-func (t *Time) String() string {
-	if t == nil {
-		return "<nil>"
-	}
+func (t Time) String() string {
 	v := t.Val()
 	suf := "ns"
 	if v%1000 == 0 {

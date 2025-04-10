@@ -9,7 +9,7 @@ import (
 )
 
 type ExecuteConfig struct {
-	config.RunConfig
+	config.RunConfig `yaml:",inline"`
 
 	Command string   `yaml:"-"`
 	Args    []string `yaml:"-"` // Except zero argument (command name itself)
