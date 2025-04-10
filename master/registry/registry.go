@@ -59,14 +59,15 @@ func (r *InvokerRegistry) rescheduleJobIfNeeded(jobID string, epoch int) {
 	}
 
 	invoker.Mutex.Lock()
-	defer invoker.Mutex.Unlock()
-
 	jobType := invoker.GetJobType(jobID)
 	if jobType != NoReplyJob {
+		invoker.Mutex.Unlock()
 		return
 	}
 
 	invoker.RemoveJob(jobID)
+	invoker.Mutex.Unlock()
+
 	r.queue.RescheduleJob(jobID)
 
 	r.mutex.Lock()
