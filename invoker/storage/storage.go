@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"github.com/xorcare/pointer"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -15,13 +16,14 @@ import (
 type InvokerStorage struct {
 	ts *common.TestingSystem
 
-	cache *cache.LRUSizeCache[cacheKey, storageconn.ResponseFiles]
+	cache *commonCache
 
 	Source     *cacheGetter
 	Binary     *cacheGetter
 	Checker    *cacheGetter
 	Interactor *cacheGetter
-	Test       *cacheGetter
+	TestInput  *cacheGetter
+	TestAnswer *cacheGetter
 }
 
 func NewInvokerStorage(ts *common.TestingSystem) *InvokerStorage {
@@ -34,23 +36,22 @@ func NewInvokerStorage(ts *common.TestingSystem) *InvokerStorage {
 	if err != nil {
 		logger.Panic(err.Error())
 	}
-	s.cache = cache.NewLRUSizeCache[cacheKey, storageconn.ResponseFiles](
+	s.cache = cache.NewLRUSizeCache[cacheKey, string](
 		ts.Config.Invoker.CacheSize,
 		s.getFiles,
-		func(key cacheKey, files *storageconn.ResponseFiles) {
-			files.CleanUp()
-		},
+		cleanUpFile,
 	)
 	s.Source = newSourceCache(s.cache)
 	s.Binary = newBinaryCache(s.cache)
 	s.Checker = newCheckerCache(s.cache)
 	s.Interactor = newInteractorCache(s.cache)
-	s.Test = newTestCache(s.cache)
+	s.TestInput = newTestInputCache(s.cache)
+	s.TestAnswer = newTestAnswerCache(s.cache)
 	logger.Info("Created invoker storage")
 	return s
 }
 
-func (s *InvokerStorage) getFiles(key cacheKey) (*storageconn.ResponseFiles, error, uint64) {
+func (s *InvokerStorage) getFiles(key cacheKey) (*string, error, uint64) {
 	request := &storageconn.Request{
 		Resource:  key.Resource,
 		ProblemID: key.ProblemID,
@@ -62,7 +63,11 @@ func (s *InvokerStorage) getFiles(key cacheKey) (*storageconn.ResponseFiles, err
 	if files.Error != nil {
 		return nil, files.Error, 0
 	} else {
-		return files, nil, files.Size
+		file, ok := files.File()
+		if !ok {
+			return nil, fmt.Errorf("file not exists"), 0
+		}
+		return pointer.String(filepath.Join(request.BaseFolder, file)), nil, files.Size
 	}
 }
 
@@ -73,9 +78,19 @@ func setRequestBaseFolder(request *storageconn.Request, parent string) {
 		request.BaseFolder = filepath.Join(request.BaseFolder, strconv.FormatUint(request.SubmitID, 10))
 	case resource.Checker, resource.Interactor:
 		request.BaseFolder = filepath.Join(request.BaseFolder, strconv.FormatUint(request.ProblemID, 10))
-	case resource.Test:
-		request.BaseFolder = filepath.Join(request.BaseFolder, fmt.Sprintf("%d-%d", request.SubmitID, request.TestID))
+	case resource.TestInput, resource.TestAnswer:
+		request.BaseFolder = filepath.Join(request.BaseFolder, fmt.Sprintf("%d-%d", request.ProblemID, request.TestID))
 	default:
 		logger.Panic("Can not fill base folder for storageconn request of type %v", request.Resource)
+	}
+}
+
+func cleanUpFile(key cacheKey, file *string) {
+	if file == nil {
+		return
+	}
+	err := os.RemoveAll(filepath.Dir(*file))
+	if err != nil {
+		logger.Error("can not clean up file %s, key: %+v, error: %s", *file, key, err)
 	}
 }

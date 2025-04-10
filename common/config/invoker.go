@@ -11,6 +11,8 @@ type InvokerConfig struct {
 	SaveOutputHead *uint64 `yaml:"SaveOutputHead,omitempty"`
 
 	CompilerConfigsFolder string `yaml:"CompilerConfigsFolder"`
+
+	CheckerLimits *RunConfig `yaml:"CheckerLimits,omitempty"`
 }
 
 func fillInInvokerConfig(config *InvokerConfig) {
@@ -30,4 +32,12 @@ func fillInInvokerConfig(config *InvokerConfig) {
 	if config.CacheSize == 0 {
 		panic("No invoker cache size specified")
 	}
+	if len(config.CompilerConfigsFolder) == 0 {
+		panic("No invoker compiler folder specified")
+	}
+
+	if config.CheckerLimits == nil {
+		config.CheckerLimits = &RunConfig{}
+	}
+	fillInDefaultCheckerRunConfig(config.CheckerLimits)
 }

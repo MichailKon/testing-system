@@ -2,6 +2,7 @@ package invoker
 
 import (
 	"fmt"
+	"slices"
 	"testing_system/common/connectors/invokerconn"
 	"testing_system/common/connectors/masterconn"
 	"testing_system/common/constants/verdict"
@@ -16,7 +17,15 @@ type Job struct {
 	Submission *models.Submission `json:"-"`
 	Problem    *models.Problem    `json:"-"`
 
-	// TODO: Add invoker state
+	Defers []func() `json:"-"`
+}
+
+func (j *Job) DeferFunc() {
+	slices.Reverse(j.Defers)
+	for _, f := range j.Defers {
+		f()
+	}
+	j.Defers = nil
 }
 
 func (i *Invoker) FailJob(j *Job, errf string, args ...interface{}) {
@@ -40,6 +49,8 @@ func (i *Invoker) SuccessJob(j *Job, runResult *sandbox.RunResult) {
 	request := &masterconn.InvokerJobResult{
 		JobID:         j.ID,
 		Verdict:       runResult.Verdict,
+		Points:        runResult.Points,
+		Statistics:    runResult.Statistics,
 		InvokerStatus: i.getStatus(),
 	}
 	err := i.TS.MasterConn.InvokerJobResult(request)

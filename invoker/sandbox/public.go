@@ -3,7 +3,7 @@ package sandbox
 type ISandbox interface {
 	Init()
 	Dir() string
-	Run(process string, args []string, config *RunConfig) *RunResult
+	Run(config *ExecuteConfig) *RunResult
 	Cleanup()
 	Delete()
 }

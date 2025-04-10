@@ -13,8 +13,8 @@ type Language struct {
 
 	TemplateValues map[string]interface{} `yaml:"TemplateValues"`
 
-	TemplateName *string            `yaml:"Template,omitempty"`
-	Limits       *sandbox.RunConfig `yaml:"Limits,omitempty"`
+	TemplateName *string                `yaml:"Template,omitempty"`
+	Limits       *sandbox.ExecuteConfig `yaml:"Limits,omitempty"`
 
 	Template *template.Template `yaml:"-"`
 }
@@ -32,4 +32,32 @@ func (l *Language) GenerateScript(source string, binary string) ([]byte, error) 
 		return nil, fmt.Errorf("error while creating compile script for language %s, error: %s", l.Name, err.Error())
 	}
 	return script.Bytes(), nil
+}
+
+func (l *Language) GenerateExecuteConfig(stdout *bytes.Buffer) *sandbox.ExecuteConfig {
+	c := *l.Limits
+	c.Stdout = stdout
+	c.Stderr = stdout
+	return &c
+}
+
+func fillInCompileExecuteConfig(c *sandbox.ExecuteConfig) {
+	if c.TimeLimit == 0 {
+		c.TimeLimit.FromStr("5s")
+	}
+	if c.WallTimeLimit == 0 {
+		c.WallTimeLimit.FromStr("15s")
+	}
+	if c.MemoryLimit == 0 {
+		c.MemoryLimit.FromStr("1g")
+	}
+	if c.MaxOpenFiles == 0 {
+		c.MaxOpenFiles = 1000
+	}
+	if c.MaxThreads == 0 {
+		c.MaxThreads = 64
+	}
+	if c.MaxOutputSize == 0 {
+		c.MaxOutputSize.FromStr("1g")
+	}
 }
