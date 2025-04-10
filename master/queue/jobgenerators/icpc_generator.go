@@ -3,7 +3,6 @@ package jobgenerators
 import (
 	"fmt"
 	"github.com/google/uuid"
-	"slices"
 	"sync"
 	"testing_system/common/connectors/invokerconn"
 	"testing_system/common/connectors/masterconn"
@@ -11,191 +10,177 @@ import (
 	"testing_system/common/db/models"
 )
 
+type state int
+
+const (
+	compilationNotStarted state = iota
+	compilationStarted
+	compilationFinished
+)
+
 type ICPCGenerator struct {
-	problem            *models.Problem
-	mutex              sync.RWMutex
-	jobs               []*GeneratorJob
-	blockedJobs        []*GeneratorJob
-	givenJobs          map[string]*GeneratorJob // given, but completed jobs
-	hasFailedJobs      bool
-	isTestingCompleted bool
+	mutex       sync.Mutex
+	submission  *models.Submission
+	problem     *models.Problem
+	state       state
+	hasFails    bool
+	givenJobs   map[string]*invokerconn.Job
+	futureTests []uint64
 }
 
-func (i *ICPCGenerator) GivenJobs() map[string]*GeneratorJob {
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
-	return i.givenJobs
-}
-
-func (i *ICPCGenerator) CanGiveJob() bool {
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
-	return len(i.jobs) > 0
-}
-
-func (i *ICPCGenerator) IsTestingCompleted() bool {
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
-	return i.isTestingCompleted
-}
-
-func (i *ICPCGenerator) Score() (float64, error) {
-	if !i.IsTestingCompleted() {
-		return 0, fmt.Errorf("testing is not completed")
+// finalizeResults must be done with acquired mutex
+func (i *ICPCGenerator) finalizeResults() {
+	setUnknown := false
+	for j := range i.submission.TestResults {
+		if setUnknown {
+			i.submission.TestResults[j].Verdict = verdict.UK
+			continue
+		}
+		if i.submission.TestResults[j].Verdict == verdict.OK || i.submission.TestResults[j].Verdict == verdict.UK {
+			continue
+		}
+		setUnknown = true
+		i.submission.Verdict = i.submission.TestResults[j].Verdict
 	}
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
-	if i.hasFailedJobs {
-		return 0, nil
-	} else {
-		return 1, nil
+	if !setUnknown {
+		i.submission.Score = 1
+		i.submission.Verdict = verdict.OK
 	}
 }
 
-func (i *ICPCGenerator) RescheduleJob(jobID string) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (i *ICPCGenerator) NextJob() (*GeneratorJob, error) {
+func (i *ICPCGenerator) RescheduleJob(jobID string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
-	if len(i.jobs) == 0 {
-		return nil, fmt.Errorf("can't give any job")
+	job, ok := i.givenJobs[jobID]
+	if !ok {
+		return fmt.Errorf("job %s not found", jobID)
 	}
-	job := i.jobs[0]
-	i.jobs = i.jobs[1:]
-	i.givenJobs[job.InvokerJob.ID] = job
+	newUUID, err := uuid.NewV7()
+	if err != nil {
+		return err
+	}
+
+	if job.Type == invokerconn.CompileJob {
+		i.state = compilationNotStarted
+	}
+
+	i.givenJobs[newUUID.String()] = job
+	delete(i.givenJobs, jobID)
+	return nil
+}
+
+func (i *ICPCGenerator) NextJob() (*invokerconn.Job, error) {
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+	if i.state == compilationFinished && len(i.futureTests) == 0 {
+		return nil, fmt.Errorf("no more jobs")
+	}
+	if i.state == compilationStarted {
+		return nil, fmt.Errorf("no more jobs (compiling)")
+	}
+	UUID, err := uuid.NewV7()
+	if err != nil {
+		return nil, err
+	}
+	job := &invokerconn.Job{
+		ID:       UUID.String(),
+		SubmitID: i.submission.ID,
+	}
+	if i.state == compilationNotStarted {
+		job.Type = invokerconn.CompileJob
+		i.state = compilationStarted
+	} else {
+		if i.hasFails {
+			return nil, fmt.Errorf("no more jobs")
+		}
+		job.Test = i.futureTests[0]
+		i.futureTests = i.futureTests[1:]
+		job.Type = invokerconn.TestJob
+	}
+	i.givenJobs[job.ID] = job
 	return job, nil
 }
 
-// jobCompletedSuccessfully must be done with acquired mutex
-func (i *ICPCGenerator) jobCompletedSuccessfully(job *GeneratorJob) error {
-	for _, nextJobID := range job.requiredBy {
-		nextJobInd := slices.IndexFunc(i.blockedJobs, func(job *GeneratorJob) bool {
-			return job.InvokerJob.ID == nextJobID
-		})
-		if nextJobInd == -1 {
-			return fmt.Errorf("job %v is blocked by %v, but is not in blocked list",
-				nextJobID, job.InvokerJob.ID)
-		}
-		nextJob := i.blockedJobs[nextJobInd]
-		curJobInd := slices.Index(nextJob.blockedBy, job.InvokerJob.ID)
-		if curJobInd == -1 {
-			return fmt.Errorf("job %v is blocked by %v, but the first one doesn't contain the latter one",
-				nextJob.InvokerJob.ID, job.InvokerJob.ID)
-		}
-		nextJob.blockedBy[curJobInd] = nextJob.blockedBy[len(nextJob.blockedBy)-1]
-		nextJob.blockedBy = nextJob.blockedBy[:len(nextJob.blockedBy)-1]
-		if len(nextJob.blockedBy) == 0 {
-			i.jobs = append(i.jobs, nextJob)
-			i.blockedJobs = slices.DeleteFunc(i.blockedJobs, func(job *GeneratorJob) bool {
-				return job.InvokerJob.ID == nextJobID
-			})
-		}
-	}
-	job.requiredBy = nil
-	if len(i.givenJobs) == 0 && len(i.jobs) == 0 && len(i.blockedJobs) == 0 {
-		i.isTestingCompleted = true
-	}
-	return nil
-}
-
-// jobFailed must be done with acquired mutex
-func (i *ICPCGenerator) jobFailed() error {
-	i.isTestingCompleted = true
-	i.hasFailedJobs = true
-	i.jobs = nil
-	i.blockedJobs = nil
-	return nil
-}
-
 // compileJobCompleted must be done with acquired mutex
-func (i *ICPCGenerator) compileJobCompleted(job *GeneratorJob, result *masterconn.InvokerJobResult) error {
+func (i *ICPCGenerator) compileJobCompleted(job *invokerconn.Job, result *masterconn.InvokerJobResult) (*models.Submission, error) {
+	if job.Type != invokerconn.CompileJob {
+		return nil, fmt.Errorf("job type %s is not compile job", job.ID)
+	}
 	switch result.Verdict {
 	case verdict.CD:
-		return i.jobCompletedSuccessfully(job)
+		i.state = compilationFinished
+		return nil, nil
 	case verdict.CE:
-		return i.jobFailed()
+		i.submission.Verdict = result.Verdict
+		return i.submission, nil
 	default:
-		return fmt.Errorf("unknown verdict for compilation completed: %v", result.Verdict)
+		return nil, fmt.Errorf("unknown verdict for compilation completed: %v", result.Verdict)
 	}
 }
 
 // testJobCompleted must be done with acquired mutex
-func (i *ICPCGenerator) testJobCompleted(job *GeneratorJob, result *masterconn.InvokerJobResult) error {
+func (i *ICPCGenerator) testJobCompleted(job *invokerconn.Job, result *masterconn.InvokerJobResult) (*models.Submission, error) {
+	i.submission.TestResults[job.Test-1].Verdict = result.Verdict
 	switch result.Verdict {
 	case verdict.OK:
-		return i.jobCompletedSuccessfully(job)
+		if len(i.givenJobs) == 0 && (len(i.futureTests) == 0 || i.hasFails) {
+			i.finalizeResults()
+			return i.submission, nil
+		}
+		return nil, nil
 	case verdict.PT, verdict.WA, verdict.PE, verdict.RT, verdict.ML, verdict.TL, verdict.WL, verdict.SE, verdict.CF:
-		return i.jobFailed()
+		i.hasFails = true
+		if len(i.givenJobs) == 0 {
+			i.finalizeResults()
+			return i.submission, nil
+		}
+		return nil, nil
 	default:
-		return fmt.Errorf("unknown verdict for testing completed: %v", result.Verdict)
+		return nil, fmt.Errorf("unknown verdict for testing completed: %v", result.Verdict)
 	}
 }
 
-func (i *ICPCGenerator) JobCompleted(result *masterconn.InvokerJobResult) error {
+func (i *ICPCGenerator) JobCompleted(result *masterconn.InvokerJobResult) (*models.Submission, error) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 	job, ok := i.givenJobs[result.JobID]
 	if !ok {
-		return fmt.Errorf("job %v does not exist", result.JobID)
+		return nil, fmt.Errorf("job not found")
 	}
 	delete(i.givenJobs, result.JobID)
-	switch job.InvokerJob.Type {
+
+	switch job.Type {
 	case invokerconn.CompileJob:
 		return i.compileJobCompleted(job, result)
 	case invokerconn.TestJob:
 		return i.testJobCompleted(job, result)
 	default:
-		return fmt.Errorf("unknown job type %d", job.InvokerJob.Type)
+		return nil, fmt.Errorf("unknown job type for ICPC problem: %v", job.Type)
 	}
 }
 
-func newICPCGenerator(problem *models.Problem, submitID uint) (Generator, error) {
+func newICPCGenerator(problem *models.Problem, submission *models.Submission) (Generator, error) {
 	if problem.ProblemType != models.ProblemType_ICPC {
-		return nil, fmt.Errorf("problem type is not ICPC")
+		return nil, fmt.Errorf("problem %v is not ICPC", problem.ID)
 	}
-	// prepare compile job
-	compileJob := &GeneratorJob{
-		InvokerJob: nil,
-		blockedBy:  nil,
-		requiredBy: make([]string, 0),
-	}
-	compileJobUUID, err := uuid.NewV7()
-	if err != nil {
-		return nil, err
-	}
-	compileJob.InvokerJob = &invokerconn.Job{
-		ID:       compileJobUUID.String(),
-		SubmitID: submitID,
-		Type:     invokerconn.CompileJob,
-	}
-	// prepare testing jobs
-	testingJobs := make([]*GeneratorJob, 0)
+	futureTests := make([]uint64, 0, problem.TestsNumber)
+	testResults := make([]models.TestResult, 0, problem.TestsNumber)
 	for i := range problem.TestsNumber {
-		testJobUUID, err := uuid.NewV7()
-		if err != nil {
-			return nil, err
-		}
-		compileJob.requiredBy = append(compileJob.requiredBy, testJobUUID.String())
-		testingJobs = append(testingJobs, &GeneratorJob{
-			InvokerJob: &invokerconn.Job{
-				ID:       testJobUUID.String(),
-				SubmitID: submitID,
-				Type:     invokerconn.TestJob,
-				Test:     i + 1,
-			},
-			blockedBy:  []string{compileJob.InvokerJob.ID},
-			requiredBy: nil,
+		futureTests = append(futureTests, i+1)
+		testResults = append(testResults, models.TestResult{
+			TestNumber:     i + 1,
+			Verdict:        verdict.UK,
+			TimeConsumed:   0,
+			MemoryConsumed: 0,
 		})
 	}
 
+	submission.TestResults = testResults
+
 	return &ICPCGenerator{
-		problem:       problem,
-		jobs:          []*GeneratorJob{compileJob},
-		blockedJobs:   testingJobs,
-		givenJobs:     make(map[string]*GeneratorJob),
-		hasFailedJobs: false,
+		submission:  submission,
+		problem:     problem,
+		givenJobs:   make(map[string]*invokerconn.Job),
+		futureTests: futureTests,
 	}, nil
 }

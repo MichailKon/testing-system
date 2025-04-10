@@ -17,193 +17,251 @@ func fixtureProblem() *models.Problem {
 	}
 }
 
-func nextJob(t *testing.T, g Generator, SubmitID uint, jobType invokerconn.JobType, test uint64) *GeneratorJob {
+func fixtureSubmission() *models.Submission {
+	submission := &models.Submission{}
+	submission.ID = 1
+	return submission
+}
+
+func nextJob(t *testing.T, g Generator, SubmitID uint, jobType invokerconn.JobType, test uint64) *invokerconn.Job {
 	job, err := g.NextJob()
 	assert.Nil(t, err)
 	assert.NotNil(t, job)
-	assert.Equal(t, job.InvokerJob.Type, jobType)
-	assert.Equal(t, SubmitID, job.InvokerJob.SubmitID)
-	assert.Equal(t, test, job.InvokerJob.Test)
+	assert.Equal(t, job.Type, jobType)
+	assert.Equal(t, SubmitID, job.SubmitID)
+	assert.Equal(t, test, job.Test)
 	return job
+}
+
+func noJobs(t *testing.T, g Generator) {
+	job, err := g.NextJob()
+	assert.Nil(t, job)
+	assert.NotNil(t, err)
 }
 
 func TestStraightTasksFinishing(t *testing.T) {
 	problem := fixtureProblem()
-	generator, err := NewGenerator(problem, 1)
+	submission := fixtureSubmission()
+	generator, err := NewGenerator(problem, submission)
 	require.Nil(t, err)
 	job := nextJob(t, generator, 1, invokerconn.CompileJob, 0)
-	require.False(t, generator.CanGiveJob())
-	require.Nil(t, generator.JobCompleted(&masterconn.InvokerJobResult{
-		JobID:   job.InvokerJob.ID,
+	noJobs(t, generator)
+	sub, err := generator.JobCompleted(&masterconn.InvokerJobResult{
+		JobID:   job.ID,
 		Verdict: verdict.CD,
-	}))
+	})
+	require.Nil(t, sub)
+	require.Nil(t, err)
 	for i := range 9 {
 		job = nextJob(t, generator, 1, invokerconn.TestJob, uint64(i)+1)
-		require.False(t, generator.IsTestingCompleted())
-		require.NoError(t, generator.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   job.InvokerJob.ID,
+		sub, err = generator.JobCompleted(&masterconn.InvokerJobResult{
+			JobID:   job.ID,
 			Verdict: verdict.OK,
-		}))
+		})
+		require.Nil(t, sub)
+		require.Nil(t, err)
 	}
 	job = nextJob(t, generator, 1, invokerconn.TestJob, 10)
-	require.False(t, generator.IsTestingCompleted())
-	require.Nil(t, generator.JobCompleted(&masterconn.InvokerJobResult{
-		JobID:   job.InvokerJob.ID,
+	sub, err = generator.JobCompleted(&masterconn.InvokerJobResult{
+		JobID:   job.ID,
 		Verdict: verdict.OK,
-	}))
-	require.True(t, generator.IsTestingCompleted())
-	score, err := generator.Score()
+	})
+	require.NotNil(t, sub)
 	require.Nil(t, err)
-	require.Equal(t, 1., score)
+
+	require.Equal(t, verdict.OK, sub.Verdict)
+	require.Equal(t, 1., sub.Score)
+	for i, result := range sub.TestResults {
+		require.Equal(t, verdict.OK, result.Verdict)
+		require.Equal(t, uint64(i)+1, result.TestNumber)
+	}
 }
 
 func TestTasksFinishing(t *testing.T) {
 	prepare := func() (Generator, []string) {
-		g, err := NewGenerator(fixtureProblem(), 1)
+		problem := fixtureProblem()
+		submission := fixtureSubmission()
+		g, err := NewGenerator(problem, submission)
 		require.Nil(t, err)
 		job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
-		require.Nil(t, g.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   job.InvokerJob.ID,
+		sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
+			JobID:   job.ID,
 			Verdict: verdict.CD,
-		}))
+		})
+		require.Nil(t, sub)
+		require.Nil(t, err)
 		firstTwoJobIds := make([]string, 0)
 		for i := range 2 {
 			job = nextJob(t, g, 1, invokerconn.TestJob, uint64(i)+1)
-			firstTwoJobIds = append(firstTwoJobIds, job.InvokerJob.ID)
+			firstTwoJobIds = append(firstTwoJobIds, job.ID)
 		}
 		return g, firstTwoJobIds
 	}
 	finishOtherTests := func(g Generator) {
 		for i := 2; i < 9; i++ {
 			job := nextJob(t, g, 1, invokerconn.TestJob, uint64(i)+1)
-			require.Nil(t, g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.InvokerJob.ID,
+			sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:   job.ID,
 				Verdict: verdict.OK,
-			}))
+			})
+			require.Nil(t, sub)
+			require.Nil(t, err)
 		}
 		job := nextJob(t, g, 1, invokerconn.TestJob, 10)
-		require.Nil(t, g.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   job.InvokerJob.ID,
+		sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
+			JobID:   job.ID,
 			Verdict: verdict.OK,
-		}))
-		score, err := g.Score()
+		})
+		require.NotNil(t, sub)
 		require.Nil(t, err)
-		require.Equal(t, 1., score)
+
+		require.Equal(t, verdict.OK, sub.Verdict)
+		require.Equal(t, 1., sub.Score)
+		for i, result := range sub.TestResults {
+			require.Equal(t, verdict.OK, result.Verdict)
+			require.Equal(t, uint64(i)+1, result.TestNumber)
+		}
 	}
 
 	t.Run("right order", func(t *testing.T) {
 		g, firstTwoJobIds := prepare()
 		for _, id := range firstTwoJobIds {
-			require.Nil(t, g.JobCompleted(&masterconn.InvokerJobResult{
+			sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
 				JobID:   id,
 				Verdict: verdict.OK,
-			}))
+			})
+			require.Nil(t, sub)
+			require.Nil(t, err)
 		}
 		finishOtherTests(g)
 	})
 
 	t.Run("wrong order + both ok", func(t *testing.T) {
 		g, firstTwoJobIds := prepare()
-		require.Nil(t, g.JobCompleted(&masterconn.InvokerJobResult{
+		sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
 			JobID:   firstTwoJobIds[1],
 			Verdict: verdict.OK,
-		}))
-		require.Nil(t, g.JobCompleted(&masterconn.InvokerJobResult{
+		})
+		require.Nil(t, sub)
+		require.Nil(t, err)
+
+		sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
 			JobID:   firstTwoJobIds[0],
 			Verdict: verdict.OK,
-		}))
+		})
+		require.Nil(t, sub)
+		require.Nil(t, err)
 
 		finishOtherTests(g)
 	})
 
 	t.Run("wrong order + 2nd fail", func(t *testing.T) {
 		g, firstTwoJobIds := prepare()
-		require.Nil(t, g.JobCompleted(&masterconn.InvokerJobResult{
+		sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
 			JobID:   firstTwoJobIds[1],
 			Verdict: verdict.WA,
-		}))
-		// this task no longer exists, so any result may be here
-		_ = g.JobCompleted(&masterconn.InvokerJobResult{
+		})
+		require.Nil(t, sub)
+		require.Nil(t, err)
+
+		sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
 			JobID:   firstTwoJobIds[0],
 			Verdict: verdict.OK,
 		})
-
-		require.True(t, g.IsTestingCompleted())
-		score, err := g.Score()
+		require.NotNil(t, sub)
 		require.Nil(t, err)
-		require.Equal(t, 0., score)
+
+		require.Equal(t, verdict.WA, sub.Verdict)
+		require.Equal(t, 0., sub.Score)
+		require.Equal(t, verdict.OK, sub.TestResults[0].Verdict)
+		require.Equal(t, verdict.WA, sub.TestResults[1].Verdict)
+		for i, result := range sub.TestResults[2:] {
+			require.Equal(t, verdict.UK, result.Verdict)
+			require.Equal(t, uint64(i)+3, result.TestNumber)
+		}
 	})
 
 	t.Run("wrong order + 1st fail", func(t *testing.T) {
 		g, firstTwoJobIds := prepare()
-		require.Nil(t, g.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   firstTwoJobIds[0],
-			Verdict: verdict.WA,
-		}))
-		// this task no longer exists, so any result may be here
-		_ = g.JobCompleted(&masterconn.InvokerJobResult{
+		sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
 			JobID:   firstTwoJobIds[1],
 			Verdict: verdict.OK,
 		})
-
-		require.True(t, g.IsTestingCompleted())
-		score, err := g.Score()
+		require.Nil(t, sub)
 		require.Nil(t, err)
-		require.Equal(t, 0., score)
+
+		sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+			JobID:   firstTwoJobIds[0],
+			Verdict: verdict.WA,
+		})
+		require.NotNil(t, sub)
+		require.Nil(t, err)
+
+		require.Equal(t, verdict.WA, sub.Verdict)
+		require.Equal(t, 0., sub.Score)
+		require.Equal(t, verdict.WA, sub.TestResults[0].Verdict)
+		require.Equal(t, verdict.UK, sub.TestResults[1].Verdict)
+		for i, result := range sub.TestResults[2:] {
+			require.Equal(t, verdict.UK, result.Verdict)
+			require.Equal(t, uint64(i)+3, result.TestNumber)
+		}
 	})
 }
 
 func TestFailedCompilation(t *testing.T) {
-	g, err := NewGenerator(fixtureProblem(), 1)
+	problem, submission := fixtureProblem(), fixtureSubmission()
+	g, err := NewGenerator(problem, submission)
 	require.Nil(t, err)
 	job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
-	require.Nil(t, g.JobCompleted(&masterconn.InvokerJobResult{
-		JobID:   job.InvokerJob.ID,
+	sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
+		JobID:   job.ID,
 		Verdict: verdict.CE,
-	}))
-	require.True(t, g.IsTestingCompleted())
-	score, err := g.Score()
+	})
+	require.NotNil(t, sub)
 	require.Nil(t, err)
-	require.Equal(t, 0., score)
+
+	require.Equal(t, verdict.CE, sub.Verdict)
+	require.Equal(t, 0., sub.Score)
+	for i, result := range sub.TestResults {
+		require.Equal(t, verdict.UK, result.Verdict)
+		require.Equal(t, uint64(i)+1, result.TestNumber)
+	}
 }
 
 func TestFinishSameJobTwice(t *testing.T) {
-	g, err := NewGenerator(fixtureProblem(), 1)
+	problem, submission := fixtureProblem(), fixtureSubmission()
+	g, err := NewGenerator(problem, submission)
 	require.Nil(t, err)
 	job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
-	require.Nil(t, g.JobCompleted(&masterconn.InvokerJobResult{
-		JobID:   job.InvokerJob.ID,
+	sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
+		JobID:   job.ID,
 		Verdict: verdict.CE,
-	}))
-	require.True(t, g.IsTestingCompleted())
-	require.NotNil(t, g.JobCompleted(&masterconn.InvokerJobResult{
-		JobID:   job.InvokerJob.ID,
-		Verdict: verdict.CE,
-	}))
-	score, err := g.Score()
+	})
+	require.NotNil(t, sub)
 	require.Nil(t, err)
-	require.Equal(t, 0., score)
+
+	require.Equal(t, verdict.CE, sub.Verdict)
+	require.Equal(t, 0., sub.Score)
+	for i, result := range sub.TestResults {
+		require.Equal(t, verdict.UK, result.Verdict)
+		require.Equal(t, uint64(i)+1, result.TestNumber)
+	}
+
+	sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+		JobID:   job.ID,
+		Verdict: verdict.CE,
+	})
+	require.Nil(t, sub)
+	require.NotNil(t, err)
 }
 
-func TestICPCGenerator_IsTestingCompleted(t *testing.T) {
-	problem := fixtureProblem()
-	problem.TestsNumber = 1
-	g, err := NewGenerator(problem, 1)
+func TestICPCGenerator_RescheduleJob(t *testing.T) {
+	problem, submission := fixtureProblem(), fixtureSubmission()
+	g, err := NewGenerator(problem, submission)
 	require.Nil(t, err)
-	job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
-	require.Nil(t, g.JobCompleted(&masterconn.InvokerJobResult{
-		JobID:   job.InvokerJob.ID,
-		Verdict: verdict.CD,
-	}))
-	require.False(t, g.IsTestingCompleted())
-	job = nextJob(t, g, 1, invokerconn.TestJob, 1)
-	require.False(t, g.IsTestingCompleted())
-	require.Nil(t, g.JobCompleted(&masterconn.InvokerJobResult{
-		JobID:   job.InvokerJob.ID,
-		Verdict: verdict.WA,
-	}))
-	require.True(t, g.IsTestingCompleted())
-	score, err := g.Score()
+	oldJob := nextJob(t, g, 1, invokerconn.CompileJob, 0)
+	err = g.RescheduleJob(oldJob.ID)
 	require.Nil(t, err)
-	require.Equal(t, 0., score)
+	newJob := nextJob(t, g, 1, invokerconn.CompileJob, 0)
+	require.NotEqual(t, oldJob.ID, newJob.ID)
 }

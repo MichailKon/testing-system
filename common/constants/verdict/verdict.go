@@ -20,6 +20,7 @@ const (
 	CD Verdict = "CD" // Compiled
 
 	CF Verdict = "CF" // Check failed
+	UK Verdict = "UK" // Unknown
 
 	QD Verdict = "QD" // Queued
 	CL Verdict = "CL" // Compiling

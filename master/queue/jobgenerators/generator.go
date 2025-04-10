@@ -7,39 +7,22 @@ import (
 	"testing_system/common/db/models"
 )
 
-type GeneratorJob struct {
-	InvokerJob *invokerconn.Job
-
-	blockedBy  []string
-	requiredBy []string
-}
-
 type Generator interface {
-	// GivenJobs returns jobs, that has been given, but has not been completed yet
-	GivenJobs() map[string]*GeneratorJob
-
-	// CanGiveJob returns true iff Generator can give any job
-	CanGiveJob() bool
-
-	IsTestingCompleted() bool
-
-	// Score returns score (wow) if HaveJobs() == false; it returns an error if HaveJobs() == true
-	Score() (float64, error)
-
 	// RescheduleJob reschedules a job and changes it's ID
-	RescheduleJob(jobID string)
+	RescheduleJob(jobID string) error
 
-	// NextJob returns _some_ job from this generator
-	NextJob() (*GeneratorJob, error)
+	// NextJob returns _some_ job from this generator, or an error if there are no jobs
+	NextJob() (*invokerconn.Job, error)
 
-	// JobCompleted returns an errors, if it couldn't complete a job for some reason
-	JobCompleted(result *masterconn.InvokerJobResult) error
+	// JobCompleted returns an errors, if it couldn't complete a job for some reason;
+	// submission is not nil if status is finalized
+	JobCompleted(jobResult *masterconn.InvokerJobResult) (*models.Submission, error)
 }
 
-func NewGenerator(problem *models.Problem, submitID uint) (Generator, error) {
+func NewGenerator(problem *models.Problem, submission *models.Submission) (Generator, error) {
 	switch problem.ProblemType {
 	case models.ProblemType_ICPC:
-		return newICPCGenerator(problem, submitID)
+		return newICPCGenerator(problem, submission)
 	default:
 		return nil, fmt.Errorf("unknown problem type %v", problem.ProblemType)
 	}
