@@ -20,4 +20,5 @@ type StatusResponse struct {
 	// TODO: add some information about invoker state
 	MaxNewJobs   uint64   `json:"MaxNewJobs"`
 	ActiveJobIDs []string `json:"ActiveJobIDs"`
+	Epoch        int      `json:"Epoch"`
 }

@@ -5,6 +5,7 @@ import (
 	"testing_system/common"
 	"testing_system/invoker"
 	"testing_system/lib/logger"
+	"testing_system/master"
 )
 
 func main() {
@@ -18,5 +19,15 @@ func main() {
 	} else {
 		logger.Info("Invoker is not configured, skipping invoker component")
 	}
+
+	if ts.Config.Master != nil {
+		err := master.SetupMaster(ts)
+		if err != nil {
+			logger.Panic(err.Error())
+		}
+	} else {
+		logger.Info("master is not configured, skipping master component")
+	}
+
 	ts.Run()
 }

@@ -2,8 +2,6 @@ package common
 
 import (
 	"context"
-	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 	"net/http"
 	"os/signal"
 	"strconv"
@@ -15,6 +13,9 @@ import (
 	"testing_system/common/connectors/storageconn"
 	"testing_system/common/db"
 	"testing_system/lib/logger"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type TestingSystem struct {
@@ -71,7 +72,7 @@ func (ts *TestingSystem) Run() {
 	defer cancel()
 
 	for _, process := range ts.processes {
-		ts.runProcess(process)
+		ts.Go(process)
 	}
 
 	ts.runServer()
@@ -101,8 +102,12 @@ func (ts *TestingSystem) runServer() {
 	server.ListenAndServe()
 }
 
-func (ts *TestingSystem) runProcess(f func()) {
+func (ts *TestingSystem) Go(f func()) {
 	ts.stopWG.Add(1)
+	go ts.runProcess(f)
+}
+
+func (ts *TestingSystem) runProcess(f func()) {
 	defer func() {
 		v := recover()
 		if v != nil {

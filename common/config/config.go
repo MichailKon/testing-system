@@ -15,6 +15,7 @@ type Config struct {
 	LogLevel *int    `yaml:"LogLevel,omitempty"`
 
 	Invoker *InvokerConfig `yaml:"Invoker,omitempty"`
+	Master  *MasterConfig  `yaml:"Master,omitempty"`
 	// TODO: Add instances here
 
 	DB DBConfig `yaml:"DB"`
@@ -47,4 +48,5 @@ func fillInConfig(config *Config) {
 
 	fillInConnections(config)
 	fillInInvokerConfig(config.Invoker)
+	fillInMasterConfig(config.Master)
 }
