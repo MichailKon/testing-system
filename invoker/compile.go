@@ -51,7 +51,10 @@ func (i *Invoker) Compile(tester *JobExecutor, job *Job) {
 
 	err = j.Prepare()
 	if err != nil {
-		logger.Error("Compilation of submit %d in job %s prepare error: %s", job.Submission.ID, job.ID, err.Error())
+		logger.Error(
+			"Compilation of submit %d in job %s prepare error: %s",
+			job.Submission.ID, job.ID, err.Error(),
+		)
 		j.invoker.FailJob(job, "can not prepare compilation of job %s, error: %s", job.ID, err.Error())
 		return
 	}
@@ -62,23 +65,32 @@ func (i *Invoker) Compile(tester *JobExecutor, job *Job) {
 	j.wg.Wait()
 
 	if j.compileResult.Err != nil {
-		logger.Error("Can not compile submit %d in job %s error: %s",
-			job.Submission.ID, job.ID, j.compileResult.Err.Error())
+		logger.Error(
+			"Can not compile submit %d in job %s error: %s",
+			job.Submission.ID, job.ID, j.compileResult.Err.Error(),
+		)
 		j.invoker.FailJob(job, "can not compile submit in job %s, error: %s", job.ID, j.compileResult.Err.Error())
 		return
 	}
-	logger.Trace("Finished compilation process of submit %d in job %s with verdict %v",
-		job.Submission.ID, job.ID, j.compileResult.Verdict)
+	logger.Trace(
+		"Finished compilation process of submit %d in job %s with verdict %v",
+		job.Submission.ID, job.ID, j.compileResult.Verdict,
+	)
 
 	err = j.Finish()
 	if err == nil {
 		logger.Trace("Uploaded result of compilation of submit %d in job %s", job.Submission.ID, job.ID)
 		j.invoker.SuccessJob(job, j.compileResult)
 	} else {
-		logger.Error("Compilation of submit %d in job %s send result error: %s",
-			job.Submission.ID, job.ID, err.Error())
-		j.invoker.FailJob(job, "can not upload compilation result of submit %d, job %s, error: %s",
-			job.Submission.ID, job.ID, err.Error())
+		logger.Error(
+			"Compilation of submit %d in job %s send result error: %s",
+			job.Submission.ID, job.ID, err.Error(),
+		)
+		j.invoker.FailJob(
+			job,
+			"can not upload compilation result of submit %d, job %s, error: %s",
+			job.Submission.ID, job.ID, err.Error(),
+		)
 	}
 }
 
@@ -139,16 +151,22 @@ func (j *compileJob) Finish() error {
 		outputReader = j.invoker.limitedReader(&j.stdout)
 	case verdict.TL:
 		j.compileResult.Verdict = verdict.CE
-		outputReader = strings.NewReader(fmt.Sprintf("Compilation took more than %v time",
-			j.language.Limits.TimeLimit))
+		outputReader = strings.NewReader(
+			fmt.Sprintf("Compilation took more than %v time",
+				j.language.Limits.TimeLimit),
+		)
 	case verdict.ML:
 		j.compileResult.Verdict = verdict.CE
-		outputReader = strings.NewReader(fmt.Sprintf("Compilation took more than %v memory",
-			j.language.Limits.MemoryLimit))
+		outputReader = strings.NewReader(
+			fmt.Sprintf("Compilation took more than %v memory",
+				j.language.Limits.MemoryLimit),
+		)
 	case verdict.WL:
 		j.compileResult.Verdict = verdict.CE
-		outputReader = strings.NewReader(fmt.Sprintf("Compilation took more than %v wall time",
-			j.language.Limits.WallTimeLimit))
+		outputReader = strings.NewReader(
+			fmt.Sprintf("Compilation took more than %v wall time",
+				j.language.Limits.WallTimeLimit),
+		)
 	case verdict.SE:
 		j.compileResult.Verdict = verdict.CE
 		outputReader = strings.NewReader(fmt.Sprintf("Security violation"))
