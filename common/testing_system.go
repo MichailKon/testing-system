@@ -8,7 +8,6 @@ import (
 	"sync"
 	"syscall"
 	"testing_system/common/config"
-	"testing_system/common/connectors/invokerconn"
 	"testing_system/common/connectors/masterconn"
 	"testing_system/common/connectors/storageconn"
 	"testing_system/common/db"
@@ -25,7 +24,6 @@ type TestingSystem struct {
 
 	MasterConn  *masterconn.Connector
 	StorageConn *storageconn.Connector
-	InvokerConn *invokerconn.Connector
 
 	processes []func()
 	defers    []func()
@@ -50,8 +48,6 @@ func InitTestingSystem(configPath string) *TestingSystem {
 
 	ts.MasterConn = masterconn.NewConnector(ts.Config.MasterConnection)
 	ts.StorageConn = storageconn.NewConnector(ts.Config.StorageConnection)
-	// TODO!!!
-	//ts.InvokerConn = invokerconn.NewConnector(ts.Config.InvokerConnection)
 
 	return ts
 }

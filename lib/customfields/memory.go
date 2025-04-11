@@ -87,7 +87,7 @@ func (m *Memory) FromStr(s string) error {
 	return nil
 }
 
-func (m *Memory) String() string {
+func (m Memory) String() string {
 	v := m.Val()
 	suf := "b"
 	if v%1024 == 0 {

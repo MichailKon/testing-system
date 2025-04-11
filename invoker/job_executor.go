@@ -4,9 +4,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing_system/common"
 	"testing_system/common/connectors/invokerconn"
 	"testing_system/invoker/sandbox"
+	"testing_system/invoker/sandbox/simple"
 	"testing_system/lib/logger"
 )
 
@@ -16,10 +18,20 @@ type JobExecutor struct {
 }
 
 func NewJobExecutor(ts *common.TestingSystem, id uint64) *JobExecutor {
-	// TODO: Add sandbox
-	return &JobExecutor{
+	e := &JobExecutor{
 		ID: id,
 	}
+	switch ts.Config.Invoker.SandboxType {
+	case "simple":
+		var err error
+		e.Sandbox, err = simple.NewSandbox(filepath.Join(ts.Config.Invoker.SandboxHomePath, strconv.FormatUint(id, 10)))
+		if err != nil {
+			logger.Panic("Can not create sandbox %d, error: %v", id, err)
+		}
+	default:
+		logger.Panic("Unsupported sandbox type: %s", ts.Config.Invoker.SandboxType)
+	}
+	return e
 }
 
 func (t *JobExecutor) Delete() {

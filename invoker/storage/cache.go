@@ -46,6 +46,11 @@ func (c *cacheGetter) Unlock(vals ...uint64) error {
 	return c.Cache.Unlock(c.keyGen(vals...))
 }
 
+// Insert can be used only for testing
+func (c *cacheGetter) Insert(file string, vals ...uint64) error {
+	return c.Cache.Insert(c.keyGen(vals...), &file, 1)
+}
+
 func newSourceCache(commonCache *commonCache) *cacheGetter {
 	return &cacheGetter{
 		Cache: commonCache,

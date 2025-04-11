@@ -125,6 +125,7 @@ func (c *LRUSizeCache[TKey, TValue]) Unlock(key TKey) error {
 
 // Remove removes item from cache.
 //
+// This method is not tested and not recommended for usage
 // If item does not exist in cache, returns nil.
 // If item is locked, returns ErrItemLocked.
 func (c *LRUSizeCache[TKey, TValue]) Remove(key TKey) error {
@@ -141,6 +142,27 @@ func (c *LRUSizeCache[TKey, TValue]) Remove(key TKey) error {
 	}
 
 	c.removeSingleItem(key)
+	return nil
+}
+
+// Insert inserts custom value inside cache.
+//
+// This method should be used only for testing purpose.
+// The value must not be present inside cache, otherwise ErrItemAlreadyExists is returned
+func (c *LRUSizeCache[TKey, TValue]) Insert(key TKey, val *TValue, size uint64) error {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	_, ok := c.valueHolders[key]
+	if ok {
+		return &ErrItemAlreadyExists{key: key}
+	}
+	c.valueHolders[key] = &valHolder[TValue]{
+		Value:     val,
+		Error:     nil,
+		LockCount: 0,
+		Size:      size,
+	}
+	c.itemUsed(key, c.valueHolders[key])
 	return nil
 }
 
@@ -223,7 +245,7 @@ func (c *LRUSizeCache[TKey, TValue]) removeSingleItem(key TKey) {
 	if valueHolder.LockCount != 0 {
 		logger.Panic("Error in LRUSizeCache. Removing key with non zero lock count, key: %#v", key)
 	}
-	if c.remover != nil && valueHolder.Error != nil {
+	if c.remover != nil && valueHolder.Error == nil {
 		c.remover(key, valueHolder.Value)
 	}
 
