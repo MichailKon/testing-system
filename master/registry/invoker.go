@@ -90,7 +90,7 @@ func (i *Invoker) getJobType(jobID string) JobType {
 func (i *Invoker) setJobType(jobID string, jobType JobType) {
 	i.jobTypesCount[i.getJobType(jobID)]--
 	i.jobTypeByID[jobID] = jobType
-	i.jobTypesCount[i.getJobType(jobID)]++
+	i.jobTypesCount[jobType]++
 }
 
 func (i *Invoker) completeSendJob(job *invokerconn.Job) {
