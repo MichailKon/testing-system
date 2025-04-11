@@ -98,7 +98,9 @@ func newTestAnswerCache(commonCache *commonCache) *cacheGetter {
 
 func problemIDKeyGen(resource resource.Type, vals []uint64) cacheKey {
 	if len(vals) != 1 {
-		logger.PanicLevel(3, "wrong usage of storage cache, can not get problem %s for id %v, too many ids passed", resource.String(), vals)
+		logger.PanicLevel(3,
+			"wrong usage of storage cache, can not get problem %s for id %v, too many ids passed",
+			resource.String(), vals)
 	}
 	key := cacheKey{
 		Resource:  resource,
@@ -109,7 +111,9 @@ func problemIDKeyGen(resource resource.Type, vals []uint64) cacheKey {
 
 func submitKeyGen(resource resource.Type, vals []uint64) cacheKey {
 	if len(vals) != 1 {
-		logger.PanicLevel(3, "wrong usage of storage cache, can not get submit %s for id %v, too many ids passed", resource.String(), vals)
+		logger.PanicLevel(3,
+			"wrong usage of storage cache, can not get submit %s for id %v, too many ids passed",
+			resource.String(), vals)
 	}
 	key := cacheKey{
 		Resource: resource,
@@ -120,7 +124,9 @@ func submitKeyGen(resource resource.Type, vals []uint64) cacheKey {
 
 func testKeyGen(resource resource.Type, vals []uint64) cacheKey {
 	if len(vals) != 2 {
-		logger.PanicLevel(2, "wrong usage of storage cache, can not get problem test for ids %v, exactly 2 ids should be passed", vals)
+		logger.PanicLevel(3,
+			"wrong usage of storage cache, can not get problem test for ids %v, exactly 2 ids should be passed",
+			vals)
 	}
 	key := cacheKey{
 		Resource:  resource,

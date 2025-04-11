@@ -11,11 +11,11 @@ import (
 )
 
 type TestResult struct {
-	TestNumber uint64                   `json:"testNumber" yaml:"testNumber"`
-	Points     *float64                 `json:"points,omitempty" yaml:"points,omitempty"`
-	Verdict    verdict.Verdict          `json:"verdict" yaml:"verdict"`
-	Time       customfields.TimeLimit   `json:"time" yaml:"time"`
-	Memory     customfields.MemoryLimit `json:"memory" yaml:"memory"`
+	TestNumber uint64              `json:"testNumber" yaml:"testNumber"`
+	Points     *float64            `json:"points,omitempty" yaml:"points,omitempty"`
+	Verdict    verdict.Verdict     `json:"verdict" yaml:"verdict"`
+	Time       customfields.Time   `json:"time" yaml:"time"`
+	Memory     customfields.Memory `json:"memory" yaml:"memory"`
 }
 
 type TestResults []TestResult
@@ -33,10 +33,6 @@ func (t *TestResults) Scan(value interface{}) error {
 }
 
 func (t TestResults) GormDBDataType(db *gorm.DB, field *schema.Field) string {
-	// use field.Tag, field.TagSettings gets field's tags
-	// checkout https://github.com/go-gorm/gorm/blob/master/schema/field.go for all options
-
-	// returns different database type based on driver name
 	switch db.Dialector.Name() {
 	case "mysql", "sqlite":
 		return "JSON"

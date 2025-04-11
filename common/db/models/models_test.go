@@ -21,9 +21,9 @@ func fixtureDb(t *testing.T) *gorm.DB {
 }
 
 func TestTestResultSerialization(t *testing.T) {
-	var time customfields.TimeLimit
+	var time customfields.Time
 	require.Nil(t, time.FromStr("5s"))
-	var memory customfields.MemoryLimit
+	var memory customfields.Memory
 	require.Nil(t, memory.FromStr("5m"))
 
 	testResult := TestResult{
@@ -37,7 +37,7 @@ func TestTestResultSerialization(t *testing.T) {
 	t.Run("json", func(t *testing.T) {
 		b, err := json.Marshal(testResult)
 		require.Nil(t, err)
-		require.Equal(t, `{"testNumber":1,"verdict":"OK","time":"5s","memory":"5120k"}`, string(b))
+		require.Equal(t, `{"testNumber":1,"verdict":"OK","time":"5s","memory":"5m"}`, string(b))
 
 		var newTestResult TestResult
 		err = json.Unmarshal(b, &newTestResult)
@@ -51,7 +51,7 @@ func TestTestResultSerialization(t *testing.T) {
 		require.Equal(t, `testNumber: 1
 verdict: OK
 time: 5s
-memory: 5120k
+memory: 5m
 `, string(b))
 		var newTestResult TestResult
 		err = yaml.Unmarshal(b, &newTestResult)
@@ -73,15 +73,15 @@ func TestTestResultsDB(t *testing.T) {
 					TestNumber: 1,
 					Points:     nil,
 					Verdict:    verdict.OK,
-					Time:       customfields.TimeLimit(1 * time.Second),
-					Memory:     customfields.MemoryLimit(10 * 1024 * 1024),
+					Time:       customfields.Time(1 * time.Second),
+					Memory:     customfields.Memory(10 * 1024 * 1024),
 				},
 				{
 					TestNumber: 0,
 					Points:     nil,
 					Verdict:    "",
-					Time:       customfields.TimeLimit(10 * time.Second),
-					Memory:     customfields.MemoryLimit(10 * 1024 * 1024),
+					Time:       customfields.Time(10 * time.Second),
+					Memory:     customfields.Memory(10 * 1024 * 1024),
 				},
 			},
 		}

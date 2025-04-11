@@ -61,8 +61,8 @@ func (i *Invoker) getStatus() *invokerconn.StatusResponse {
 	i.Mutex.Lock()
 	defer i.Mutex.Unlock()
 	status := new(invokerconn.StatusResponse)
-	for jobId := range i.ActiveJobs {
-		status.ActiveJobIDs = append(status.ActiveJobIDs, jobId)
+	for jobID := range i.ActiveJobs {
+		status.ActiveJobIDs = append(status.ActiveJobIDs, jobID)
 	}
 	if uint64(len(status.ActiveJobIDs)) > i.MaxJobs {
 		status.MaxNewJobs = 0

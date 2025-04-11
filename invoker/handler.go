@@ -78,7 +78,10 @@ func (i *Invoker) newCompileJob(c *gin.Context, job *Job) {
 
 func (i *Invoker) newTestJob(c *gin.Context, job *Job) bool {
 	if job.Test <= 0 || job.Test > job.Problem.TestsNumber {
-		connector.RespErr(c, http.StatusBadRequest, "%d test required, tests in problem %d are numbered from 1 to %d", job.Test, job.Problem.ID, job.Problem.TestsNumber)
+		connector.RespErr(c,
+			http.StatusBadRequest,
+			"%d test required, tests in problem %d are numbered from 1 to %d",
+			job.Test, job.Problem.ID, job.Problem.TestsNumber)
 		return false
 	}
 

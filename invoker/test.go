@@ -61,55 +61,67 @@ func (i *Invoker) Test(tester *JobExecutor, job *Job) {
 
 	err := j.PrepareRun()
 	if err != nil {
-		logger.Error("Prepare running of submit %d on problem %d test %d job %s fail, error: %s", job.Submission.ID, job.Problem, job.Test, job.ID, err.Error())
+		logger.Error("Prepare running of submit %v on problem %v test %d job %s fail, error: %s",
+			job.Submission.ID, job.Problem, job.Test, job.ID, err.Error())
 		j.invoker.FailJob(job, "can not prepare run of job %s, error: %s", job.ID, err.Error())
 		return
 	}
-	logger.Trace("Prepared running of submit %d on problem %d test %d job %s", job.Submission.ID, job.Problem.ID, job.Test, job.ID)
+	logger.Trace("Prepared running of submit %d on problem %d test %d job %s",
+		job.Submission.ID, job.Problem.ID, job.Test, job.ID)
 
 	j.wg.Add(1)
 	i.RunQueue <- j.RunOnTest
 	j.wg.Wait()
 
 	if j.runResult.Err != nil {
-		logger.Error("Can not run submit %d on problem %d test %d in job %s error: %s", job.Submission.ID, job.Problem.ID, job.Test, job.ID, err)
+		logger.Error("Can not run submit %d on problem %d test %d in job %s error: %s",
+			job.Submission.ID, job.Problem.ID, job.Test, job.ID, err)
 		j.invoker.FailJob(job, "can not run submit in job %s, error: %s", job.ID, j.runResult.Err.Error())
 		return
 	}
 
 	if j.runResult.Verdict != verdict.OK {
-		logger.Trace("Finished running process of submit %d on problem %d test %d job %s with verdict %v, uploading result", job.Submission.ID, job.Problem.ID, job.Test, job.ID, j.runResult.Verdict)
+		logger.Trace("Finished running process of submit %d on problem %d test %d job %s with verdict %v, uploading result",
+			job.Submission.ID, job.Problem.ID, job.Test, job.ID, j.runResult.Verdict)
 		j.invoker.SuccessJob(job, j.runResult)
 		return
 	}
 
-	logger.Trace("Successfully finished running process of submit %d on problem %d test %d job %s, preparing checker run", job.Submission.ID, job.Problem.ID, job.Test, job.ID)
+	logger.Trace("Successfully finished running process of submit %d on problem %d test %d job %s, preparing checker run",
+		job.Submission.ID, job.Problem.ID, job.Test, job.ID)
 	err = j.PrepareCheck()
 	if err != nil {
-		logger.Error("Prepare checking of submit %d on problem %d test %d job %s fail, error: %s", job.Submission.ID, job.Problem.ID, job.Test, job.ID, err.Error())
+		logger.Error("Prepare checking of submit %d on problem %d test %d job %s fail, error: %s",
+			job.Submission.ID, job.Problem.ID, job.Test, job.ID, err.Error())
 		j.invoker.FailJob(job, "can not prepare check of job %s, error: %s", job.ID, err.Error())
 		return
 	}
-	logger.Trace("Prepared checking of submit %d on problem %d test %d job %s", job.Submission.ID, job.Problem, job.Test, job.ID)
+	logger.Trace("Prepared checking of submit %d on problem %d test %d job %s",
+		job.Submission.ID, job.Problem, job.Test, job.ID)
 
 	j.wg.Add(1)
 	i.RunQueue <- j.RunChecker
 	j.wg.Wait()
 
 	if j.runResult.Err != nil {
-		logger.Error("Can not check submit %d on problem %d test %d in job %s error: %s", job.Submission.ID, job.Problem.ID, job.Test, job.ID, j.runResult.Err.Error())
+		logger.Error("Can not check submit %d on problem %d test %d in job %s error: %s",
+			job.Submission.ID, job.Problem.ID, job.Test, job.ID, j.runResult.Err.Error())
 		j.invoker.FailJob(job, "can not check job %s, error: %s", job.ID, j.runResult.Err.Error())
 		return
 	}
-	logger.Trace("Finished checking of submit %d on problem %d test %d in job %s", job.Submission.ID, job.Problem.ID, job.Test, job.ID)
+	logger.Trace("Finished checking of submit %d on problem %d test %d in job %s",
+		job.Submission.ID, job.Problem.ID, job.Test, job.ID)
 
 	err = j.Finish()
 	if err == nil {
-		logger.Trace("Uploaded testing and checking result of submit %d on problem %d test %d in job %s", job.Submission.ID, job.Problem.ID, job.Test, job.ID)
+		logger.Trace("Uploaded testing and checking result of submit %d on problem %d test %d in job %s",
+			job.Submission.ID, job.Problem.ID, job.Test, job.ID)
 		j.invoker.SuccessJob(job, j.runResult)
 	} else {
-		logger.Error("Upload testing and checking result of submit %d on problem %d test %d in job %s error %s", job.Submission.ID, job.Problem.ID, job.Test, job.ID, err.Error())
-		j.invoker.FailJob(job, "can not upload testing and checking result of job %s, error: %s", job.ID, err.Error())
+		logger.Error("Upload testing and checking result of submit %d on problem %d test %d in job %s error %s",
+			job.Submission.ID, job.Problem.ID, job.Test, job.ID, err.Error())
+		j.invoker.FailJob(job, "can not upload testing and checking result of job %s, error: %s",
+			job.ID, err.Error())
 	}
 }
 
@@ -246,13 +258,16 @@ func (j *testJob) Finish() error {
 		j.ParseCheckerOutput()
 	case verdict.TL:
 		j.runResult.Verdict = verdict.CF
-		j.checkerOutputReader = strings.NewReader(fmt.Sprintf("Checker running took more than %v time", j.checkConfig.TimeLimit))
+		j.checkerOutputReader = strings.NewReader(fmt.Sprintf("Checker running took more than %v time",
+			j.checkConfig.TimeLimit))
 	case verdict.ML:
 		j.runResult.Verdict = verdict.CF
-		j.checkerOutputReader = strings.NewReader(fmt.Sprintf("Checker running took more than %v memory", j.checkConfig.MemoryLimit))
+		j.checkerOutputReader = strings.NewReader(fmt.Sprintf("Checker running took more than %v memory",
+			j.checkConfig.MemoryLimit))
 	case verdict.WL:
 		j.runResult.Verdict = verdict.CF
-		j.checkerOutputReader = strings.NewReader(fmt.Sprintf("Checker running took more than %v wall time", j.checkConfig.WallTimeLimit))
+		j.checkerOutputReader = strings.NewReader(fmt.Sprintf("Checker running took more than %v wall time",
+			j.checkConfig.WallTimeLimit))
 	case verdict.SE:
 		j.runResult.Verdict = verdict.CF
 		j.checkerOutputReader = strings.NewReader(fmt.Sprintf("Checker security violation"))
@@ -301,14 +316,17 @@ func (j *testJob) ParseCheckerOutput() {
 	checkResultData, err := os.ReadFile(filepath.Join(j.tester.Sandbox.Dir(), CheckResultFile))
 	if err != nil {
 		j.runResult.Verdict = verdict.CF
-		j.checkerOutputReader = strings.NewReader(fmt.Sprintf("Checker exited with exit code %d, can not parse checker result xml file in appes mode", j.checkResult.Statistics.ExitCode))
+		j.checkerOutputReader = strings.NewReader(
+			fmt.Sprintf("Checker exited with exit code %d, can not parse checker result xml file in appes mode",
+				j.checkResult.Statistics.ExitCode))
 		return
 	}
 	var checkerResult CheckerResultXML
 	err = xml.Unmarshal(checkResultData, &checkerResult)
 	if err != nil {
 		j.runResult.Verdict = verdict.CF
-		j.checkerOutputReader = strings.NewReader(fmt.Sprintf("Can not parse checker result xml file in appes mode: %s", err.Error()))
+		j.checkerOutputReader = strings.NewReader(
+			fmt.Sprintf("Can not parse checker result xml file in appes mode: %s", err.Error()))
 		return
 	}
 	j.checkerOutputReader = strings.NewReader(checkerResult.Value)
@@ -322,14 +340,18 @@ func (j *testJob) ParseCheckerOutput() {
 	case "points", "relative-scoring":
 		if checkerResult.Points == nil {
 			j.runResult.Verdict = verdict.CF
-			j.checkerOutputReader = strings.NewReader(fmt.Sprintf("Checker exited with exit code %d and verdict %s, but no points specified", j.checkResult.Statistics.ExitCode, checkerResult.Outcome))
+			j.checkerOutputReader = strings.NewReader(
+				fmt.Sprintf("Checker exited with exit code %d and verdict %s, but no points specified",
+					j.checkResult.Statistics.ExitCode, checkerResult.Outcome))
 		} else {
 			j.runResult.Verdict = verdict.PT
 			j.runResult.Points = checkerResult.Points
 		}
 	default:
 		j.runResult.Verdict = verdict.CF
-		j.checkerOutputReader = strings.NewReader(fmt.Sprintf("Unknown checker verdict %s, checker exited with exit code %d", checkerResult.Outcome, j.checkResult.Statistics.ExitCode))
+		j.checkerOutputReader = strings.NewReader(
+			fmt.Sprintf("Unknown checker verdict %s, checker exited with exit code %d",
+				checkerResult.Outcome, j.checkResult.Statistics.ExitCode))
 	}
 }
 

@@ -3,13 +3,13 @@ package config
 import "testing_system/lib/customfields"
 
 type RunConfig struct {
-	TimeLimit     customfields.TimeLimit   `yaml:"TimeLimit" json:"TimeLimit"`
-	MemoryLimit   customfields.MemoryLimit `yaml:"MemoryLimit" json:"MemoryLimit"`
-	WallTimeLimit customfields.TimeLimit   `yaml:"WallTimeLimit" json:"WallTimeLimit"`
+	TimeLimit     customfields.Time   `yaml:"TimeLimit" json:"TimeLimit"`
+	MemoryLimit   customfields.Memory `yaml:"MemoryLimit" json:"MemoryLimit"`
+	WallTimeLimit customfields.Time   `yaml:"WallTimeLimit" json:"WallTimeLimit"`
 
-	MaxThreads    uint64                   `yaml:"MaxThreads" json:"MaxThreads"`
-	MaxOpenFiles  uint64                   `yaml:"MaxOpenFiles" json:"MaxOpenFiles"`
-	MaxOutputSize customfields.MemoryLimit `yaml:"MaxOutputSize" json:"MaxOutputSize"`
+	MaxThreads    uint64              `yaml:"MaxThreads" json:"MaxThreads"`
+	MaxOpenFiles  uint64              `yaml:"MaxOpenFiles" json:"MaxOpenFiles"`
+	MaxOutputSize customfields.Memory `yaml:"MaxOutputSize" json:"MaxOutputSize"`
 }
 
 func fillInDefaultCheckerRunConfig(config *RunConfig) {

@@ -20,9 +20,9 @@ type InvokerJobResult struct {
 }
 
 type JobResultStatistics struct {
-	Time     customfields.TimeLimit   `json:"Time"`
-	Memory   customfields.MemoryLimit `json:"Memory"`
-	WallTime customfields.TimeLimit   `json:"WallTime"`
+	Time     customfields.Time   `json:"Time"`
+	Memory   customfields.Memory `json:"Memory"`
+	WallTime customfields.Time   `json:"WallTime"`
 
 	ExitCode int `json:"ExitCode"`
 	// TODO: Add more statistics
