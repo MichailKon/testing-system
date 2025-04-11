@@ -1,8 +1,8 @@
 package cache
 
 import (
-	"errors"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"github.com/xorcare/pointer"
 	"math/rand/v2"
 	"sync"
@@ -13,11 +13,18 @@ import (
 
 func testGet[TKey comparable, TValue comparable](t *testing.T, cache *LRUSizeCache[TKey, TValue], key TKey, expectedVal *TValue, expectedErr error) {
 	val, err := cache.Get(key)
-	if (val == nil) != (expectedVal == nil) || (val != nil && *val != *expectedVal) {
-		t.Fatalf("Get should return val=%v, instead got val=%v", expectedVal, val)
+	if expectedVal == nil {
+		require.Nil(t, val)
+	} else {
+		require.NotNil(t, val)
+		require.Equal(t, *expectedVal, *val)
 	}
-	if (err == nil) != (expectedErr == nil) || (err != nil && err.Error() != expectedErr.Error()) {
-		t.Fatalf("Get should return error=%v, instead got error=%v", expectedErr, err)
+
+	if expectedErr == nil {
+		require.Nil(t, err)
+	} else {
+		require.NotNil(t, err)
+		require.Equal(t, expectedErr.Error(), err.Error())
 	}
 }
 
@@ -34,10 +41,7 @@ func TestSimpleGet(t *testing.T) {
 	)
 
 	for i := range 10 {
-		err := cache.Insert(i, pointer.Int(i), 1)
-		if err != nil {
-			t.Fatalf("Insert should not fail")
-		}
+		require.NoError(t, cache.Insert(i, pointer.Int(i), 1))
 		for j := range i + 1 {
 			testGet(t, cache, j, pointer.Int(j), nil)
 		}
@@ -111,9 +115,7 @@ func TestDelete(t *testing.T) {
 	expect(1, 26)
 	expect(0, 25)
 	expect(2, 27)
-	if delCount != counter-2 {
-		t.Fatalf("All items should be deleted")
-	}
+	require.Equal(t, counter-2, delCount)
 }
 
 func TestLock(t *testing.T) {
@@ -137,10 +139,7 @@ func TestLock(t *testing.T) {
 	expect(1, 3)
 	expect(2, 4)
 	expect(0, 0)
-	err := cache.Unlock(0)
-	if err != nil {
-		t.Fatalf("Unlock should not fail")
-	}
+	require.NoError(t, cache.Unlock(0))
 	expect(2, 4)
 	expect(1, 5)
 	expect(0, 6)
@@ -212,10 +211,7 @@ func singleTestGoroutine(t *testing.T, size uint64, maxKey int, iterations int) 
 		cache.Lock(lastLock)
 		for _ = range iterations {
 			if rand.Int()%5 == 0 {
-				err := cache.Unlock(lastLock)
-				if err != nil {
-					t.Fatalf("Unlock should not fail")
-				}
+				require.NoError(t, cache.Unlock(lastLock))
 				lastLock = rand.Int() % maxKey
 				cache.Lock(lastLock)
 			}
@@ -250,25 +246,16 @@ func TestErrors(t *testing.T) {
 	)
 	err := cache.Unlock(0)
 	var errNotFound *ErrItemNotFound
-	if !errors.As(err, &errNotFound) {
-		t.Fatalf("error should be ErrItemNotFound")
-	}
+	require.ErrorAs(t, err, &errNotFound)
 
 	cache.Lock(0)
-	err = cache.Unlock(0)
-	if err != nil {
-		t.Fatalf("unlock should not fail")
-	}
+	require.NoError(t, cache.Unlock(0))
 
 	err = cache.Unlock(0)
 	var errNotLocked *ErrItemNotLocked
-	if !errors.As(err, &errNotLocked) {
-		t.Fatalf("error should be ErrItemNotLocked")
-	}
+	require.ErrorAs(t, err, &errNotLocked)
 
 	err = cache.Insert(0, pointer.Int(0), 1)
 	var errItemExists *ErrItemAlreadyExists
-	if !errors.As(err, &errItemExists) {
-		t.Fatalf("error should be ErrItemExists")
-	}
+	require.ErrorAs(t, err, &errItemExists)
 }

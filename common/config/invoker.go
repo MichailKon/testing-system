@@ -37,7 +37,7 @@ func FillInInvokerConfig(config *InvokerConfig) {
 		case "simple":
 			panic("No sandbox home path specified")
 		default:
-			// TODO: Support other sandbox types
+			panic("unsupported sandbox type: " + config.SandboxType)
 		}
 	}
 	if len(config.CachePath) == 0 {

@@ -55,6 +55,7 @@ func (i *Invoker) Test(tester *JobExecutor, job *Job) {
 	if err != nil {
 		logger.Error("Prepare sandbox %s for job %s error: %v", tester.Sandbox.Dir(), job.ID, err)
 		i.FailJob(job, "can not prepare sandbox for job %s, error: %s", job.ID, err)
+		return
 	}
 	defer tester.Sandbox.Cleanup()
 

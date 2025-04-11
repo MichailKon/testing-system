@@ -40,6 +40,7 @@ func (i *Invoker) Compile(tester *JobExecutor, job *Job) {
 	if err != nil {
 		logger.Error("Prepare sandbox %s for job %s error: %v", tester.Sandbox.Dir(), job.ID, err)
 		i.FailJob(job, "can not prepare sandbox for job %s, error: %s", job.ID, err)
+		return
 	}
 	defer tester.Sandbox.Cleanup()
 
@@ -139,39 +140,41 @@ func (j *compileJob) Execute() {
 	j.wg.Done()
 }
 
-func (j *compileJob) Finish() error {
-	var outputReader io.Reader
-
+func (j *compileJob) FinalizeVerdict() (io.Reader, error) {
 	switch j.compileResult.Verdict {
 	case verdict.OK:
 		j.compileResult.Verdict = verdict.CD
-		outputReader = j.invoker.limitedReader(&j.stdout)
+		return j.invoker.limitedReader(&j.stdout), nil
 	case verdict.RT:
 		j.compileResult.Verdict = verdict.CE
-		outputReader = j.invoker.limitedReader(&j.stdout)
+		return j.invoker.limitedReader(&j.stdout), nil
 	case verdict.TL:
 		j.compileResult.Verdict = verdict.CE
-		outputReader = strings.NewReader(
-			fmt.Sprintf("Compilation took more than %v time",
-				j.language.Limits.TimeLimit),
-		)
+		return strings.NewReader(
+			fmt.Sprintf("Compilation took more than %v time", j.language.Limits.TimeLimit),
+		), nil
 	case verdict.ML:
 		j.compileResult.Verdict = verdict.CE
-		outputReader = strings.NewReader(
-			fmt.Sprintf("Compilation took more than %v memory",
-				j.language.Limits.MemoryLimit),
-		)
+		return strings.NewReader(
+			fmt.Sprintf("Compilation took more than %v memory", j.language.Limits.MemoryLimit),
+		), nil
 	case verdict.WL:
 		j.compileResult.Verdict = verdict.CE
-		outputReader = strings.NewReader(
-			fmt.Sprintf("Compilation took more than %v wall time",
-				j.language.Limits.WallTimeLimit),
-		)
+		return strings.NewReader(
+			fmt.Sprintf("Compilation took more than %v wall time", j.language.Limits.WallTimeLimit),
+		), nil
 	case verdict.SE:
 		j.compileResult.Verdict = verdict.CE
-		outputReader = strings.NewReader(fmt.Sprintf("Security violation"))
+		return strings.NewReader(fmt.Sprintf("Security violation")), nil
 	default:
-		return fmt.Errorf("unknown sandbox verdict: %s", j.compileResult.Verdict)
+		return nil, fmt.Errorf("unknown sandbox verdict: %s", j.compileResult.Verdict)
+	}
+}
+
+func (j *compileJob) Finish() error {
+	outputReader, err := j.FinalizeVerdict()
+	if err != nil {
+		return err
 	}
 
 	compileOutputStoreRequest := &storageconn.Request{

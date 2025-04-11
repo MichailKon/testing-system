@@ -2,6 +2,7 @@ package invoker
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"github.com/xorcare/pointer"
 	"gorm.io/gorm"
 	"os"
@@ -52,15 +53,12 @@ func newTestState(t *testing.T) *testState {
 		Storage:  storage.NewInvokerStorage(ts.TS),
 		Compiler: compiler.NewCompiler(ts.TS),
 	}
-	err := os.CopyFS(ts.FilesDir, os.DirFS("testdata/files"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.CopyFS(ts.FilesDir, os.DirFS("testdata/files")))
 	ts.Executor = NewJobExecutor(ts.TS, 1)
 	return ts
 }
 
-func (ts *testState) TestCompile(submitID uint) (file *string, v verdict.Verdict) {
+func (ts *testState) testCompile(submitID uint) (file *string, v verdict.Verdict) {
 	job := &Job{
 		Job: invokerconn.Job{
 			ID:       "JOB",
@@ -80,10 +78,7 @@ func (ts *testState) TestCompile(submitID uint) (file *string, v verdict.Verdict
 			Language:  "cpp",
 		},
 	}
-	err := ts.Executor.Sandbox.Init()
-	if err != nil {
-		ts.t.Fatalf("failed to init executor, error: %v", err)
-	}
+	require.NoError(ts.t, ts.Executor.Sandbox.Init())
 
 	j := compileJob{
 		invoker: ts.Invoker,
@@ -91,25 +86,23 @@ func (ts *testState) TestCompile(submitID uint) (file *string, v verdict.Verdict
 		job:     job,
 	}
 
-	err = j.invoker.Storage.Source.Insert(fmt.Sprintf("%s/source/%d/%d.cpp", ts.FilesDir, submitID, submitID), uint64(submitID))
-	if err != nil {
-		ts.t.Fatalf("failed to insert source to storage, error: %v", err)
-	}
+	require.NoError(ts.t, j.invoker.Storage.Source.Insert(
+		fmt.Sprintf("%s/source/%d/%d.cpp", ts.FilesDir, submitID, submitID),
+		uint64(submitID),
+	))
 
-	err = j.Prepare()
-	if err != nil {
-		ts.t.Fatalf("failed to prepare job, error: %v", err)
-	}
+	require.NoError(ts.t, j.Prepare())
 
 	j.wg.Add(1)
 	j.Execute()
 
-	if j.compileResult.Err != nil {
-		ts.t.Fatalf("failed to execute compile job, error: %v", j.compileResult.Err)
-	}
+	require.NoError(ts.t, j.compileResult.Err)
+
+	_, err := j.FinalizeVerdict()
+	require.NoError(ts.t, err)
 
 	v = j.compileResult.Verdict
-	if j.compileResult.Verdict == verdict.OK {
+	if j.compileResult.Verdict == verdict.CD {
 		file = pointer.String(filepath.Join(j.tester.Sandbox.Dir(), j.binaryName))
 	}
 	return
@@ -118,56 +111,42 @@ func (ts *testState) TestCompile(submitID uint) (file *string, v verdict.Verdict
 func TestCompile(t *testing.T) {
 	ts := newTestState(t)
 
-	file, v := ts.TestCompile(1)
-	if v != verdict.OK {
-		t.Fatalf("Compilation verdict wrong, error: %v", v)
-	}
+	file, v := ts.testCompile(1)
+	require.Equal(t, verdict.CD, v)
 
 	cmd := exec.Command(*file)
 	var stdout strings.Builder
 	cmd.Stdout = &stdout
 
-	err := cmd.Run()
-	if err != nil {
-		t.Fatalf("failed to execute compiled source, error: %v", err)
-	}
-	if strings.TrimSpace(stdout.String()) != "1" {
-		t.Fatalf("failed to execute compiled source, wrong stdout: %v", stdout.String())
-	}
+	require.NoError(t, cmd.Run())
+	require.Equal(t, "1", strings.TrimSpace(stdout.String()))
 
 	ts.Executor.Sandbox.Cleanup()
 
-	file, v = ts.TestCompile(2)
-	if v != verdict.RT {
-		t.Fatalf("Compilation verdict wrong, error: %v", v)
-	}
+	_, v = ts.testCompile(2)
+	require.Equal(t, verdict.CE, v)
 }
 
-func (ts *testState) AddProblem(problemID uint) {
-	err := ts.Invoker.Storage.TestInput.Insert(fmt.Sprintf("%s/test_input/%d-1/1", ts.FilesDir, problemID), uint64(problemID), 1)
-	if err != nil {
-		ts.t.Fatalf("failed to add problem test input, error: %v", err)
-	}
+func (ts *testState) addProblem(problemID uint) {
+	require.NoError(ts.t, ts.Invoker.Storage.TestInput.Insert(
+		fmt.Sprintf("%s/test_input/%d-1/1", ts.FilesDir, problemID),
+		uint64(problemID), 1,
+	))
 
-	err = ts.Invoker.Storage.TestAnswer.Insert(fmt.Sprintf("%s/test_answer/%d-1/1.a", ts.FilesDir, problemID), uint64(problemID), 1)
-	if err != nil {
-		ts.t.Fatalf("failed to add problem test answer, error: %v", err)
-	}
+	require.NoError(ts.t, ts.Invoker.Storage.TestAnswer.Insert(
+		fmt.Sprintf("%s/test_answer/%d-1/1.a", ts.FilesDir, problemID),
+		uint64(problemID), 1,
+	))
 
 	checkerDir := fmt.Sprintf("%s/checker/%d", ts.FilesDir, problemID)
 	cmd := exec.Command("g++", "check.cpp", "-std=c++17", "-o", "check")
 	cmd.Dir = checkerDir
-	err = cmd.Run()
-	if err != nil {
-		ts.t.Fatalf("failed to compile checker, error: %v", err)
-	}
-	err = ts.Invoker.Storage.Checker.Insert(filepath.Join(checkerDir, "check"), uint64(problemID))
-	if err != nil {
-		ts.t.Fatalf("failed to add problem checker, error: %v", err)
-	}
+	require.NoError(ts.t, cmd.Run())
+
+	require.NoError(ts.t, ts.Invoker.Storage.Checker.Insert(filepath.Join(checkerDir, "check"), uint64(problemID)))
 }
 
-func (ts *testState) TestRun(submitID uint, problemID uint) *sandbox.RunResult {
+func (ts *testState) testRun(submitID uint, problemID uint) *sandbox.RunResult {
 	job := &Job{
 		Job: invokerconn.Job{
 			ID:       "JOB",
@@ -195,19 +174,11 @@ func (ts *testState) TestRun(submitID uint, problemID uint) *sandbox.RunResult {
 	sourceDir := fmt.Sprintf("%s/binary/%d", ts.FilesDir, submitID)
 	cmd := exec.Command("g++", "source.cpp", "-std=c++17", "-o", "binary")
 	cmd.Dir = sourceDir
-	err := cmd.Run()
-	if err != nil {
-		ts.t.Fatalf("failed to compile source, error: %v", err)
-	}
-	err = ts.Invoker.Storage.Binary.Insert(filepath.Join(sourceDir, "binary"), uint64(submitID))
-	if err != nil {
-		ts.t.Fatalf("failed to insert submit binary, error: %v", err)
-	}
+	require.NoError(ts.t, cmd.Run())
 
-	err = ts.Executor.Sandbox.Init()
-	if err != nil {
-		ts.t.Fatalf("failed to init executor, error: %v", err)
-	}
+	require.NoError(ts.t, ts.Invoker.Storage.Binary.Insert(filepath.Join(sourceDir, "binary"), uint64(submitID)))
+
+	require.NoError(ts.t, ts.Executor.Sandbox.Init())
 	defer ts.Executor.Sandbox.Cleanup()
 
 	j := testJob{
@@ -216,33 +187,22 @@ func (ts *testState) TestRun(submitID uint, problemID uint) *sandbox.RunResult {
 		job:     job,
 	}
 
-	err = j.PrepareRun()
-	if err != nil {
-		ts.t.Fatalf("failed to prepare run, error: %v", err)
-	}
+	require.NoError(ts.t, j.PrepareRun())
 
 	j.wg.Add(1)
 	j.RunOnTest()
-
-	if j.runResult.Err != nil {
-		ts.t.Fatalf("failed to run, error: %v", j.runResult.Err)
-	}
+	require.NoError(ts.t, j.runResult.Err)
 
 	if j.runResult.Verdict != verdict.OK {
 		return j.runResult
 	}
 
-	err = j.PrepareCheck()
-	if err != nil {
-		ts.t.Fatalf("failed to prepare check, error: %v", err)
-	}
+	require.NoError(ts.t, j.PrepareCheck())
 
 	j.wg.Add(1)
 	j.RunChecker()
 
-	if j.checkResult.Err != nil {
-		ts.t.Fatalf("failed to check, error: %v", j.checkResult.Err)
-	}
+	require.NoError(ts.t, j.checkResult.Err)
 
 	switch j.checkResult.Verdict {
 	case verdict.OK, verdict.RT:
@@ -256,39 +216,25 @@ func (ts *testState) TestRun(submitID uint, problemID uint) *sandbox.RunResult {
 
 func TestRun(t *testing.T) {
 	ts := newTestState(t)
-	ts.AddProblem(1)
+	ts.addProblem(1)
 
-	res := ts.TestRun(3, 1)
-	if res.Verdict != verdict.OK {
-		t.Fatalf("Wrong verdict: %v", res.Verdict)
-	}
+	res := ts.testRun(3, 1)
+	require.Equal(t, verdict.OK, res.Verdict)
 
-	res = ts.TestRun(4, 1)
-	if res.Verdict != verdict.RT {
-		t.Fatalf("Wrong verdict: %v", res.Verdict)
-	}
+	res = ts.testRun(4, 1)
+	require.Equal(t, verdict.RT, res.Verdict)
 
-	res = ts.TestRun(5, 1)
-	if res.Verdict != verdict.TL {
-		t.Fatalf("Wrong verdict: %v", res.Verdict)
-	}
+	res = ts.testRun(5, 1)
+	require.Equal(t, verdict.TL, res.Verdict)
 
-	res = ts.TestRun(6, 1)
-	if res.Verdict != verdict.WA {
-		t.Fatalf("Wrong verdict: %v", res.Verdict)
-	}
+	res = ts.testRun(6, 1)
+	require.Equal(t, verdict.WA, res.Verdict)
 
-	res = ts.TestRun(7, 1)
-	if res.Verdict != verdict.ML {
-		t.Fatalf("Wrong verdict: %v", res.Verdict)
-	}
+	res = ts.testRun(7, 1)
+	require.Equal(t, verdict.ML, res.Verdict)
 
-	ts.AddProblem(2)
-	res = ts.TestRun(8, 2)
-	if res.Verdict != verdict.PT {
-		t.Fatalf("Wrong verdict: %v", res.Verdict)
-	}
-	if *res.Points != 5 {
-		t.Fatalf("Wrong points: %v", res.Points)
-	}
+	ts.addProblem(2)
+	res = ts.testRun(8, 2)
+	require.Equal(t, verdict.PT, res.Verdict)
+	require.EqualValues(t, 5, *res.Points)
 }
