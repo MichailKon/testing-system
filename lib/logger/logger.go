@@ -2,7 +2,7 @@ package logger
 
 import (
 	"fmt"
-	base_log "log"
+	baselog "log"
 	"os"
 	"testing_system/common/config"
 )
@@ -17,8 +17,8 @@ const (
 
 var (
 	logLevel = LogLevelInfo
-	log      = base_log.New(os.Stdout, "", base_log.Ldate|base_log.Ltime)
-	logErr   = base_log.New(os.Stderr, "", base_log.Ldate|base_log.Ltime)
+	log      = baselog.New(os.Stdout, "", baselog.Ldate|baselog.Ltime)
+	logErr   = baselog.New(os.Stderr, "", baselog.Ldate|baselog.Ltime)
 )
 
 func Trace(format string, values ...interface{}) {
@@ -80,9 +80,9 @@ func InitLogger(config *config.Config) {
 		}
 	}
 
-	flags := base_log.Ldate | base_log.Ltime
-	log = base_log.New(logFile, "", flags)
-	logErr = base_log.New(logErrFile, "", flags)
+	flags := baselog.Ldate | baselog.Ltime
+	log = baselog.New(logFile, "", flags)
+	logErr = baselog.New(logErrFile, "", flags)
 
 	Info("Logger is successfully initialized")
 }

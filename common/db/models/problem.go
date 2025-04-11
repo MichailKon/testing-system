@@ -17,13 +17,13 @@ type Problem struct {
 
 	ProblemType ProblemType
 
-	TimeLimit     customfields.TimeLimit
-	MemoryLimit   customfields.MemoryLimit
-	WallTimeLimit *customfields.TimeLimit
+	TimeLimit     customfields.Time
+	MemoryLimit   customfields.Memory
+	WallTimeLimit *customfields.Time
 
 	TestsNumber uint64
 
 	MaxOpenFiles  *uint64
 	MaxThreads    *uint64
-	MaxOutputSize *customfields.MemoryLimit
+	MaxOutputSize *customfields.Memory
 }

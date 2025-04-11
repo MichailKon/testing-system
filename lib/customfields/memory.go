@@ -8,17 +8,25 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type MemoryLimit uint64
+// Memory is set by number and size suffix. Possible suffixes are:
+// * g: means gigibytes
+// * m: means mebibytes
+// * k: means kibibytes
+// * b: means bytes
+// Suffix can be in uppercase or lowercase.
+// E.g. "10g" means 10 gigibyte (the value will be 10 * 2^30), "5ms" means 5 milliseconds (the value will be 5 * 2^20)
 
-func (m *MemoryLimit) Val() uint64 {
+type Memory uint64
+
+func (m *Memory) Val() uint64 {
 	return uint64(*m)
 }
 
-func (m MemoryLimit) MarshalYAML() (interface{}, error) {
+func (m Memory) MarshalYAML() (interface{}, error) {
 	return m.String(), nil
 }
 
-func (m *MemoryLimit) UnmarshalYAML(node *yaml.Node) error {
+func (m *Memory) UnmarshalYAML(node *yaml.Node) error {
 	var s string
 	if err := node.Decode(&s); err != nil {
 		return err
@@ -26,11 +34,11 @@ func (m *MemoryLimit) UnmarshalYAML(node *yaml.Node) error {
 	return m.FromStr(s)
 }
 
-func (m MemoryLimit) MarshalJSON() ([]byte, error) {
+func (m Memory) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m.String())
 }
 
-func (m *MemoryLimit) UnmarshalJSON(data []byte) error {
+func (m *Memory) UnmarshalJSON(data []byte) error {
 	var s string
 	err := json.Unmarshal(data, &s)
 	if err != nil {
@@ -39,24 +47,24 @@ func (m *MemoryLimit) UnmarshalJSON(data []byte) error {
 	return m.FromStr(s)
 }
 
-func (m *MemoryLimit) Scan(value interface{}) error {
+func (m *Memory) Scan(value interface{}) error {
 	val, ok := value.(int64)
 	if !ok {
-		return errors.New("MemoryLimit must be int64")
+		return errors.New("Memory must be int64")
 	}
-	*m = MemoryLimit(val)
+	*m = Memory(val)
 	return nil
 }
 
-func (m *MemoryLimit) Value() (driver.Value, error) {
+func (m *Memory) Value() (driver.Value, error) {
 	return int64(*m), nil
 }
 
-func (m *MemoryLimit) GormDataType() string {
+func (m *Memory) GormDataType() string {
 	return "int64" // uint64 not supported by goorm
 }
 
-func (m *MemoryLimit) FromStr(s string) error {
+func (m *Memory) FromStr(s string) error {
 	num, suf, err := separateStr(s)
 	if err != nil {
 		return err
@@ -75,20 +83,20 @@ func (m *MemoryLimit) FromStr(s string) error {
 	default:
 		return fmt.Errorf("unknown size suffix %s", suf)
 	}
-	*m = MemoryLimit(num)
+	*m = Memory(num)
 	return nil
 }
 
-func (m *MemoryLimit) String() string {
+func (m *Memory) String() string {
 	v := m.Val()
 	suf := "b"
 	if v%1024 == 0 {
 		suf = "k"
 		v /= 1024
-		if v%1024 != 0 {
+		if v%1024 == 0 {
 			suf = "m"
 			v /= 1024
-			if v%1024 != 0 {
+			if v%1024 == 0 {
 				suf = "g"
 				v /= 1024
 			}
