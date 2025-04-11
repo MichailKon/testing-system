@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"slices"
 	"sync"
 	"testing_system/common"
 	"testing_system/common/connectors/invokerconn"
@@ -16,6 +17,8 @@ type InvokerRegistry struct {
 
 	invokers       []*Invoker
 	invokerByJobID map[string]*Invoker
+
+	nextJob *invokerconn.Job
 }
 
 func NewInvokerRegistry(queue queue.IQueue, ts *common.TestingSystem) *InvokerRegistry {
@@ -40,13 +43,7 @@ func (r *InvokerRegistry) OnInvokerFailure(invoker *Invoker) {
 		}
 	}
 
-	for i, curInvoker := range r.invokers {
-		if curInvoker == invoker {
-			r.invokers[i] = nil
-			r.invokers = append(r.invokers[:i], r.invokers[i+1:]...)
-			break
-		}
-	}
+	r.invokers = slices.DeleteFunc(r.invokers, func(i *Invoker) bool { return i == invoker })
 }
 
 func (r *InvokerRegistry) RegisterNewInvoker(connector *invokerconn.Connector) {
@@ -76,11 +73,9 @@ func (r *InvokerRegistry) JobTested(jobID string) bool {
 
 func (r *InvokerRegistry) trySendJob(job *invokerconn.Job) bool {
 	r.mutex.Lock()
-	invokersList := make([]*Invoker, len(r.invokers))
-	copy(invokersList, r.invokers)
-	r.mutex.Unlock()
+	defer r.mutex.Unlock()
 
-	for _, invoker := range invokersList {
+	for _, invoker := range r.invokers {
 		if invoker.TrySendJob(job) {
 			return true
 		}
@@ -90,13 +85,22 @@ func (r *InvokerRegistry) trySendJob(job *invokerconn.Job) bool {
 }
 
 func (r *InvokerRegistry) SendJobs() {
-	for {
-		job := r.queue.NextJob()
-		if job == nil {
-			return
-		}
-		if !r.trySendJob(job) {
-			return
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	for _, invoker := range r.invokers {
+		for {
+			if r.nextJob == nil {
+				r.nextJob = r.queue.NextJob()
+			}
+			if r.nextJob == nil {
+				return
+			}
+
+			if !invoker.TrySendJob(r.nextJob) {
+				break
+			}
+			r.nextJob = nil
 		}
 	}
 }

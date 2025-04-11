@@ -10,7 +10,7 @@ type MasterConfig struct {
 
 func fillInMasterConfig(config *MasterConfig) {
 	if config.InvokersPingInterval == 0 {
-		config.InvokersPingInterval = 10 * time.Second
+		config.InvokersPingInterval = time.Second
 	}
 	if config.SendJobInterval == 0 {
 		config.SendJobInterval = time.Second

@@ -43,7 +43,7 @@ func newInvoker(connector *invokerconn.Connector, registry *InvokerRegistry, ts 
 
 	var ctx context.Context
 	ctx, invoker.cancel = context.WithCancel(ts.StopCtx)
-	go invoker.PingLoop(ctx)
+	ts.Go(func() { invoker.PingLoop(ctx) })
 
 	return &invoker
 }
@@ -87,10 +87,20 @@ func (i *Invoker) getJobType(jobID string) JobType {
 	return jobType
 }
 
+func (i *Invoker) addJob(jobID string, jobType JobType) {
+	i.jobTypeByID[jobID] = jobType
+	i.jobTypesCount[jobType]++
+}
+
 func (i *Invoker) setJobType(jobID string, jobType JobType) {
 	i.jobTypesCount[i.getJobType(jobID)]--
 	i.jobTypeByID[jobID] = jobType
 	i.jobTypesCount[jobType]++
+}
+
+func (i *Invoker) removeJob(jobID string) {
+	i.jobTypesCount[i.getJobType(jobID)]--
+	delete(i.jobTypeByID, jobID)
 }
 
 func (i *Invoker) completeSendJob(job *invokerconn.Job) {
@@ -109,8 +119,7 @@ func (i *Invoker) completeSendJob(job *invokerconn.Job) {
 	case SendingJob:
 		i.setJobType(job.ID, TestingJob)
 	case TestingJob, NoReplyJob:
-		logger.Error("SendingJob unexpectedly changed its status")
-		return
+		panic(logger.Error("SendingJob unexpectedly changed its status"))
 	case UnknownJob:
 		// job has been already tested
 	}
@@ -126,8 +135,8 @@ func (i *Invoker) TrySendJob(job *invokerconn.Job) bool {
 		return false
 	}
 
-	i.setJobType(job.ID, SendingJob)
-	go i.completeSendJob(job)
+	i.addJob(job.ID, SendingJob)
+	i.ts.Go(func() { i.completeSendJob(job) })
 
 	return true
 }
@@ -151,7 +160,7 @@ func (i *Invoker) ensureJobIsNotLost(jobID string) {
 }
 
 func (i *Invoker) updateStatus(status *invokerconn.StatusResponse) {
-	if i.failed || (i.status != nil && i.status.Timestamp.After(status.Timestamp)) {
+	if i.failed || (i.status != nil && i.status.Epoch >= status.Epoch) {
 		return
 	}
 
@@ -174,7 +183,7 @@ func (i *Invoker) updateStatus(status *invokerconn.StatusResponse) {
 				return
 			}
 		case UnknownJob:
-			logger.Error("invoker shouldn't store job of type UnknownJob")
+			panic(logger.Error("invoker shouldn't store job of type UnknownJob"))
 		}
 	}
 
@@ -190,7 +199,7 @@ func (i *Invoker) markFailed() {
 
 	i.failed = true
 	i.cancel()
-	go i.registry.OnInvokerFailure(i)
+	i.ts.Go(func() { i.registry.OnInvokerFailure(i) })
 }
 
 func (i *Invoker) ExtractJobs() []string {
@@ -206,14 +215,6 @@ func (i *Invoker) ExtractJobs() []string {
 	i.jobTypesCount = make(map[JobType]int)
 
 	return jobs
-}
-
-func (i *Invoker) removeJob(jobID string) {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
-
-	i.jobTypesCount[i.getJobType(jobID)]--
-	delete(i.jobTypeByID, jobID)
 }
 
 func (i *Invoker) JobTested(jobID string) bool {
