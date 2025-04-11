@@ -7,7 +7,7 @@ import (
 )
 
 type IFilesystem interface {
-	SaveFile(prefix string, id string, filename string, file *multipart.FileHeader, c *gin.Context) error
+	SaveFile(c *gin.Context, prefix string, id string, filename string, file *multipart.FileHeader) error
 	RemoveFile(prefix string, id string, filename string) error
 	GetFilePath(prefix string, id string, filename string) (string, error)
 }

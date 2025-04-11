@@ -1,6 +1,7 @@
 package resource
 
 //go:generate stringer -type=Type
+//go:generate stringer -type=DataType
 
 type Type int
 
@@ -15,5 +16,14 @@ const (
 	Checker
 	CheckerOutput
 	Interactor
+	// Will be increased
+)
+
+type DataType int
+
+const (
+	UnknownDataType DataType = iota
+	Problem
+	Submission
 	// Will be increased
 )
