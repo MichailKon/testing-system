@@ -89,8 +89,8 @@ func (s *Sandbox) Run(config *sandbox.ExecuteConfig) *sandbox.RunResult {
 	}
 
 	rusage := cmd.ProcessState.SysUsage().(*syscall.Rusage)
-	result.Statistics.Time = customfields.TimeLimit(rusage.Utime.Nano())
-	result.Statistics.Memory = customfields.MemoryLimit(rusage.Maxrss)
+	result.Statistics.Time = customfields.Time(rusage.Utime.Nano())
+	result.Statistics.Memory = customfields.Memory(rusage.Maxrss)
 	if runtime.GOOS != "darwin" { // We have macOS defined for tests!
 		result.Statistics.Memory *= 1024
 	}
