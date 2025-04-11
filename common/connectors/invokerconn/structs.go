@@ -1,5 +1,7 @@
 package invokerconn
 
+import "time"
+
 type JobType int
 
 const (
@@ -18,6 +20,7 @@ type Job struct {
 
 type StatusResponse struct {
 	// TODO: add some information about invoker state
-	MaxNewJobs   uint64   `json:"MaxNewJobs"`
-	ActiveJobIDs []string `json:"ActiveJobIDs"`
+	MaxNewJobs   uint64    `json:"MaxNewJobs"`
+	ActiveJobIDs []string  `json:"ActiveJobIDs"`
+	Timestamp    time.Time `json:"Timestamp"`
 }

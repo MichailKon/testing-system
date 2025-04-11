@@ -1,7 +1,9 @@
 package registry
 
 import (
+	"context"
 	"sync"
+	"testing_system/common"
 	"testing_system/common/connectors/invokerconn"
 	"testing_system/lib/logger"
 	"time"
@@ -17,29 +19,67 @@ const (
 )
 
 type Invoker struct {
-	Connector *invokerconn.Connector
-	Mutex     sync.Mutex
+	ts        *common.TestingSystem
+	connector *invokerconn.Connector
+	registry  *InvokerRegistry
+	cancel    context.CancelFunc
+
+	mutex sync.Mutex
 
 	jobTypeByID   map[string]JobType
 	jobTypesCount map[JobType]int
 
-	status           *invokerconn.StatusResponse
-	curStatusEpoch   int
-	lastStatusEpoch  int
-	lastStatusUpdate time.Time
-	failed           bool
+	status *invokerconn.StatusResponse
+	failed bool
 }
 
-func (i *Invoker) NeedToPing(pingInterval time.Duration) bool {
-	return !i.failed && (i.status == nil || time.Now().Sub(i.lastStatusUpdate) > pingInterval)
+func newInvoker(connector *invokerconn.Connector, registry *InvokerRegistry, ts *common.TestingSystem) *Invoker {
+	invoker := Invoker{
+		connector:     connector,
+		registry:      registry,
+		jobTypeByID:   make(map[string]JobType),
+		jobTypesCount: make(map[JobType]int),
+	}
+
+	var ctx context.Context
+	ctx, invoker.cancel = context.WithCancel(ts.StopCtx)
+	go invoker.PingLoop(ctx)
+
+	return &invoker
 }
 
-func (i *Invoker) NextStatusEpoch() int {
-	i.curStatusEpoch++
-	return i.curStatusEpoch
+func (i *Invoker) ping() {
+	status, err := i.connector.Status()
+
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+
+	if err != nil {
+		i.markFailed()
+		return
+	}
+
+	i.updateStatus(status)
 }
 
-func (i *Invoker) GetJobType(jobID string) JobType {
+func (i *Invoker) PingLoop(ctx context.Context) {
+	logger.Info("starting invoker ping loop")
+
+	t := time.Tick(i.ts.Config.Master.InvokersPingInterval)
+
+	for {
+		i.ping()
+
+		select {
+		case <-ctx.Done():
+			logger.Info("stopping invoker ping loop")
+			return
+		case <-t:
+		}
+	}
+}
+
+func (i *Invoker) getJobType(jobID string) JobType {
 	jobType, ok := i.jobTypeByID[jobID]
 	if !ok {
 		return UnknownJob
@@ -47,19 +87,49 @@ func (i *Invoker) GetJobType(jobID string) JobType {
 	return jobType
 }
 
-func (i *Invoker) SetJobType(jobID string, jobType JobType) {
-	i.jobTypesCount[i.GetJobType(jobID)]--
+func (i *Invoker) setJobType(jobID string, jobType JobType) {
+	i.jobTypesCount[i.getJobType(jobID)]--
 	i.jobTypeByID[jobID] = jobType
-	i.jobTypesCount[i.GetJobType(jobID)]++
+	i.jobTypesCount[i.getJobType(jobID)]++
 }
 
-func (i *Invoker) RemoveJob(jobID string) {
-	i.jobTypesCount[i.GetJobType(jobID)]--
-	delete(i.jobTypeByID, jobID)
+func (i *Invoker) completeSendJob(job *invokerconn.Job) {
+	status, err := i.connector.NewJob(job)
+
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+
+	if err != nil {
+		i.markFailed()
+		return
+	}
+
+	jobType := i.getJobType(job.ID)
+	switch jobType {
+	case SendingJob:
+		i.setJobType(job.ID, TestingJob)
+	case TestingJob, NoReplyJob:
+		logger.Error("SendingJob unexpectedly changed its status")
+		return
+	case UnknownJob:
+		// job has been already tested
+	}
+
+	i.updateStatus(status)
 }
 
-func (i *Invoker) CanSendJob() bool {
-	return !i.failed && i.status != nil && i.jobTypesCount[SendingJob]+1 <= int(i.status.MaxNewJobs)
+func (i *Invoker) TrySendJob(job *invokerconn.Job) bool {
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+
+	if i.failed || (i.status != nil && i.jobTypesCount[SendingJob]+1 > int(i.status.MaxNewJobs)) {
+		return false
+	}
+
+	i.setJobType(job.ID, SendingJob)
+	go i.completeSendJob(job)
+
+	return true
 }
 
 func isJobTesting(jobID string, status *invokerconn.StatusResponse) bool {
@@ -71,14 +141,22 @@ func isJobTesting(jobID string, status *invokerconn.StatusResponse) bool {
 	return false
 }
 
-func (i *Invoker) SetStatus(status *invokerconn.StatusResponse, epoch int) (jobsToReschedule, newNoReplyJobs []string) {
-	if i.failed || (status != nil && epoch <= i.lastStatusEpoch) {
+func (i *Invoker) ensureJobIsNotLost(jobID string) {
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+
+	if i.getJobType(jobID) == NoReplyJob {
+		i.markFailed()
+	}
+}
+
+func (i *Invoker) updateStatus(status *invokerconn.StatusResponse) {
+	if i.failed || (i.status != nil && i.status.Timestamp.After(status.Timestamp)) {
 		return
 	}
 
 	i.status = status
-	i.lastStatusEpoch = epoch
-	i.lastStatusUpdate = time.Now()
+	newNoReplyJobs := make([]string, 0)
 
 	for jobID, jobType := range i.jobTypeByID {
 		switch jobType {
@@ -87,41 +165,66 @@ func (i *Invoker) SetStatus(status *invokerconn.StatusResponse, epoch int) (jobs
 		case TestingJob:
 			if !isJobTesting(jobID, status) {
 				newNoReplyJobs = append(newNoReplyJobs, jobID)
-				i.SetJobType(jobID, NoReplyJob)
+				i.setJobType(jobID, NoReplyJob)
 			}
 		case NoReplyJob:
 			if isJobTesting(jobID, status) {
 				logger.Info("job %s diappeared from status, but then reappeared", jobID)
-				return i.MarkFailed(), nil
+				i.markFailed()
+				return
 			}
 		case UnknownJob:
 			logger.Error("invoker shouldn't store job of type UnknownJob")
 		}
 	}
-	return
+
+	for _, jobID := range newNoReplyJobs {
+		time.AfterFunc(i.ts.Config.Master.LostJobTimeout, func() { i.ensureJobIsNotLost(jobID) })
+	}
 }
 
-func (i *Invoker) MarkFailed() []string {
+func (i *Invoker) markFailed() {
 	if i.failed {
-		return nil
+		return
 	}
+
 	i.failed = true
+	i.cancel()
+	go i.registry.OnInvokerFailure(i)
+}
+
+func (i *Invoker) ExtractJobs() []string {
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	jobs := make([]string, 0, len(i.jobTypeByID))
-	for jobID := range i.jobTypeByID {
-		jobs = append(jobs, jobID)
+	for k := range i.jobTypeByID {
+		jobs = append(jobs, k)
 	}
 
-	i.jobTypeByID = nil
-	i.jobTypesCount = nil
+	i.jobTypeByID = make(map[string]JobType)
+	i.jobTypesCount = make(map[JobType]int)
 
 	return jobs
 }
 
-func newInvoker(connector *invokerconn.Connector) *Invoker {
-	return &Invoker{
-		Connector:     connector,
-		jobTypeByID:   make(map[string]JobType),
-		jobTypesCount: make(map[JobType]int),
+func (i *Invoker) removeJob(jobID string) {
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+
+	i.jobTypesCount[i.getJobType(jobID)]--
+	delete(i.jobTypeByID, jobID)
+}
+
+func (i *Invoker) JobTested(jobID string) bool {
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+
+	jobType := i.getJobType(jobID)
+	if jobType == UnknownJob {
+		return false
 	}
+
+	i.removeJob(jobID)
+	return true
 }
