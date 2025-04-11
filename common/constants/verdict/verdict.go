@@ -8,10 +8,9 @@ const (
 	PT Verdict = "PT" // Partial solution
 
 	WA Verdict = "WA" // Wrong answer
-	//PE Verdict = "PE" // Presentation error, we will treat it as Wrong Answer
 
 	RT Verdict = "RT" // Runtime error
-	ML Verdict = "PE" // Memory limit
+	ML Verdict = "ML" // Memory limit
 	TL Verdict = "TL" // Time limit
 	WL Verdict = "WL" // Wall time limit
 	SE Verdict = "SE" // Security violation
@@ -20,6 +19,7 @@ const (
 	CD Verdict = "CD" // Compiled
 
 	CF Verdict = "CF" // Check failed
+	SK Verdict = "SK" // Skipped
 
 	QD Verdict = "QD" // Queued
 	CL Verdict = "CL" // Compiling

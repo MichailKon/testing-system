@@ -14,7 +14,7 @@ func (m *MemoryLimit) Val() uint64 {
 	return uint64(*m)
 }
 
-func (m *MemoryLimit) MarshalYAML() (interface{}, error) {
+func (m MemoryLimit) MarshalYAML() (interface{}, error) {
 	return m.String(), nil
 }
 
@@ -26,7 +26,7 @@ func (m *MemoryLimit) UnmarshalYAML(node *yaml.Node) error {
 	return m.FromStr(s)
 }
 
-func (m *MemoryLimit) MarshalJSON() ([]byte, error) {
+func (m MemoryLimit) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m.String())
 }
 

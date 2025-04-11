@@ -4,6 +4,8 @@ import (
 	"testing_system/common"
 	"testing_system/common/connectors/invokerconn"
 	"testing_system/common/connectors/masterconn"
+	"testing_system/common/db/models"
+	"testing_system/master/queue/jobgenerators"
 )
 
 /*
@@ -17,20 +19,27 @@ When the submission status is finalized, it returns to the Master, which saves t
 */
 
 type IQueue interface {
-	// Processes a new submission
-	Submit(submission *SubmissionHolder) error
+	// Submit processes a new submission; you SHOULD NOT submit the same pointer twice
+	Submit(problem *models.Problem, submission *models.Submission) error
 
-	// Returns not nil if submission status is finalized
-	JobCompleted(job *masterconn.InvokerJobResult) (submission *SubmissionHolder, err error)
+	// JobCompleted returns not nil if submission status is finalized
+	JobCompleted(jobResult *masterconn.InvokerJobResult) (submission *models.Submission, err error)
 
-	// Puts job back into the queue in case of failure
+	// RescheduleJob puts job back into the queue in case of failure;
+	// it may change previous *masterconn.InvokerJobResult's ID
 	RescheduleJob(jobID string) error
 
-	// Returns a new job or nil if no jobs are queued
+	// NextJob returns a new job or nil if no jobs to do; each job should be completed or rescheduled
 	NextJob() *invokerconn.Job
 }
 
 func NewQueue(ts *common.TestingSystem) IQueue {
-	// TODO
-	return nil
+	return &Queue{
+		ts:                       ts,
+		jobIDToOriginalJobID:     make(map[string]string),
+		newFailedJobs:            make([]*invokerconn.Job, 0),
+		originalJobIDToJob:       make(map[string]*invokerconn.Job),
+		originalJobIDToGenerator: make(map[string]jobgenerators.Generator),
+		activeGeneratorIDs:       make(map[string]struct{}),
+	}
 }

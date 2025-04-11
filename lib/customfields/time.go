@@ -21,7 +21,7 @@ func (t *TimeLimit) Val() uint64 {
 	return uint64(*t)
 }
 
-func (t *TimeLimit) MarshalYAML() (interface{}, error) {
+func (t TimeLimit) MarshalYAML() (interface{}, error) {
 	return t.String(), nil
 }
 
@@ -33,7 +33,7 @@ func (t *TimeLimit) UnmarshalYAML(node *yaml.Node) error {
 	return t.FromStr(s)
 }
 
-func (t *TimeLimit) MarshalJSON() ([]byte, error) {
+func (t TimeLimit) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t.String())
 }
 
