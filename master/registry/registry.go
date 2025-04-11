@@ -57,17 +57,16 @@ func (r *InvokerRegistry) RegisterNewInvoker(connector *invokerconn.Connector) {
 
 func (r *InvokerRegistry) JobTested(jobID string) bool {
 	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
 	invoker, exists := r.invokerByJobID[jobID]
 
 	if !exists {
 		logger.Info("old or unknown job %s is tested", jobID)
-		r.mutex.Unlock()
 		return false
 	}
 
 	delete(r.invokerByJobID, jobID)
-	r.mutex.Unlock()
-
 	return invoker.JobTested(jobID)
 }
 

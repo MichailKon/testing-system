@@ -119,7 +119,7 @@ func (i *Invoker) completeSendJob(job *invokerconn.Job) {
 	case SendingJob:
 		i.setJobType(job.ID, TestingJob)
 	case TestingJob, NoReplyJob:
-		panic(logger.Error("SendingJob unexpectedly changed its status"))
+		logger.Panic("SendingJob unexpectedly changed its status")
 	case UnknownJob:
 		// job has been already tested
 	}
@@ -165,7 +165,6 @@ func (i *Invoker) updateStatus(status *invokerconn.StatusResponse) {
 	}
 
 	i.status = status
-	newNoReplyJobs := make([]string, 0)
 
 	for jobID, jobType := range i.jobTypeByID {
 		switch jobType {
@@ -173,22 +172,18 @@ func (i *Invoker) updateStatus(status *invokerconn.StatusResponse) {
 			// pass
 		case TestingJob:
 			if !isJobTesting(jobID, status) {
-				newNoReplyJobs = append(newNoReplyJobs, jobID)
 				i.setJobType(jobID, NoReplyJob)
+				time.AfterFunc(i.ts.Config.Master.LostJobTimeout, func() { i.ensureJobIsNotLost(jobID) })
 			}
 		case NoReplyJob:
 			if isJobTesting(jobID, status) {
-				logger.Info("job %s diappeared from status, but then reappeared", jobID)
+				logger.Info("job %s disappeared from status, but then reappeared", jobID)
 				i.markFailed()
 				return
 			}
 		case UnknownJob:
-			panic(logger.Error("invoker shouldn't store job of type UnknownJob"))
+			logger.Panic("invoker shouldn't store job of type UnknownJob")
 		}
-	}
-
-	for _, jobID := range newNoReplyJobs {
-		time.AfterFunc(i.ts.Config.Master.LostJobTimeout, func() { i.ensureJobIsNotLost(jobID) })
 	}
 }
 
