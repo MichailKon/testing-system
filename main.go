@@ -23,7 +23,7 @@ func main() {
 	if ts.Config.Master != nil {
 		err := master.SetupMaster(ts)
 		if err != nil {
-			logger.Panic(err.Error())
+			logger.Panic("Can not setup master, error: %v", err.Error())
 		}
 	} else {
 		logger.Info("master is not configured, skipping master component")
