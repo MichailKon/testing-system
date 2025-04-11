@@ -36,19 +36,19 @@ func (i *ICPCGenerator) ID() string {
 
 // finalizeResults must be done with acquired mutex
 func (i *ICPCGenerator) finalizeResults() {
-	setUnknown := false
+	setSkipped := false
 	for j := range i.submission.TestResults {
-		if setUnknown {
+		if setSkipped {
 			i.submission.TestResults[j].Verdict = verdict.SK
 			continue
 		}
 		if i.submission.TestResults[j].Verdict == verdict.OK || i.submission.TestResults[j].Verdict == verdict.SK {
 			continue
 		}
-		setUnknown = true
+		setSkipped = true
 		i.submission.Verdict = i.submission.TestResults[j].Verdict
 	}
-	if !setUnknown {
+	if !setSkipped {
 		i.submission.Score = 1
 		i.submission.Verdict = verdict.OK
 	}
@@ -63,12 +63,12 @@ func (i *ICPCGenerator) NextJob() *invokerconn.Job {
 	if i.state == compilationStarted {
 		return nil
 	}
-	UUID, err := uuid.NewV7()
+	id, err := uuid.NewV7()
 	if err != nil {
-		logger.Panic("Can't generate UUID for job: %w", err)
+		logger.Panic("Can't generate id for job: %w", err)
 	}
 	job := &invokerconn.Job{
-		ID:       UUID.String(),
+		ID:       id.String(),
 		SubmitID: i.submission.ID,
 	}
 	if i.state == compilationNotStarted {
@@ -145,9 +145,9 @@ func (i *ICPCGenerator) JobCompleted(result *masterconn.InvokerJobResult) (*mode
 }
 
 func newICPCGenerator(problem *models.Problem, submission *models.Submission) (Generator, error) {
-	ID, err := uuid.NewV7()
+	id, err := uuid.NewV7()
 	if err != nil {
-		logger.Panic("Can't generate generator ID: %w", err)
+		logger.Panic("Can't generate generator id: %w", err)
 	}
 
 	if problem.ProblemType != models.ProblemType_ICPC {
@@ -168,7 +168,7 @@ func newICPCGenerator(problem *models.Problem, submission *models.Submission) (G
 	submission.TestResults = testResults
 
 	return &ICPCGenerator{
-		id:          ID.String(),
+		id:          id.String(),
 		submission:  submission,
 		problem:     problem,
 		givenJobs:   make(map[string]*invokerconn.Job),

@@ -19,7 +19,7 @@ const (
 	CD Verdict = "CD" // Compiled
 
 	CF Verdict = "CF" // Check failed
-	SK Verdict = "SK" // Unknown
+	SK Verdict = "SK" // Skipped
 
 	QD Verdict = "QD" // Queued
 	CL Verdict = "CL" // Compiling

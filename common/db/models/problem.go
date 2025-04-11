@@ -15,6 +15,8 @@ const (
 type Problem struct {
 	gorm.Model
 
+	ProblemType ProblemType
+
 	TimeLimit     customfields.TimeLimit
 	MemoryLimit   customfields.MemoryLimit
 	WallTimeLimit *customfields.TimeLimit
@@ -24,5 +26,4 @@ type Problem struct {
 	MaxOpenFiles  *uint64
 	MaxThreads    *uint64
 	MaxOutputSize *customfields.MemoryLimit
-	ProblemType   ProblemType
 }

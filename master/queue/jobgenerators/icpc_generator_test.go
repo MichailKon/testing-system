@@ -88,12 +88,12 @@ func TestTasksFinishing(t *testing.T) {
 		})
 		require.Nil(t, sub)
 		require.Nil(t, err)
-		firstTwoJobIds := make([]string, 0)
+		firstTwoJobIDs := make([]string, 0)
 		for i := range 2 {
 			job = nextJob(t, g, 1, invokerconn.TestJob, uint64(i)+1)
-			firstTwoJobIds = append(firstTwoJobIds, job.ID)
+			firstTwoJobIDs = append(firstTwoJobIDs, job.ID)
 		}
-		return g, firstTwoJobIds
+		return g, firstTwoJobIDs
 	}
 	finishOtherTests := func(g Generator) {
 		for i := 2; i < 9; i++ {
@@ -122,8 +122,8 @@ func TestTasksFinishing(t *testing.T) {
 	}
 
 	t.Run("right order", func(t *testing.T) {
-		g, firstTwoJobIds := prepare()
-		for _, id := range firstTwoJobIds {
+		g, firstTwoJobIDs := prepare()
+		for _, id := range firstTwoJobIDs {
 			sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
 				JobID:   id,
 				Verdict: verdict.OK,
@@ -135,16 +135,16 @@ func TestTasksFinishing(t *testing.T) {
 	})
 
 	t.Run("wrong order + both ok", func(t *testing.T) {
-		g, firstTwoJobIds := prepare()
+		g, firstTwoJobIDs := prepare()
 		sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   firstTwoJobIds[1],
+			JobID:   firstTwoJobIDs[1],
 			Verdict: verdict.OK,
 		})
 		require.Nil(t, sub)
 		require.Nil(t, err)
 
 		sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   firstTwoJobIds[0],
+			JobID:   firstTwoJobIDs[0],
 			Verdict: verdict.OK,
 		})
 		require.Nil(t, sub)
@@ -154,16 +154,16 @@ func TestTasksFinishing(t *testing.T) {
 	})
 
 	t.Run("wrong order + 2nd fail", func(t *testing.T) {
-		g, firstTwoJobIds := prepare()
+		g, firstTwoJobIDs := prepare()
 		sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   firstTwoJobIds[1],
+			JobID:   firstTwoJobIDs[1],
 			Verdict: verdict.WA,
 		})
 		require.Nil(t, sub)
 		require.Nil(t, err)
 
 		sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   firstTwoJobIds[0],
+			JobID:   firstTwoJobIDs[0],
 			Verdict: verdict.OK,
 		})
 		require.NotNil(t, sub)
@@ -180,16 +180,16 @@ func TestTasksFinishing(t *testing.T) {
 	})
 
 	t.Run("wrong order + 1st fail", func(t *testing.T) {
-		g, firstTwoJobIds := prepare()
+		g, firstTwoJobIDs := prepare()
 		sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   firstTwoJobIds[1],
+			JobID:   firstTwoJobIDs[1],
 			Verdict: verdict.OK,
 		})
 		require.Nil(t, sub)
 		require.Nil(t, err)
 
 		sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   firstTwoJobIds[0],
+			JobID:   firstTwoJobIDs[0],
 			Verdict: verdict.WA,
 		})
 		require.NotNil(t, sub)

@@ -19,12 +19,12 @@ type Queue struct {
 	mutex            sync.Mutex
 	activeGenerators list.List
 	// in case of reschedule, new ID will be mapped to the first one
-	jobIdToOriginalJobId map[string]string
+	jobIDToOriginalJobID map[string]string
 	newFailedJobs        []*invokerconn.Job
 	originalJobIDToJob   map[string]*invokerconn.Job
 
 	originalJobIDToGenerator map[string]jobgenerators.Generator
-	activeGeneratorIds       map[string]struct{}
+	activeGeneratorIDs       map[string]struct{}
 }
 
 func (q *Queue) Submit(problem *models.Problem, submission *models.Submission) error {
@@ -35,7 +35,7 @@ func (q *Queue) Submit(problem *models.Problem, submission *models.Submission) e
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
 	q.activeGenerators.PushBack(generator)
-	q.activeGeneratorIds[generator.ID()] = struct{}{}
+	q.activeGeneratorIDs[generator.ID()] = struct{}{}
 	return nil
 }
 
@@ -43,9 +43,9 @@ func (q *Queue) JobCompleted(jobResult *masterconn.InvokerJobResult) (submission
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
 	wasID := jobResult.JobID
-	if origId, ok := q.jobIdToOriginalJobId[jobResult.JobID]; ok {
-		delete(q.jobIdToOriginalJobId, jobResult.JobID)
-		jobResult.JobID = origId
+	if origID, ok := q.jobIDToOriginalJobID[jobResult.JobID]; ok {
+		delete(q.jobIDToOriginalJobID, jobResult.JobID)
+		jobResult.JobID = origID
 		defer func() {
 			jobResult.JobID = wasID
 		}()
@@ -54,10 +54,10 @@ func (q *Queue) JobCompleted(jobResult *masterconn.InvokerJobResult) (submission
 	generator, ok := q.originalJobIDToGenerator[jobResult.JobID]
 	if !ok {
 		if wasID != jobResult.JobID {
-			logger.Panic("Job has id=%v and origId=%v; was not found in originalJobIDToGenerator",
+			logger.Panic("Job has id=%v and origID=%v; was not found in originalJobIDToGenerator",
 				wasID, jobResult.JobID)
 		}
-		return nil, fmt.Errorf("no job with id=%v (origId=%v)", jobResult.JobID, wasID)
+		return nil, fmt.Errorf("no job with id=%v (origID=%v)", jobResult.JobID, wasID)
 	}
 	delete(q.originalJobIDToJob, jobResult.JobID)
 	delete(q.originalJobIDToGenerator, jobResult.JobID)
@@ -69,18 +69,18 @@ func (q *Queue) RescheduleJob(jobID string) error {
 	defer q.mutex.Unlock()
 
 	var origJob *invokerconn.Job
-	wasId := jobID
-	if origId, ok := q.jobIdToOriginalJobId[jobID]; ok {
-		delete(q.jobIdToOriginalJobId, jobID)
-		jobID = origId
+	wasID := jobID
+	if origID, ok := q.jobIDToOriginalJobID[jobID]; ok {
+		delete(q.jobIDToOriginalJobID, jobID)
+		jobID = origID
 		if origJob, ok = q.originalJobIDToJob[jobID]; !ok {
-			logger.Panic("Job has id=%v and origId=%v; was not found in originalJobIDToGenerator",
-				wasId, jobID)
+			logger.Panic("Job has id=%v and origID=%v; was not found in originalJobIDToGenerator",
+				wasID, jobID)
 		}
 	} else {
 		origJob, ok = q.originalJobIDToJob[jobID]
 		if !ok {
-			return fmt.Errorf("no job with id=%v (origId=%v)", wasId, jobID)
+			return fmt.Errorf("no job with id=%v (origID=%v)", wasID, jobID)
 		}
 	}
 	newUUID, err := uuid.NewV7()
@@ -88,7 +88,7 @@ func (q *Queue) RescheduleJob(jobID string) error {
 		logger.Panic("Can't generate job id: %v", err)
 	}
 	origJob.ID = newUUID.String()
-	q.jobIdToOriginalJobId[origJob.ID] = jobID
+	q.jobIDToOriginalJobID[origJob.ID] = jobID
 	q.newFailedJobs = append(q.newFailedJobs, origJob)
 	return nil
 }
@@ -108,7 +108,7 @@ func (q *Queue) NextJob() *invokerconn.Job {
 		job := generator.NextJob()
 		if job == nil {
 			q.activeGenerators.Remove(generatorListElement)
-			delete(q.activeGeneratorIds, generator.ID())
+			delete(q.activeGeneratorIDs, generator.ID())
 			continue
 		}
 		q.activeGenerators.MoveToBack(generatorListElement)

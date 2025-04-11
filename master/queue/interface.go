@@ -36,10 +36,10 @@ type IQueue interface {
 func NewQueue(ts *common.TestingSystem) IQueue {
 	return &Queue{
 		ts:                       ts,
-		jobIdToOriginalJobId:     make(map[string]string),
+		jobIDToOriginalJobID:     make(map[string]string),
 		newFailedJobs:            make([]*invokerconn.Job, 0),
 		originalJobIDToJob:       make(map[string]*invokerconn.Job),
 		originalJobIDToGenerator: make(map[string]jobgenerators.Generator),
-		activeGeneratorIds:       make(map[string]struct{}),
+		activeGeneratorIDs:       make(map[string]struct{}),
 	}
 }

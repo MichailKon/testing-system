@@ -43,7 +43,7 @@ func doQueueCycles(t *testing.T, q *Queue, cycles int, maxNoJobs int) int {
 }
 
 func isQueueEmpty(q *Queue) bool {
-	return len(q.jobIdToOriginalJobId) == 0 &&
+	return len(q.jobIDToOriginalJobID) == 0 &&
 		len(q.newFailedJobs) == 0 &&
 		len(q.originalJobIDToJob) == 0 &&
 		len(q.originalJobIDToGenerator) == 0 &&
