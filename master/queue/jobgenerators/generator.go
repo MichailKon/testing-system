@@ -8,11 +8,11 @@ import (
 )
 
 type Generator interface {
-	// RescheduleJob reschedules a job and changes it's ID
-	RescheduleJob(jobID string) error
+	// ID returns Generator's unique(!) ID
+	ID() string
 
-	// NextJob returns _some_ job from this generator, or an error if there are no jobs
-	NextJob() (*invokerconn.Job, error)
+	// NextJob returns _some_ job from this generator
+	NextJob() *invokerconn.Job
 
 	// JobCompleted returns an errors, if it couldn't complete a job for some reason;
 	// submission is not nil if status is finalized

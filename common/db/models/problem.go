@@ -1,6 +1,9 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"gorm.io/gorm"
+	"testing_system/lib/customfields"
+)
 
 type ProblemType int
 
@@ -21,5 +24,5 @@ type Problem struct {
 	MaxOpenFiles  *uint64
 	MaxThreads    *uint64
 	MaxOutputSize *customfields.MemoryLimit
-	ProblemType ProblemType
+	ProblemType   ProblemType
 }

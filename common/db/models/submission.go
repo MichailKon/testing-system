@@ -5,14 +5,17 @@ import (
 	"encoding/json"
 	"errors"
 	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
 	"testing_system/common/constants/verdict"
+	"testing_system/lib/customfields"
 )
 
 type TestResult struct {
-	TestNumber     uint64          `json:"testNumber"`
-	Verdict        verdict.Verdict `json:"verdict"`
-	TimeConsumed   int64           `json:"timeConsumed"`
-	MemoryConsumed int64           `json:"memoryConsumed"`
+	TestNumber uint64                   `json:"testNumber" yaml:"testNumber"`
+	Points     *float64                 `json:"points,omitempty" yaml:"points,omitempty"`
+	Verdict    verdict.Verdict          `json:"verdict" yaml:"verdict"`
+	Time       customfields.TimeLimit   `json:"time" yaml:"time"`
+	Memory     customfields.MemoryLimit `json:"memory" yaml:"memory"`
 }
 
 type TestResults []TestResult
@@ -26,7 +29,21 @@ func (t *TestResults) Scan(value interface{}) error {
 	if !ok {
 		return errors.New("type assertion to []byte failed")
 	}
-	return json.Unmarshal(bytes, &t)
+	return json.Unmarshal(bytes, t)
+}
+
+func (t TestResults) GormDBDataType(db *gorm.DB, field *schema.Field) string {
+	// use field.Tag, field.TagSettings gets field's tags
+	// checkout https://github.com/go-gorm/gorm/blob/master/schema/field.go for all options
+
+	// returns different database type based on driver name
+	switch db.Dialector.Name() {
+	case "mysql", "sqlite":
+		return "JSON"
+	case "postgres":
+		return "JSONB"
+	}
+	return ""
 }
 
 type Submission struct {
@@ -36,5 +53,5 @@ type Submission struct {
 
 	Score       float64
 	Verdict     verdict.Verdict
-	TestResults []TestResult `gorm:"type:jsonb"`
+	TestResults TestResults `gorm:"type:jsonb"`
 }

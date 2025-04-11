@@ -25,7 +25,8 @@ type IQueue interface {
 	// JobCompleted returns not nil if submission status is finalized
 	JobCompleted(jobResult *masterconn.InvokerJobResult) (submission *models.Submission, err error)
 
-	// RescheduleJob puts job back into the queue in case of failure
+	// RescheduleJob puts job back into the queue in case of failure;
+	// it may change previous *masterconn.InvokerJobResult's ID
 	RescheduleJob(jobID string) error
 
 	// NextJob returns a new job or nil if no jobs to do; each job should be completed or rescheduled
@@ -34,8 +35,11 @@ type IQueue interface {
 
 func NewQueue(ts *common.TestingSystem) IQueue {
 	return &Queue{
-		ts:               ts,
-		jobIDToGenerator: make(map[string]jobgenerators.Generator),
-		generatorsInList: make(map[jobgenerators.Generator]struct{}),
+		ts:                       ts,
+		jobIdToOriginalJobId:     make(map[string]string),
+		newFailedJobs:            make([]*invokerconn.Job, 0),
+		originalJobIDToJob:       make(map[string]*invokerconn.Job),
+		originalJobIDToGenerator: make(map[string]jobgenerators.Generator),
+		activeGeneratorIds:       make(map[string]struct{}),
 	}
 }

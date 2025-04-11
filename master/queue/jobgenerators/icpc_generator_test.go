@@ -24,8 +24,7 @@ func fixtureSubmission() *models.Submission {
 }
 
 func nextJob(t *testing.T, g Generator, SubmitID uint, jobType invokerconn.JobType, test uint64) *invokerconn.Job {
-	job, err := g.NextJob()
-	assert.Nil(t, err)
+	job := g.NextJob()
 	assert.NotNil(t, job)
 	assert.Equal(t, job.Type, jobType)
 	assert.Equal(t, SubmitID, job.SubmitID)
@@ -34,9 +33,8 @@ func nextJob(t *testing.T, g Generator, SubmitID uint, jobType invokerconn.JobTy
 }
 
 func noJobs(t *testing.T, g Generator) {
-	job, err := g.NextJob()
+	job := g.NextJob()
 	assert.Nil(t, job)
-	assert.NotNil(t, err)
 }
 
 func TestStraightTasksFinishing(t *testing.T) {
@@ -176,7 +174,7 @@ func TestTasksFinishing(t *testing.T) {
 		require.Equal(t, verdict.OK, sub.TestResults[0].Verdict)
 		require.Equal(t, verdict.WA, sub.TestResults[1].Verdict)
 		for i, result := range sub.TestResults[2:] {
-			require.Equal(t, verdict.UK, result.Verdict)
+			require.Equal(t, verdict.SK, result.Verdict)
 			require.Equal(t, uint64(i)+3, result.TestNumber)
 		}
 	})
@@ -200,9 +198,9 @@ func TestTasksFinishing(t *testing.T) {
 		require.Equal(t, verdict.WA, sub.Verdict)
 		require.Equal(t, 0., sub.Score)
 		require.Equal(t, verdict.WA, sub.TestResults[0].Verdict)
-		require.Equal(t, verdict.UK, sub.TestResults[1].Verdict)
+		require.Equal(t, verdict.SK, sub.TestResults[1].Verdict)
 		for i, result := range sub.TestResults[2:] {
-			require.Equal(t, verdict.UK, result.Verdict)
+			require.Equal(t, verdict.SK, result.Verdict)
 			require.Equal(t, uint64(i)+3, result.TestNumber)
 		}
 	})
@@ -223,7 +221,7 @@ func TestFailedCompilation(t *testing.T) {
 	require.Equal(t, verdict.CE, sub.Verdict)
 	require.Equal(t, 0., sub.Score)
 	for i, result := range sub.TestResults {
-		require.Equal(t, verdict.UK, result.Verdict)
+		require.Equal(t, verdict.SK, result.Verdict)
 		require.Equal(t, uint64(i)+1, result.TestNumber)
 	}
 }
@@ -243,7 +241,7 @@ func TestFinishSameJobTwice(t *testing.T) {
 	require.Equal(t, verdict.CE, sub.Verdict)
 	require.Equal(t, 0., sub.Score)
 	for i, result := range sub.TestResults {
-		require.Equal(t, verdict.UK, result.Verdict)
+		require.Equal(t, verdict.SK, result.Verdict)
 		require.Equal(t, uint64(i)+1, result.TestNumber)
 	}
 
@@ -253,15 +251,4 @@ func TestFinishSameJobTwice(t *testing.T) {
 	})
 	require.Nil(t, sub)
 	require.NotNil(t, err)
-}
-
-func TestICPCGenerator_RescheduleJob(t *testing.T) {
-	problem, submission := fixtureProblem(), fixtureSubmission()
-	g, err := NewGenerator(problem, submission)
-	require.Nil(t, err)
-	oldJob := nextJob(t, g, 1, invokerconn.CompileJob, 0)
-	err = g.RescheduleJob(oldJob.ID)
-	require.Nil(t, err)
-	newJob := nextJob(t, g, 1, invokerconn.CompileJob, 0)
-	require.NotEqual(t, oldJob.ID, newJob.ID)
 }

@@ -8,7 +8,6 @@ const (
 	PT Verdict = "PT" // Partial solution
 
 	WA Verdict = "WA" // Wrong answer
-	//PE Verdict = "PE" // Presentation error, we will treat it as Wrong Answer
 
 	RT Verdict = "RT" // Runtime error
 	ML Verdict = "ML" // Memory limit
@@ -20,7 +19,7 @@ const (
 	CD Verdict = "CD" // Compiled
 
 	CF Verdict = "CF" // Check failed
-	UK Verdict = "UK" // Unknown
+	SK Verdict = "SK" // Unknown
 
 	QD Verdict = "QD" // Queued
 	CL Verdict = "CL" // Compiling

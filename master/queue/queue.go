@@ -3,11 +3,13 @@ package queue
 import (
 	"container/list"
 	"fmt"
+	"github.com/google/uuid"
 	"sync"
 	"testing_system/common"
 	"testing_system/common/connectors/invokerconn"
 	"testing_system/common/connectors/masterconn"
 	"testing_system/common/db/models"
+	"testing_system/lib/logger"
 	"testing_system/master/queue/jobgenerators"
 )
 
@@ -16,8 +18,13 @@ type Queue struct {
 
 	mutex            sync.Mutex
 	activeGenerators list.List
-	jobIDToGenerator map[string]jobgenerators.Generator
-	generatorsInList map[jobgenerators.Generator]struct{}
+	// in case of reschedule, new ID will be mapped to the first one
+	jobIdToOriginalJobId map[string]string
+	newFailedJobs        []*invokerconn.Job
+	originalJobIDToJob   map[string]*invokerconn.Job
+
+	originalJobIDToGenerator map[string]jobgenerators.Generator
+	activeGeneratorIds       map[string]struct{}
 }
 
 func (q *Queue) Submit(problem *models.Problem, submission *models.Submission) error {
@@ -28,49 +35,85 @@ func (q *Queue) Submit(problem *models.Problem, submission *models.Submission) e
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
 	q.activeGenerators.PushBack(generator)
-	q.generatorsInList[generator] = struct{}{}
+	q.activeGeneratorIds[generator.ID()] = struct{}{}
 	return nil
 }
 
 func (q *Queue) JobCompleted(jobResult *masterconn.InvokerJobResult) (submission *models.Submission, err error) {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
-	generator, ok := q.jobIDToGenerator[jobResult.JobID]
-	if !ok {
-		return nil, fmt.Errorf("no job with id %v", jobResult.JobID)
+	wasID := jobResult.JobID
+	if origId, ok := q.jobIdToOriginalJobId[jobResult.JobID]; ok {
+		delete(q.jobIdToOriginalJobId, jobResult.JobID)
+		jobResult.JobID = origId
+		defer func() {
+			jobResult.JobID = wasID
+		}()
 	}
+
+	generator, ok := q.originalJobIDToGenerator[jobResult.JobID]
+	if !ok {
+		if wasID != jobResult.JobID {
+			logger.Panic("Job has id=%v and origId=%v; was not found in originalJobIDToGenerator",
+				wasID, jobResult.JobID)
+		}
+		return nil, fmt.Errorf("no job with id=%v (origId=%v)", jobResult.JobID, wasID)
+	}
+	delete(q.originalJobIDToJob, jobResult.JobID)
+	delete(q.originalJobIDToGenerator, jobResult.JobID)
 	return generator.JobCompleted(jobResult)
 }
 
 func (q *Queue) RescheduleJob(jobID string) error {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
-	generator := q.jobIDToGenerator[jobID]
-	// should check if this generator in activeGenerators, or it may appear several times there
-	// that will affect queue's fairness
-	if _, ok := q.generatorsInList[generator]; !ok {
-		q.activeGenerators.PushBack(generator)
-		q.generatorsInList[generator] = struct{}{}
+
+	var origJob *invokerconn.Job
+	wasId := jobID
+	if origId, ok := q.jobIdToOriginalJobId[jobID]; ok {
+		delete(q.jobIdToOriginalJobId, jobID)
+		jobID = origId
+		if origJob, ok = q.originalJobIDToJob[jobID]; !ok {
+			logger.Panic("Job has id=%v and origId=%v; was not found in originalJobIDToGenerator",
+				wasId, jobID)
+		}
+	} else {
+		origJob, ok = q.originalJobIDToJob[jobID]
+		if !ok {
+			return fmt.Errorf("no job with id=%v (origId=%v)", wasId, jobID)
+		}
 	}
-	return generator.RescheduleJob(jobID)
+	newUUID, err := uuid.NewV7()
+	if err != nil {
+		logger.Panic("Can't generate job id: %v", err)
+	}
+	origJob.ID = newUUID.String()
+	q.jobIdToOriginalJobId[origJob.ID] = jobID
+	q.newFailedJobs = append(q.newFailedJobs, origJob)
+	return nil
 }
 
 func (q *Queue) NextJob() *invokerconn.Job {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
+	if len(q.newFailedJobs) > 0 {
+		job := q.newFailedJobs[0]
+		q.newFailedJobs = q.newFailedJobs[1:]
+		return job
+	}
 	attempts := q.activeGenerators.Len()
 	for range attempts {
 		generatorListElement := q.activeGenerators.Front()
-		q.activeGenerators.Remove(generatorListElement)
 		generator := generatorListElement.Value.(jobgenerators.Generator)
-		delete(q.generatorsInList, generator)
-		job, err := generator.NextJob()
-		if err != nil {
+		job := generator.NextJob()
+		if job == nil {
+			q.activeGenerators.Remove(generatorListElement)
+			delete(q.activeGeneratorIds, generator.ID())
 			continue
 		}
-		q.activeGenerators.PushBack(generator)
-		q.generatorsInList[generator] = struct{}{}
-		q.jobIDToGenerator[job.ID] = generator
+		q.activeGenerators.MoveToBack(generatorListElement)
+		q.originalJobIDToGenerator[job.ID] = generator
+		q.originalJobIDToJob[job.ID] = job
 		return job
 	}
 	return nil

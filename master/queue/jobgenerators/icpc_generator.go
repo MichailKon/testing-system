@@ -8,6 +8,7 @@ import (
 	"testing_system/common/connectors/masterconn"
 	"testing_system/common/constants/verdict"
 	"testing_system/common/db/models"
+	"testing_system/lib/logger"
 )
 
 type state int
@@ -19,6 +20,7 @@ const (
 )
 
 type ICPCGenerator struct {
+	id          string
 	mutex       sync.Mutex
 	submission  *models.Submission
 	problem     *models.Problem
@@ -28,15 +30,19 @@ type ICPCGenerator struct {
 	futureTests []uint64
 }
 
+func (i *ICPCGenerator) ID() string {
+	return i.id
+}
+
 // finalizeResults must be done with acquired mutex
 func (i *ICPCGenerator) finalizeResults() {
 	setUnknown := false
 	for j := range i.submission.TestResults {
 		if setUnknown {
-			i.submission.TestResults[j].Verdict = verdict.UK
+			i.submission.TestResults[j].Verdict = verdict.SK
 			continue
 		}
-		if i.submission.TestResults[j].Verdict == verdict.OK || i.submission.TestResults[j].Verdict == verdict.UK {
+		if i.submission.TestResults[j].Verdict == verdict.OK || i.submission.TestResults[j].Verdict == verdict.SK {
 			continue
 		}
 		setUnknown = true
@@ -48,39 +54,18 @@ func (i *ICPCGenerator) finalizeResults() {
 	}
 }
 
-func (i *ICPCGenerator) RescheduleJob(jobID string) error {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
-	job, ok := i.givenJobs[jobID]
-	if !ok {
-		return fmt.Errorf("job %s not found", jobID)
-	}
-	newUUID, err := uuid.NewV7()
-	if err != nil {
-		return err
-	}
-
-	if job.Type == invokerconn.CompileJob {
-		i.state = compilationNotStarted
-	}
-
-	i.givenJobs[newUUID.String()] = job
-	delete(i.givenJobs, jobID)
-	return nil
-}
-
-func (i *ICPCGenerator) NextJob() (*invokerconn.Job, error) {
+func (i *ICPCGenerator) NextJob() *invokerconn.Job {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 	if i.state == compilationFinished && len(i.futureTests) == 0 {
-		return nil, fmt.Errorf("no more jobs")
+		return nil
 	}
 	if i.state == compilationStarted {
-		return nil, fmt.Errorf("no more jobs (compiling)")
+		return nil
 	}
 	UUID, err := uuid.NewV7()
 	if err != nil {
-		return nil, err
+		logger.Panic("Can't generate UUID for job: %w", err)
 	}
 	job := &invokerconn.Job{
 		ID:       UUID.String(),
@@ -91,14 +76,14 @@ func (i *ICPCGenerator) NextJob() (*invokerconn.Job, error) {
 		i.state = compilationStarted
 	} else {
 		if i.hasFails {
-			return nil, fmt.Errorf("no more jobs")
+			return nil
 		}
 		job.Test = i.futureTests[0]
 		i.futureTests = i.futureTests[1:]
 		job.Type = invokerconn.TestJob
 	}
 	i.givenJobs[job.ID] = job
-	return job, nil
+	return job
 }
 
 // compileJobCompleted must be done with acquired mutex
@@ -128,7 +113,7 @@ func (i *ICPCGenerator) testJobCompleted(job *invokerconn.Job, result *mastercon
 			return i.submission, nil
 		}
 		return nil, nil
-	case verdict.PT, verdict.WA, verdict.PE, verdict.RT, verdict.ML, verdict.TL, verdict.WL, verdict.SE, verdict.CF:
+	case verdict.PT, verdict.WA, verdict.RT, verdict.ML, verdict.TL, verdict.WL, verdict.SE, verdict.CF:
 		i.hasFails = true
 		if len(i.givenJobs) == 0 {
 			i.finalizeResults()
@@ -160,6 +145,11 @@ func (i *ICPCGenerator) JobCompleted(result *masterconn.InvokerJobResult) (*mode
 }
 
 func newICPCGenerator(problem *models.Problem, submission *models.Submission) (Generator, error) {
+	ID, err := uuid.NewV7()
+	if err != nil {
+		logger.Panic("Can't generate generator ID: %w", err)
+	}
+
 	if problem.ProblemType != models.ProblemType_ICPC {
 		return nil, fmt.Errorf("problem %v is not ICPC", problem.ID)
 	}
@@ -168,16 +158,17 @@ func newICPCGenerator(problem *models.Problem, submission *models.Submission) (G
 	for i := range problem.TestsNumber {
 		futureTests = append(futureTests, i+1)
 		testResults = append(testResults, models.TestResult{
-			TestNumber:     i + 1,
-			Verdict:        verdict.UK,
-			TimeConsumed:   0,
-			MemoryConsumed: 0,
+			TestNumber: i + 1,
+			Verdict:    verdict.SK,
+			Time:       0,
+			Memory:     0,
 		})
 	}
 
 	submission.TestResults = testResults
 
 	return &ICPCGenerator{
+		id:          ID.String(),
 		submission:  submission,
 		problem:     problem,
 		givenJobs:   make(map[string]*invokerconn.Job),
