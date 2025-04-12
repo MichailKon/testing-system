@@ -27,7 +27,7 @@ func (l *Language) GenerateScript(source string, binary string) ([]byte, error) 
 	}
 	maps.Copy(values, l.TemplateValues)
 
-	err := l.Template.Execute(&script, l.TemplateValues)
+	err := l.Template.Execute(&script, values)
 	if err != nil {
 		return nil, fmt.Errorf("error while creating compile script for language %s, error: %s", l.Name, err.Error())
 	}

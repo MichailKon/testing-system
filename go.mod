@@ -1,8 +1,6 @@
 module testing_system
 
-go 1.22
-
-toolchain go1.22rc1
+go 1.24
 
 require (
 	github.com/gin-gonic/gin v1.10.0
@@ -10,6 +8,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.9.0
 	github.com/xorcare/pointer v1.2.2
+	golang.org/x/net v0.33.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.5.9
 	gorm.io/driver/sqlite v1.5.7
@@ -49,7 +48,6 @@ require (
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	golang.org/x/arch v0.8.0 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
-	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect

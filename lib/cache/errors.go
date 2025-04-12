@@ -25,3 +25,11 @@ type ErrItemNotLocked struct {
 func (e *ErrItemNotLocked) Error() string {
 	return fmt.Sprintf("size_cache: item not locked, key: %#v", e.key)
 }
+
+type ErrItemAlreadyExists struct {
+	key interface{}
+}
+
+func (e *ErrItemAlreadyExists) Error() string {
+	return fmt.Sprintf("size_cache: item already exists, key: %#v", e.key)
+}

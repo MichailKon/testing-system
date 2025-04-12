@@ -48,7 +48,7 @@ func fillInConfig(config *Config) {
 	}
 
 	fillInConnections(config)
-	fillInInvokerConfig(config.Invoker)
 	fillInMasterConfig(config.Master)
 	fillInStorageConfig(config.Storage)
+	FillInInvokerConfig(config.Invoker)
 }

@@ -36,7 +36,12 @@ func (i *Invoker) Compile(tester *JobExecutor, job *Job) {
 	logger.Trace("Starting compilation of submit %d, job %s", job.Submission.ID, job.ID)
 	defer job.DeferFunc()
 
-	tester.Sandbox.Init()
+	err := tester.Sandbox.Init()
+	if err != nil {
+		logger.Error("Prepare sandbox %s for job %s error: %v", tester.Sandbox.Dir(), job.ID, err)
+		i.FailJob(job, "can not prepare sandbox for job %s, error: %s", job.ID, err)
+		return
+	}
 	defer tester.Sandbox.Cleanup()
 
 	j := compileJob{
@@ -45,9 +50,12 @@ func (i *Invoker) Compile(tester *JobExecutor, job *Job) {
 		job:     job,
 	}
 
-	err := j.Prepare()
+	err = j.Prepare()
 	if err != nil {
-		logger.Error("Compilation of submit %d in job %s prepare error: %s", job.Submission.ID, job.ID, err.Error())
+		logger.Error(
+			"Compilation of submit %d in job %s prepare error: %s",
+			job.Submission.ID, job.ID, err.Error(),
+		)
 		j.invoker.FailJob(job, "can not prepare compilation of job %s, error: %s", job.ID, err.Error())
 		return
 	}
@@ -58,23 +66,32 @@ func (i *Invoker) Compile(tester *JobExecutor, job *Job) {
 	j.wg.Wait()
 
 	if j.compileResult.Err != nil {
-		logger.Error("Can not compile submit %d in job %s error: %s",
-			job.Submission.ID, job.ID, j.compileResult.Err.Error())
+		logger.Error(
+			"Can not compile submit %d in job %s error: %s",
+			job.Submission.ID, job.ID, j.compileResult.Err.Error(),
+		)
 		j.invoker.FailJob(job, "can not compile submit in job %s, error: %s", job.ID, j.compileResult.Err.Error())
 		return
 	}
-	logger.Trace("Finished compilation process of submit %d in job %s with verdict %v",
-		job.Submission.ID, job.ID, j.compileResult.Verdict)
+	logger.Trace(
+		"Finished compilation process of submit %d in job %s with verdict %v",
+		job.Submission.ID, job.ID, j.compileResult.Verdict,
+	)
 
 	err = j.Finish()
 	if err == nil {
 		logger.Trace("Uploaded result of compilation of submit %d in job %s", job.Submission.ID, job.ID)
 		j.invoker.SuccessJob(job, j.compileResult)
 	} else {
-		logger.Error("Compilation of submit %d in job %s send result error: %s",
-			job.Submission.ID, job.ID, err.Error())
-		j.invoker.FailJob(job, "can not upload compilation result of submit %d, job %s, error: %s",
-			job.Submission.ID, job.ID, err.Error())
+		logger.Error(
+			"Compilation of submit %d in job %s send result error: %s",
+			job.Submission.ID, job.ID, err.Error(),
+		)
+		j.invoker.FailJob(
+			job,
+			"can not upload compilation result of submit %d, job %s, error: %s",
+			job.Submission.ID, job.ID, err.Error(),
+		)
 	}
 }
 
@@ -123,33 +140,41 @@ func (j *compileJob) Execute() {
 	j.wg.Done()
 }
 
-func (j *compileJob) Finish() error {
-	var outputReader io.Reader
-
+func (j *compileJob) FinalizeVerdict() (io.Reader, error) {
 	switch j.compileResult.Verdict {
 	case verdict.OK:
 		j.compileResult.Verdict = verdict.CD
-		outputReader = j.invoker.limitedReader(&j.stdout)
+		return j.invoker.limitedReader(&j.stdout), nil
 	case verdict.RT:
 		j.compileResult.Verdict = verdict.CE
-		outputReader = j.invoker.limitedReader(&j.stdout)
+		return j.invoker.limitedReader(&j.stdout), nil
 	case verdict.TL:
 		j.compileResult.Verdict = verdict.CE
-		outputReader = strings.NewReader(fmt.Sprintf("Compilation took more than %v time",
-			j.language.Limits.TimeLimit))
+		return strings.NewReader(
+			fmt.Sprintf("Compilation took more than %v time", j.language.Limits.TimeLimit),
+		), nil
 	case verdict.ML:
 		j.compileResult.Verdict = verdict.CE
-		outputReader = strings.NewReader(fmt.Sprintf("Compilation took more than %v memory",
-			j.language.Limits.MemoryLimit))
+		return strings.NewReader(
+			fmt.Sprintf("Compilation took more than %v memory", j.language.Limits.MemoryLimit),
+		), nil
 	case verdict.WL:
 		j.compileResult.Verdict = verdict.CE
-		outputReader = strings.NewReader(fmt.Sprintf("Compilation took more than %v wall time",
-			j.language.Limits.WallTimeLimit))
+		return strings.NewReader(
+			fmt.Sprintf("Compilation took more than %v wall time", j.language.Limits.WallTimeLimit),
+		), nil
 	case verdict.SE:
 		j.compileResult.Verdict = verdict.CE
-		outputReader = strings.NewReader(fmt.Sprintf("Security violation"))
+		return strings.NewReader(fmt.Sprintf("Security violation")), nil
 	default:
-		return fmt.Errorf("unknown sandbox verdict: %s", j.compileResult.Verdict)
+		return nil, fmt.Errorf("unknown sandbox verdict: %s", j.compileResult.Verdict)
+	}
+}
+
+func (j *compileJob) Finish() error {
+	outputReader, err := j.FinalizeVerdict()
+	if err != nil {
+		return err
 	}
 
 	compileOutputStoreRequest := &storageconn.Request{

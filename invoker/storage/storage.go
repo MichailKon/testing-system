@@ -30,11 +30,11 @@ func NewInvokerStorage(ts *common.TestingSystem) *InvokerStorage {
 	s := &InvokerStorage{ts: ts}
 	err := os.RemoveAll(ts.Config.Invoker.CachePath)
 	if err != nil {
-		logger.Panic(err.Error())
+		logger.Panic("Can not clean up previous cache, error: %v", err.Error())
 	}
 	err = os.MkdirAll(ts.Config.Invoker.CachePath, 0775)
 	if err != nil {
-		logger.Panic(err.Error())
+		logger.Panic("Can not create directory for cache, error: %v", err.Error())
 	}
 	s.cache = cache.NewLRUSizeCache[cacheKey, string](
 		ts.Config.Invoker.CacheSize,
