@@ -3,8 +3,8 @@ package storage
 import (
 	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
-	"strconv"
 	"testing_system/lib/connector"
 	"testing_system/lib/logger"
 
@@ -12,7 +12,7 @@ import (
 )
 
 func (s *Storage) HandleUpload(c *gin.Context) {
-	info, err := getInfoFromRequest(c)
+	resourceInfo, err := getInfoFromRequest(c)
 	if err != nil {
 		connector.RespErr(c, http.StatusBadRequest, "Invalid request parameters: %v", err)
 		logger.Error("Invalid request parameters in HandleUpload: %v", err)
@@ -26,72 +26,63 @@ func (s *Storage) HandleUpload(c *gin.Context) {
 		return
 	}
 
-	dataTypeStr := info.dataType.String()
-	idStr := strconv.FormatUint(info.id, 10)
-
-	err = s.filesystem.SaveFile(c, dataTypeStr, idStr, info.filepath, file)
+	err = s.filesystem.SaveFile(c, resourceInfo, file)
 	if err != nil {
 		connector.RespErr(c, http.StatusInternalServerError, "Failed to save file: %v", err)
-		logger.Error("Failed to save file: id=%s, dataType=%s, filepath=%s\n %v",
-			idStr, dataTypeStr, info.filepath, err)
+		logger.Error("Failed to save file: id=%d, dataType=%s, filepath=%s: %v",
+			resourceInfo.ID, resourceInfo.DataType.String(), resourceInfo.Filepath, err)
 		return
 	}
 
 	response := struct {
-		Message  string `json:"message"`
-		Filename string `json:"filename"`
+		Message string `json:"message"`
 	}{
-		Message:  "File uploaded successfully",
-		Filename: filepath.Base(file.Filename),
+		Message: "File uploaded successfully",
 	}
 	connector.RespOK(c, &response)
 }
 
 func (s *Storage) HandleRemove(c *gin.Context) {
-	info, err := getInfoFromRequest(c)
+	resourceInfo, err := getInfoFromRequest(c)
 	if err != nil {
 		connector.RespErr(c, http.StatusBadRequest, "Invalid request parameters: %v", err)
 		logger.Error("Invalid request parameters in HandleRemove: %v", err)
 		return
 	}
 
-	dataTypeStr := info.dataType.String()
-	idStr := strconv.FormatUint(info.id, 10)
-
-	err = s.filesystem.RemoveFile(dataTypeStr, idStr, info.filepath)
+	err = s.filesystem.RemoveFile(resourceInfo)
 	if err != nil {
 		connector.RespErr(c, http.StatusInternalServerError, "Failed to remove file: %v", err)
-		logger.Error("Failed to remove file: id=%s, dataType=%s, filepath=%s\n %v",
-			idStr, dataTypeStr, info.filepath, err)
+		logger.Error("Failed to remove file: id=%d, dataType=%s, filepath=%s\n %v",
+			resourceInfo.ID, resourceInfo.DataType.String(), resourceInfo.Filepath, err)
 		return
 	}
 
 	response := struct {
-		Message  string `json:"message"`
-		Filename string `json:"filename"`
+		Message string `json:"message"`
 	}{
-		Message:  "File removed successfully",
-		Filename: info.filepath,
+		Message: "File removed successfully",
 	}
 	connector.RespOK(c, &response)
 }
 
 func (s *Storage) HandleGet(c *gin.Context) {
-	info, err := getInfoFromRequest(c)
+	resourceInfo, err := getInfoFromRequest(c)
 	if err != nil {
 		connector.RespErr(c, http.StatusBadRequest, "Invalid request parameters: %v", err)
 		logger.Error("Invalid request parameters in HandleGet: %v", err)
 		return
 	}
 
-	dataTypeStr := info.dataType.String()
-	idStr := strconv.FormatUint(info.id, 10)
-
-	fullPath, err := s.filesystem.GetFilePath(dataTypeStr, idStr, info.filepath)
+	fullPath, err := s.filesystem.GetFile(resourceInfo)
 	if err != nil {
+		if os.IsNotExist(err) {
+			connector.RespErr(c, http.StatusNotFound, "File doesn't exist: %v", err)
+			return
+		}
+		logger.Error("Failed to get file: id=%d, dataType=%s, filePath=%s\n %v",
+			resourceInfo.ID, resourceInfo.DataType.String(), resourceInfo.Filepath, err)
 		connector.RespErr(c, http.StatusInternalServerError, "Failed to get file: %v", err)
-		logger.Error("Failed to get file: id=%s, dataType=%s, filePath=%s\n %v",
-			idStr, dataTypeStr, info.filepath, err)
 		return
 	}
 

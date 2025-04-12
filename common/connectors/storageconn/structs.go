@@ -34,7 +34,7 @@ type Request struct {
 	// For uploads, File should be specified
 	File io.Reader `json:"-"`
 
-	// StorageFilename should be always specified
+	// If StorageFilename is not specified, Storage tries to get the filename automatically
 	StorageFilename string `json:"storageFilename"`
 }
 

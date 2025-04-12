@@ -34,7 +34,7 @@ func main() {
 	if ts.Config.Storage != nil {
 		err := storage.SetupStorage(ts)
 		if err != nil {
-			logger.Panic(err.Error())
+			logger.Panic("Can not setup storage, error: %v", err.Error())
 		}
 	} else {
 		logger.Info("storage is not configured, skipping storage component")

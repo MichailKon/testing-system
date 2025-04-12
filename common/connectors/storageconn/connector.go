@@ -1,11 +1,11 @@
 package storageconn
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"mime"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing_system/common/config"
@@ -25,9 +25,6 @@ func NewConnector(connection *config.Connection) *Connector {
 
 func (s *Connector) Download(request *Request) *FileResponse {
 	response := NewFileResponse(*request)
-	if request.StorageFilename == "" {
-		response.Error = fmt.Errorf("storage filename not specified")
-	}
 
 	if err := os.MkdirAll(request.BaseFolder, 0775); err != nil {
 		response.Error = fmt.Errorf("failed to create base folder: %v", err)
@@ -47,18 +44,23 @@ func (s *Connector) Download(request *Request) *FileResponse {
 		"request": string(requestJSON),
 	})
 
-	resp, err := r.Get(path)
+	resp, err := r.SetDoNotParseResponse(true).Execute("GET", path)
 	if err != nil {
 		response.Error = fmt.Errorf("failed to send request: %v", err)
 		return response
 	}
+	defer resp.RawBody().Close()
 
-	if resp.IsError() {
-		response.Error = fmt.Errorf("get request failed with status: %v", resp.Status())
+	if resp.StatusCode() != http.StatusOK {
+		if resp.StatusCode() == http.StatusNotFound {
+			response.Error = ErrStorageFileNotFound
+		} else {
+			response.Error = fmt.Errorf("get request failed with status: %v", resp.Status())
+		}
 		return response
 	}
 
-	filename := ""
+	var filename string
 	if request.DownloadFilename != nil && *request.DownloadFilename != "" {
 		filename = *request.DownloadFilename
 	} else {
@@ -85,7 +87,7 @@ func (s *Connector) Download(request *Request) *FileResponse {
 	}
 	defer file.Close()
 
-	_, err = io.Copy(file, bytes.NewReader(resp.Body()))
+	written, err := io.Copy(file, resp.RawBody())
 	if err != nil {
 		response.Error = fmt.Errorf("failed to write to file: %v", err)
 		return response
@@ -93,16 +95,12 @@ func (s *Connector) Download(request *Request) *FileResponse {
 
 	response.Filename = filename
 	response.BaseFolder = request.BaseFolder
-	response.Size = uint64(len(resp.Body()))
+	response.Size = uint64(written)
 	return response
 }
 
 func (s *Connector) Upload(request *Request) *Response {
 	response := &Response{R: *request}
-	if request.StorageFilename == "" {
-		response.Error = fmt.Errorf("storage filename not specified")
-		return response
-	}
 
 	if request.File == nil {
 		response.Error = fmt.Errorf("file for upload is not specified")
@@ -121,6 +119,8 @@ func (s *Connector) Upload(request *Request) *Response {
 	r.SetFormData(map[string]string{
 		"request": string(requestJSON),
 	})
+
+	// request.StorageFilename can be empty
 	r.SetFileReader("file", request.StorageFilename, request.File)
 
 	resp, err := r.Post(path)
@@ -139,10 +139,6 @@ func (s *Connector) Upload(request *Request) *Response {
 
 func (s *Connector) Delete(request *Request) *Response {
 	response := &Response{R: *request}
-	if request.StorageFilename == "" {
-		response.Error = fmt.Errorf("storage filename not specified")
-		return response
-	}
 
 	path := "/storage/remove"
 	r := s.connection.R()
@@ -153,7 +149,7 @@ func (s *Connector) Delete(request *Request) *Response {
 		return response
 	}
 
-	r.SetQueryParams(map[string]string{
+	r.SetFormData(map[string]string{
 		"request": string(requestJSON),
 	})
 
@@ -170,4 +166,3 @@ func (s *Connector) Delete(request *Request) *Response {
 
 	return response
 }
-

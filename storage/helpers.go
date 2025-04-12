@@ -5,56 +5,52 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"testing_system/common/connectors/storageconn"
-	"testing_system/common/constants/resource"
+	"testing_system/storage/filesystem"
 
 	"github.com/gin-gonic/gin"
 )
 
-type resourceInfo struct {
-	id       uint64
-	filepath string
-	dataType resource.DataType
-}
-
-func getInfoFromRequest(c *gin.Context) (*resourceInfo, error) {
+func getInfoFromRequest(c *gin.Context) (*filesystem.ResourceInfo, error) {
 	request, err := parseRequest(c)
 
 	if err != nil {
-		return nil, fmt.Errorf("unavailable to get request: %v", err)
+		return nil, fmt.Errorf("unavailable to parse request: %v", err)
 	}
 
-	info := &resourceInfo{}
+	resourseInfo := &filesystem.ResourceInfo{Request: request}
 
-	info.dataType, err = getDataType(request)
+	err = resourseInfo.ParseDataType()
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unavailable to parse dataType: %v", err)
 	}
 
-	info.id, err = getDataId(info.dataType, request)
+	err = resourseInfo.ParseDataID()
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unavailable to parse dataID: %v", err)
 	}
 
-	info.filepath, err = getFilepath(request)
+	err = resourseInfo.ParseFilepath()
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unavailable to parse filepath: %v", err)
 	}
 
-	return info, nil
+	return resourseInfo, nil
 }
 
 func parseRequest(c *gin.Context) (*storageconn.Request, error) {
 	var requestJSON string
 
 	switch c.Request.Method {
-	case http.MethodGet, http.MethodDelete:
+	case http.MethodGet:
 		requestJSON = c.Query("request")
 		if requestJSON == "" {
 			return nil, errors.New("missing request parameter in query")
 		}
-	case http.MethodPost, http.MethodPut:
+	case http.MethodPost, http.MethodPut, http.MethodDelete:
 		requestJSON = c.PostForm("request")
 		if requestJSON == "" {
 			return nil, errors.New("missing request parameter in form data")
@@ -70,51 +66,4 @@ func parseRequest(c *gin.Context) (*storageconn.Request, error) {
 	}
 
 	return &req, nil
-}
-
-func getDataType(request *storageconn.Request) (resource.DataType, error) {
-	switch request.Resource {
-	case resource.Checker, resource.Interactor:
-		return resource.Problem, nil
-	case resource.TestInput, resource.TestAnswer:
-		return resource.Problem, nil
-	case resource.SourceCode, resource.CompiledBinary, resource.CompileOutput:
-		return resource.Submission, nil
-	case resource.TestOutput, resource.TestStderr, resource.CheckerOutput:
-		return resource.Submission, nil
-	default:
-		return resource.UnknownDataType, errors.New("unknown resource type")
-	}
-}
-
-func getDataId(dataType resource.DataType, request *storageconn.Request) (uint64, error) {
-	switch dataType {
-	case resource.Problem:
-		if request.ProblemID == 0 {
-			return 0, errors.New("ProblemID is not specified for promlem resource")
-		}
-		return request.ProblemID, nil
-	case resource.Submission:
-		if request.SubmitID == 0 {
-			return 0, errors.New("SubmitID is not specified for submission resource")
-		}
-		return request.SubmitID, nil
-	default:
-		return 0, errors.New("unavailable to get data id")
-	}
-}
-
-func getFilepath(request *storageconn.Request) (string, error) {
-	if request.StorageFilename == "" {
-		return "", errors.New("StorageFilename is not specified")
-	}
-	switch request.Resource {
-	case resource.TestInput, resource.TestOutput, resource.TestAnswer, resource.TestStderr:
-		if request.TestID == 0 {
-			return "", errors.New("TestID is not specified for test resource")
-		}
-		return fmt.Sprintf("tests/%s/%s", strconv.FormatUint(request.TestID, 10), request.StorageFilename), nil
-	default:
-		return fmt.Sprintf("%s", request.StorageFilename), nil
-	}
 }

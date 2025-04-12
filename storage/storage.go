@@ -26,7 +26,7 @@ func SetupStorage(ts *common.TestingSystem) error {
 	r.DELETE("/remove", storage.HandleRemove)
 	r.GET("/get", storage.HandleGet)
 
-	logger.Info("Configured invoker")
+	logger.Info("Configured storage")
 	return nil
 }
 

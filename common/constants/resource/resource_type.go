@@ -17,6 +17,7 @@ const (
 	CheckerOutput
 	Interactor
 	// Will be increased
+	// Don't forget to add a new type to storage/filesystem/resource_info.go
 )
 
 type DataType int
