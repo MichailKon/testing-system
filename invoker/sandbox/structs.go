@@ -2,7 +2,6 @@ package sandbox
 
 import (
 	"io"
-	"slices"
 	"testing_system/common/config"
 	"testing_system/common/connectors/masterconn"
 	"testing_system/common/constants/verdict"
@@ -14,19 +13,18 @@ type ExecuteConfig struct {
 	Command string   `yaml:"-"`
 	Args    []string `yaml:"-"` // Except zero argument (command name itself)
 
-	Stdin  io.Reader `yaml:"-"`
-	Stdout io.Writer `yaml:"-"`
-	Stderr io.Writer `yaml:"-"`
-
-	Defers []func() `yaml:"-"`
+	Stdin  *IORedirect `yaml:"-"`
+	Stdout *IORedirect `yaml:"-"`
+	Stderr *IORedirect `yaml:"-"`
 }
 
-func (e *ExecuteConfig) DeferFunc() {
-	slices.Reverse(e.Defers)
-	for _, f := range e.Defers {
-		f()
-	}
-	e.Defers = nil
+// IORedirect specifies files to read/write to.
+// Either Input, Output or FileName should be specified
+// FileName should be relative inside sandbox
+type IORedirect struct {
+	Input    io.Reader `yaml:"-"`
+	Output   io.Writer `yaml:"-"`
+	FileName string    `yaml:"-"`
 }
 
 type RunResult struct {

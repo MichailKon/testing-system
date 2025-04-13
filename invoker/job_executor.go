@@ -8,6 +8,7 @@ import (
 	"testing_system/common"
 	"testing_system/common/connectors/invokerconn"
 	"testing_system/invoker/sandbox"
+	"testing_system/invoker/sandbox/isolate"
 	"testing_system/invoker/sandbox/simple"
 	"testing_system/lib/logger"
 )
@@ -26,7 +27,13 @@ func NewJobExecutor(ts *common.TestingSystem, id uint64) *JobExecutor {
 		var err error
 		e.Sandbox, err = simple.NewSandbox(filepath.Join(ts.Config.Invoker.SandboxHomePath, strconv.FormatUint(id, 10)))
 		if err != nil {
-			logger.Panic("Can not create sandbox %d, error: %v", id, err)
+			logger.Panic("Can not create simple sandbox %d, error: %v", id, err)
+		}
+	case "isolate":
+		var err error
+		e.Sandbox, err = isolate.NewSandbox(e.ID, ts.Config.Invoker.SandboxHomePath)
+		if err != nil {
+			logger.Panic("Can not create isolate sandbox %d, error: %v", id, err)
 		}
 	default:
 		logger.Panic("Unsupported sandbox type: %s", ts.Config.Invoker.SandboxType)

@@ -36,6 +36,8 @@ func FillInInvokerConfig(config *InvokerConfig) {
 		switch config.SandboxType {
 		case "simple":
 			panic("No sandbox home path specified")
+		case "isolate":
+			panic("No isolate home path specified (it is used for meta files)")
 		default:
 			panic("unsupported sandbox type: " + config.SandboxType)
 		}

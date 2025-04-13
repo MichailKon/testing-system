@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,6 +53,54 @@ func (s *Sandbox) Dir() string {
 	return s.dir
 }
 
+func (s *Sandbox) parseReader(r *io.Reader, conf *sandbox.IORedirect) (func() error, error) {
+	if conf == nil {
+		return nil, nil
+	}
+	if conf.Input != nil {
+		*r = conf.Input
+		return nil, nil
+	}
+	if conf.Output != nil {
+		return nil, fmt.Errorf("writer is specified for reading")
+	}
+	if len(conf.FileName) == 0 {
+		return nil, fmt.Errorf("no source is specified for IORedirect")
+	}
+
+	file := filepath.Join(s.dir, conf.FileName)
+	fd, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	*r = fd
+	return fd.Close, nil
+}
+
+func (s *Sandbox) parseWriter(r *io.Writer, conf *sandbox.IORedirect) (func() error, error) {
+	if conf == nil {
+		return nil, nil
+	}
+	if conf.Input != nil {
+		return nil, fmt.Errorf("reader is specified for writing")
+	}
+	if conf.Output != nil {
+		*r = conf.Output
+		return nil, nil
+	}
+	if len(conf.FileName) == 0 {
+		return nil, fmt.Errorf("no source is specified for IORedirect")
+	}
+
+	file := filepath.Join(s.dir, conf.FileName)
+	fd, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return nil, err
+	}
+	*r = fd
+	return fd.Close, nil
+}
+
 func (s *Sandbox) Run(config *sandbox.ExecuteConfig) *sandbox.RunResult {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.WallTimeLimit))
 	defer cancel()
@@ -61,10 +110,34 @@ func (s *Sandbox) Run(config *sandbox.ExecuteConfig) *sandbox.RunResult {
 		config.Args...,
 	)
 
+	result := &sandbox.RunResult{
+		Statistics: &masterconn.JobResultStatistics{},
+	}
+
 	cmd.Dir = s.dir
-	cmd.Stdin = config.Stdin
-	cmd.Stdout = config.Stdout
-	cmd.Stderr = config.Stderr
+	closer, err := s.parseReader(&cmd.Stdin, config.Stdin)
+	if err != nil {
+		result.Err = fmt.Errorf("can not parse stding: %v", err)
+	}
+	if closer != nil {
+		defer closer()
+	}
+
+	closer, err = s.parseWriter(&cmd.Stdout, config.Stdout)
+	if err != nil {
+		result.Err = fmt.Errorf("can not parse stdout: %v", err)
+	}
+	if closer != nil {
+		defer closer()
+	}
+
+	closer, err = s.parseWriter(&cmd.Stderr, config.Stderr)
+	if err != nil {
+		result.Err = fmt.Errorf("can not parse stderr: %v", err)
+	}
+	if closer != nil {
+		defer closer()
+	}
 
 	wallTimeLimit := false
 	cmd.Cancel = func() error {
@@ -72,11 +145,8 @@ func (s *Sandbox) Run(config *sandbox.ExecuteConfig) *sandbox.RunResult {
 		return cmd.Process.Kill()
 	}
 
-	err := cmd.Run()
+	err = cmd.Run()
 
-	result := &sandbox.RunResult{
-		Statistics: &masterconn.JobResultStatistics{},
-	}
 	if cmd.ProcessState == nil {
 		result.Err = fmt.Errorf("sandbox process state is nil, something wrong with sandbox, process error: %v", err)
 		return result
@@ -113,6 +183,10 @@ func (s *Sandbox) Run(config *sandbox.ExecuteConfig) *sandbox.RunResult {
 }
 
 func (s *Sandbox) Cleanup() {
+	if !s.initialized {
+		logger.Error("Cleaning up uninitialized sandbox")
+		return
+	}
 	err := os.RemoveAll(s.dir)
 	if err != nil {
 		logger.Error("Can not clean up sandbox, error: %v", err)

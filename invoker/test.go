@@ -2,6 +2,7 @@ package invoker
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"golang.org/x/net/html/charset"
 	"io"
@@ -159,10 +160,6 @@ func (i *Invoker) Test(tester *JobExecutor, job *Job) {
 func (j *testJob) PrepareRun() error {
 	j.runConfig = problemRunConfig(j.job.Problem)
 
-	// This defers will be called during sandbox execution. However, in case of error we will call them with job defers.
-	// The RunConfig defers are cleaned up after each call, so we can call runConfig defer function multiple times with no harm
-	j.job.Defers = append(j.job.Defers, j.runConfig.DeferFunc)
-
 	binary, err := j.invoker.Storage.Binary.Get(uint64(j.job.Submission.ID))
 	if err != nil {
 		return fmt.Errorf("can not get binary, error: %s", err.Error())
@@ -182,34 +179,9 @@ func (j *testJob) PrepareRun() error {
 		return fmt.Errorf("can not copy test input to sandbox, error: %s", err.Error())
 	}
 
-	stdin, err := os.Open(filepath.Join(j.tester.Sandbox.Dir(), InputFile))
-	if err != nil {
-		return fmt.Errorf("can not open test for reading, path: %s, error: %s", *testInput, err.Error())
-	}
-	j.runConfig.Defers = append(j.runConfig.Defers, func() { stdin.Close() })
-	j.runConfig.Stdin = stdin
-
-	stdout, err := os.OpenFile(
-		filepath.Join(j.tester.Sandbox.Dir(), OutputFile),
-		os.O_CREATE|os.O_TRUNC|os.O_WRONLY,
-		0644,
-	)
-	if err != nil {
-		return fmt.Errorf("can not open output file for writing, path: %s, error: %s", *testInput, err.Error())
-	}
-	j.runConfig.Defers = append(j.runConfig.Defers, func() { stdout.Close() })
-	j.runConfig.Stdout = stdout
-
-	stderr, err := os.OpenFile(
-		filepath.Join(j.tester.Sandbox.Dir(), ErrorFile),
-		os.O_CREATE|os.O_TRUNC|os.O_WRONLY,
-		0644,
-	)
-	if err != nil {
-		return fmt.Errorf("can not open stderr file for writing, path: %s, error: %s", *testInput, err.Error())
-	}
-	j.runConfig.Defers = append(j.runConfig.Defers, func() { stderr.Close() })
-	j.runConfig.Stderr = stderr
+	j.runConfig.Stdin = &sandbox.IORedirect{FileName: InputFile}
+	j.runConfig.Stdout = &sandbox.IORedirect{FileName: OutputFile}
+	j.runConfig.Stderr = &sandbox.IORedirect{FileName: ErrorFile}
 
 	return nil
 }
@@ -231,13 +203,21 @@ func problemRunConfig(problem *models.Problem) *sandbox.ExecuteConfig {
 		}
 	}
 
-	if problem.MaxOpenFiles == nil {
+	if problem.MaxOpenFiles != nil {
+		c.MaxThreads = *problem.MaxThreads
+	} else {
 		c.MaxOpenFiles = 64
 	}
-	if problem.MaxThreads == nil {
-		c.MaxThreads = 1
+
+	if problem.MaxThreads != nil {
+		c.MaxThreads = *problem.MaxThreads
+	} else {
+		c.MaxThreads = 0
 	}
-	if problem.MaxOutputSize == nil {
+
+	if problem.MaxOutputSize != nil {
+		c.MaxOutputSize = *problem.MaxOutputSize
+	} else {
 		c.MaxOutputSize.FromStr("1g")
 	}
 	return &c
@@ -337,7 +317,9 @@ func (j *testJob) Finish() error {
 
 func (j *testJob) UploadOutput(fileName string, resourceType resource.Type) error {
 	outputF, err := os.Open(filepath.Join(j.tester.Sandbox.Dir(), fileName))
-	if err != nil {
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	} else if err != nil {
 		return fmt.Errorf("can not open %v file for reading, error: %s", resourceType, err.Error())
 	}
 	defer outputF.Close()
