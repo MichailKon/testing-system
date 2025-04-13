@@ -204,7 +204,7 @@ func problemRunConfig(problem *models.Problem) *sandbox.ExecuteConfig {
 	}
 
 	if problem.MaxOpenFiles != nil {
-		c.MaxThreads = *problem.MaxThreads
+		c.MaxOpenFiles = *problem.MaxOpenFiles
 	} else {
 		c.MaxOpenFiles = 64
 	}

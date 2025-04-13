@@ -117,7 +117,7 @@ func (s *Sandbox) Run(config *sandbox.ExecuteConfig) *sandbox.RunResult {
 	cmd.Dir = s.dir
 	closer, err := s.parseReader(&cmd.Stdin, config.Stdin)
 	if err != nil {
-		result.Err = fmt.Errorf("can not parse stding: %v", err)
+		result.Err = fmt.Errorf("can not parse stdin: %v", err)
 	}
 	if closer != nil {
 		defer closer()
