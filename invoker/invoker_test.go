@@ -19,7 +19,6 @@ import (
 	"testing_system/invoker/compiler"
 	"testing_system/invoker/sandbox"
 	"testing_system/invoker/storage"
-	"testing_system/lib/logger"
 )
 
 type testState struct {
@@ -113,12 +112,15 @@ func (ts *testState) testCompile(submitID uint) (file *string, v verdict.Verdict
 func TestCompile(t *testing.T) {
 	t.Run("Simple sandbox", func(t *testing.T) { testCompileSandbox(t, "simple") })
 
-	_, err := os.Stat("/usr/local/bin/isolate")
-	if err != nil {
-		logger.Warn("No isolate installed on current device, skipping isolate tests")
-	} else {
-		t.Run("Isolate sandbox", func(t *testing.T) { testCompileSandbox(t, "isolate") })
-	}
+	t.Run("Isolate sandbox", func(t *testing.T) {
+		_, err := os.Stat("/usr/local/bin/isolate")
+		if err != nil {
+			t.Skip("No isolate installed on current device, skipping isolate tests")
+		} else {
+			testCompileSandbox(t, "isolate")
+		}
+	})
+
 }
 
 func testCompileSandbox(t *testing.T, sandboxType string) {
@@ -230,12 +232,15 @@ func (ts *testState) testRun(submitID uint, problemID uint) *sandbox.RunResult {
 func TestRun(t *testing.T) {
 	t.Run("Simple sandbox", func(t *testing.T) { testRunSandbox(t, "simple") })
 
-	_, err := os.Stat("/usr/local/bin/isolate")
-	if err != nil {
-		logger.Warn("No isolate installed on current device, skipping isolate tests")
-	} else {
-		t.Run("Isolate sandbox", func(t *testing.T) { testRunSandbox(t, "isolate") })
-	}
+	t.Run("Isolate sandbox", func(t *testing.T) {
+		_, err := os.Stat("/usr/local/bin/isolate")
+		if err != nil {
+			t.Skip("No isolate installed on current device, skipping isolate tests")
+		} else {
+			testRunSandbox(t, "isolate")
+		}
+	})
+
 }
 
 func testRunSandbox(t *testing.T, sandboxType string) {

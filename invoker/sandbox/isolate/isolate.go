@@ -15,15 +15,15 @@ import (
 	"testing_system/invoker/sandbox"
 	"testing_system/lib/customfields"
 	"testing_system/lib/logger"
+	"time"
 )
 
 const (
-	IsolateCommand   = "/usr/local/bin/isolate"
-	NanosInSec       = 1000 * 1000 * 1000
-	BytesInKB        = 1024
-	MemoryAdditional = 1024
-	TimeAdditional   = 0.001
-	ExtraTime        = 0.5
+	isolateCommand   = "/usr/local/bin/isolate"
+	bytesInKB        = 1024
+	memoryAdditional = 1024
+	timeAdditional   = 0.001
+	extraTime        = 0.5
 )
 
 type Sandbox struct {
@@ -59,7 +59,7 @@ func (s *Sandbox) Dir() string {
 }
 
 func (s *Sandbox) command() *exec.Cmd {
-	return exec.Command(IsolateCommand, "--cg", fmt.Sprintf("--box-id=%d", s.id), "-s")
+	return exec.Command(isolateCommand, "--cg", fmt.Sprintf("--box-id=%d", s.id), "-s")
 }
 
 func (s *Sandbox) metaPath() string {
@@ -129,11 +129,11 @@ func (s *Sandbox) prepareRun(config *sandbox.ExecuteConfig) *exec.Cmd {
 	// We initialize path ENV so that compilers will work
 	cmd.Args = append(cmd.Args, "--env=PATH=/usr/bin")
 
-	cmd.Args = append(cmd.Args, fmt.Sprintf("--time=%f", float64(config.TimeLimit)/NanosInSec+TimeAdditional))
-	cmd.Args = append(cmd.Args, fmt.Sprintf("--extra-time=%f", ExtraTime))
-	cmd.Args = append(cmd.Args, fmt.Sprintf("--wall-time=%f", float64(config.WallTimeLimit)/NanosInSec))
+	cmd.Args = append(cmd.Args, fmt.Sprintf("--time=%f", float64(config.TimeLimit)/float64(time.Second)+timeAdditional))
+	cmd.Args = append(cmd.Args, fmt.Sprintf("--extra-time=%f", extraTime))
+	cmd.Args = append(cmd.Args, fmt.Sprintf("--wall-time=%f", float64(config.WallTimeLimit)/float64(time.Second)))
 
-	cmd.Args = append(cmd.Args, fmt.Sprintf("--cg-mem=%d", uint64(config.MemoryLimit)/BytesInKB+MemoryAdditional))
+	cmd.Args = append(cmd.Args, fmt.Sprintf("--cg-mem=%d", uint64(config.MemoryLimit)/bytesInKB+memoryAdditional))
 
 	if config.MaxThreads != 0 {
 		if config.MaxThreads == -1 {
@@ -144,7 +144,7 @@ func (s *Sandbox) prepareRun(config *sandbox.ExecuteConfig) *exec.Cmd {
 	}
 
 	cmd.Args = append(cmd.Args, fmt.Sprintf("--open-files=%d", config.MaxOpenFiles))
-	cmd.Args = append(cmd.Args, fmt.Sprintf("--fsize=%d", config.MaxOutputSize/BytesInKB))
+	cmd.Args = append(cmd.Args, fmt.Sprintf("--fsize=%d", config.MaxOutputSize/bytesInKB))
 
 	if config.Stdin != nil {
 		if config.Stdin.Input != nil {
@@ -238,19 +238,19 @@ func (s *Sandbox) parseMeta(config *sandbox.ExecuteConfig, result *sandbox.RunRe
 				return
 			}
 		case "time":
-			time, err := strconv.ParseFloat(value, 64)
+			timeVal, err := strconv.ParseFloat(value, 64)
 			if err != nil {
 				result.Err = fmt.Errorf("can not parse meta file line %s", scanner.Text())
 				return
 			}
-			result.Statistics.Time = customfields.Time(time * NanosInSec)
+			result.Statistics.Time = customfields.Time(timeVal * float64(time.Second))
 		case "time-wall":
-			time, err := strconv.ParseFloat(value, 64)
+			timeVal, err := strconv.ParseFloat(value, 64)
 			if err != nil {
 				result.Err = fmt.Errorf("can not parse meta file line %s", scanner.Text())
 				return
 			}
-			result.Statistics.WallTime = customfields.Time(time * NanosInSec)
+			result.Statistics.WallTime = customfields.Time(timeVal * float64(time.Second))
 		case "csw-forced", "csw-voluntary", "killed", "max-rss", "message":
 			// skip
 		default:
