@@ -2,12 +2,14 @@ package invoker
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"sync"
 	"testing_system/common"
 	"testing_system/common/connectors/invokerconn"
 	"testing_system/invoker/compiler"
 	"testing_system/invoker/storage"
 	"testing_system/lib/logger"
+	"time"
 )
 
 type Invoker struct {
@@ -22,6 +24,8 @@ type Invoker struct {
 	ActiveJobs map[string]*Job
 	MaxJobs    uint64
 	Mutex      sync.Mutex
+
+	Epoch string
 }
 
 func SetupInvoker(ts *common.TestingSystem) error {
@@ -61,6 +65,14 @@ func (i *Invoker) getStatus() *invokerconn.StatusResponse {
 	i.Mutex.Lock()
 	defer i.Mutex.Unlock()
 	status := new(invokerconn.StatusResponse)
+
+	// V6 uid is slower than v7, but v7 is compared within milliseconds,
+	// and v6 is compared by seconds and clock sequence, which will give us better ordering if milliseconds are same
+	epochID, err := uuid.NewV6()
+	if err != nil {
+		logger.Panic("Can not status ID, error: %v", err.Error())
+	}
+	status.Epoch = epochID.String()
 	for jobID := range i.ActiveJobs {
 		status.ActiveJobIDs = append(status.ActiveJobIDs, jobID)
 	}
@@ -70,4 +82,23 @@ func (i *Invoker) getStatus() *invokerconn.StatusResponse {
 		status.MaxNewJobs = i.MaxJobs - uint64(len(status.ActiveJobIDs))
 	}
 	return status
+}
+
+func (i *Invoker) runStatusLoop() {
+	logger.Info("Starting master ping loop")
+
+	t := time.Tick(i.TS.Config.Invoker.MasterPingInterval)
+	for {
+		err := i.TS.MasterConn.SendInvokerStatus(i.getStatus())
+		if err != nil {
+			logger.Warn("Can not send invoker status, error: %v", err.Error())
+		}
+		
+		select {
+		case <-i.TS.StopCtx.Done():
+			logger.Info("Stopping master ping loop")
+			return
+		case <-t:
+		}
+	}
 }

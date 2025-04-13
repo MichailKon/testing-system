@@ -1,5 +1,7 @@
 package config
 
+import "time"
+
 type InvokerConfig struct {
 	Threads   uint64 `yaml:"Threads"`
 	Sandboxes uint64 `yaml:"Sandboxes"`
@@ -7,6 +9,8 @@ type InvokerConfig struct {
 
 	SandboxType     string `yaml:"SandboxType"`
 	SandboxHomePath string `yaml:"SandboxHomePath"`
+
+	MasterPingInterval time.Duration `yaml:"MasterPingInterval"`
 
 	CacheSize uint64 `yaml:"CacheSize"`
 	CachePath string `yaml:"CachePath"`
@@ -39,6 +43,9 @@ func FillInInvokerConfig(config *InvokerConfig) {
 		default:
 			panic("unsupported sandbox type: " + config.SandboxType)
 		}
+	}
+	if config.MasterPingInterval == 0 {
+		config.MasterPingInterval = time.Second * 10
 	}
 	if len(config.CachePath) == 0 {
 		panic("No invoker cache path specified")
