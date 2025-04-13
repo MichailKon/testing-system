@@ -24,8 +24,6 @@ type Invoker struct {
 	ActiveJobs map[string]*Job
 	MaxJobs    uint64
 	Mutex      sync.Mutex
-
-	Epoch string
 }
 
 func SetupInvoker(ts *common.TestingSystem) error {
