@@ -72,7 +72,7 @@ func (i *Invoker) getStatus() *invokerconn.StatusResponse {
 	// and v6 is compared by seconds and clock sequence, which will give us better ordering if milliseconds are same
 	epochID, err := uuid.NewV6()
 	if err != nil {
-		logger.Panic("Can not status ID, error: %v", err.Error())
+		logger.Panic("Can not generate status ID, error: %v", err.Error())
 	}
 	status.Epoch = epochID.String()
 	for jobID := range i.ActiveJobs {
