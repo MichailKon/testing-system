@@ -118,6 +118,7 @@ func (s *Sandbox) Run(config *sandbox.ExecuteConfig) *sandbox.RunResult {
 	closer, err := s.parseReader(&cmd.Stdin, config.Stdin)
 	if err != nil {
 		result.Err = fmt.Errorf("can not parse stdin: %v", err)
+		return result
 	}
 	if closer != nil {
 		defer closer()
@@ -126,6 +127,7 @@ func (s *Sandbox) Run(config *sandbox.ExecuteConfig) *sandbox.RunResult {
 	closer, err = s.parseWriter(&cmd.Stdout, config.Stdout)
 	if err != nil {
 		result.Err = fmt.Errorf("can not parse stdout: %v", err)
+		return result
 	}
 	if closer != nil {
 		defer closer()
@@ -134,6 +136,7 @@ func (s *Sandbox) Run(config *sandbox.ExecuteConfig) *sandbox.RunResult {
 	closer, err = s.parseWriter(&cmd.Stderr, config.Stderr)
 	if err != nil {
 		result.Err = fmt.Errorf("can not parse stderr: %v", err)
+		return result
 	}
 	if closer != nil {
 		defer closer()
