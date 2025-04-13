@@ -55,6 +55,8 @@ func SetupInvoker(ts *common.TestingSystem) error {
 	r.GET("/status", invoker.HandleStatus)
 	r.POST("/job/new", invoker.HandleNewJob)
 
+	ts.AddProcess(invoker.runStatusLoop)
+
 	// TODO Add master initial connection and invoker keepalive thread
 
 	logger.Info("Configured invoker")
@@ -93,7 +95,7 @@ func (i *Invoker) runStatusLoop() {
 		if err != nil {
 			logger.Warn("Can not send invoker status, error: %v", err.Error())
 		}
-		
+
 		select {
 		case <-i.TS.StopCtx.Done():
 			logger.Info("Stopping master ping loop")
