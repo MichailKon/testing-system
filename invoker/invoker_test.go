@@ -30,7 +30,7 @@ type testState struct {
 	FilesDir string
 }
 
-func newTestState(t *testing.T) *testState {
+func newTestState(t *testing.T, sandboxType string) *testState {
 	ts := &testState{
 		t:   t,
 		Dir: t.TempDir(),
@@ -39,7 +39,7 @@ func newTestState(t *testing.T) *testState {
 	ts.TS = &common.TestingSystem{
 		Config: &config.Config{
 			Invoker: &config.InvokerConfig{
-				SandboxType:           "simple",
+				SandboxType:           sandboxType,
 				SandboxHomePath:       filepath.Join(ts.Dir, "sandbox"),
 				CacheSize:             1000 * 1000 * 1000,
 				CachePath:             ts.FilesDir,
@@ -47,6 +47,7 @@ func newTestState(t *testing.T) *testState {
 			},
 		},
 	}
+	require.NoError(t, os.MkdirAll(ts.TS.Config.Invoker.SandboxHomePath, 0o755))
 	config.FillInInvokerConfig(ts.TS.Config.Invoker)
 	ts.Invoker = &Invoker{
 		TS:       ts.TS,
@@ -109,7 +110,21 @@ func (ts *testState) testCompile(submitID uint) (file *string, v verdict.Verdict
 }
 
 func TestCompile(t *testing.T) {
-	ts := newTestState(t)
+	t.Run("Simple sandbox", func(t *testing.T) { testCompileSandbox(t, "simple") })
+
+	t.Run("Isolate sandbox", func(t *testing.T) {
+		_, err := os.Stat("/usr/local/bin/isolate")
+		if err != nil {
+			t.Skip("No isolate installed on current device, skipping isolate tests")
+		} else {
+			testCompileSandbox(t, "isolate")
+		}
+	})
+
+}
+
+func testCompileSandbox(t *testing.T, sandboxType string) {
+	ts := newTestState(t, sandboxType)
 
 	file, v := ts.testCompile(1)
 	require.Equal(t, verdict.CD, v)
@@ -215,7 +230,21 @@ func (ts *testState) testRun(submitID uint, problemID uint) *sandbox.RunResult {
 }
 
 func TestRun(t *testing.T) {
-	ts := newTestState(t)
+	t.Run("Simple sandbox", func(t *testing.T) { testRunSandbox(t, "simple") })
+
+	t.Run("Isolate sandbox", func(t *testing.T) {
+		_, err := os.Stat("/usr/local/bin/isolate")
+		if err != nil {
+			t.Skip("No isolate installed on current device, skipping isolate tests")
+		} else {
+			testRunSandbox(t, "isolate")
+		}
+	})
+
+}
+
+func testRunSandbox(t *testing.T, sandboxType string) {
+	ts := newTestState(t, sandboxType)
 	ts.addProblem(1)
 
 	res := ts.testRun(3, 1)
