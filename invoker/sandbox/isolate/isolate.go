@@ -267,7 +267,7 @@ func (s *Sandbox) parseMeta(config *sandbox.ExecuteConfig, result *sandbox.RunRe
 
 	setVerdict(verdict.ML, result.Statistics.Memory > config.MemoryLimit, verdict.OK, verdict.RT)
 	setVerdict(verdict.TL, result.Statistics.Time > config.TimeLimit, verdict.OK, verdict.WL)
-	setVerdict(verdict.WL, result.Statistics.WallTime > config.TimeLimit, verdict.OK)
+	setVerdict(verdict.WL, result.Statistics.WallTime > config.WallTimeLimit, verdict.OK)
 	setVerdict(verdict.RT, result.Statistics.ExitCode != 0, verdict.OK)
 
 	// TODO: Support SE
