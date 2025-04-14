@@ -12,7 +12,7 @@ import (
 
 func fixtureProblem() *models.Problem {
 	return &models.Problem{
-		ProblemType: models.ProblemType_ICPC,
+		ProblemType: models.ProblemTypeICPC,
 		TestsNumber: 10,
 	}
 }

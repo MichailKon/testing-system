@@ -130,7 +130,7 @@ func (i *ICPCGenerator) JobCompleted(result *masterconn.InvokerJobResult) (*mode
 	defer i.mutex.Unlock()
 	job, ok := i.givenJobs[result.JobID]
 	if !ok {
-		return nil, fmt.Errorf("job not found")
+		return nil, fmt.Errorf("job %s not exist", result.JobID)
 	}
 	delete(i.givenJobs, result.JobID)
 
@@ -150,7 +150,7 @@ func newICPCGenerator(problem *models.Problem, submission *models.Submission) (G
 		logger.Panic("Can't generate generator id: %w", err)
 	}
 
-	if problem.ProblemType != models.ProblemType_ICPC {
+	if problem.ProblemType != models.ProblemTypeICPC {
 		return nil, fmt.Errorf("problem %v is not ICPC", problem.ID)
 	}
 	futureTests := make([]uint64, 0, problem.TestsNumber)

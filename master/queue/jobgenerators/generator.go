@@ -21,8 +21,10 @@ type Generator interface {
 
 func NewGenerator(problem *models.Problem, submission *models.Submission) (Generator, error) {
 	switch problem.ProblemType {
-	case models.ProblemType_ICPC:
+	case models.ProblemTypeICPC:
 		return newICPCGenerator(problem, submission)
+	case models.ProblemTypeIOI:
+		return NewIOIGenerator(problem, submission)
 	default:
 		return nil, fmt.Errorf("unknown problem type %v", problem.ProblemType)
 	}

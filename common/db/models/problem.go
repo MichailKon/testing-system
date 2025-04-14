@@ -1,16 +1,81 @@
 package models
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
 	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
 	"testing_system/lib/customfields"
 )
 
 type ProblemType int
 
+// TestGroupScoringType sets how should scheduler set points for a group
+type TestGroupScoringType int
+
+// TestGroupFeedbackType sets which info about tests in a group would be shown
+type TestGroupFeedbackType int
+
 const (
-	ProblemType_ICPC ProblemType = iota + 1
-	ProblemType_IOI
+	ProblemTypeICPC ProblemType = iota + 1
+	ProblemTypeIOI
 )
+const (
+	// TestGroupScoringTypeComplete means that group costs TestGroup.Score (all the tests should be OK)
+	TestGroupScoringTypeComplete TestGroupScoringType = iota + 1
+	// TestGroupScoringTypeEachTest means that group score = TestGroup.TestScore * (number of tests with OK)
+	TestGroupScoringTypeEachTest
+	// TestGroupScoringTypeMin means that group score = min(checker's scores among all the tests)
+	TestGroupScoringTypeMin
+)
+const (
+	// TestGroupFeedbackTypeNone won't show anything
+	TestGroupFeedbackTypeNone TestGroupFeedbackType = iota + 1
+	// TestGroupFeedbackTypePoints will show points only
+	TestGroupFeedbackTypePoints
+	// TestGroupFeedbackTypeICPC will show verdict, time and memory usage for the first test with no OK
+	TestGroupFeedbackTypeICPC
+	// TestGroupFeedbackTypeComplete same as TestGroupFeedbackTypeICPC, but for every test
+	TestGroupFeedbackTypeComplete
+	// TestGroupFeedbackTypeFull same as TestGroupFeedbackTypeComplete, but with input, output, stderr, etc.
+	TestGroupFeedbackTypeFull
+)
+
+type TestGroup struct {
+	Name      string `json:"name" yaml:"name"`
+	FirstTest int    `json:"first_test" yaml:"first_test"`
+	LastTest  int    `json:"last_test" yaml:"last_test"`
+	// TestScore meaningful only in case of TestGroupScoringTypeEachTest
+	TestScore *float64 `json:"test_score" yaml:"test_score"`
+	// Score meaningful only in case of TestGroupScoringTypeComplete
+	Score          *float64              `json:"score" yaml:"score"`
+	ScoringType    TestGroupScoringType  `json:"scoring_type" yaml:"scoring_type"`
+	FeedbackType   TestGroupFeedbackType `json:"feedback_type" yaml:"feedback_type"`
+	RequiredGroups []string              `json:"required_groups" yaml:"required_groups"`
+}
+
+func (t TestGroup) Value() (driver.Value, error) {
+	return json.Marshal(t)
+}
+
+func (t *TestGroup) Scan(value interface{}) error {
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+	return json.Unmarshal(bytes, t)
+}
+
+func (t TestGroup) GormDBDataType(db *gorm.DB, field *schema.Field) string {
+	switch db.Dialector.Name() {
+	case "mysql", "sqlite":
+		return "JSON"
+	case "postgres":
+		return "JSONB"
+	}
+	return ""
+}
 
 type Problem struct {
 	gorm.Model
@@ -21,17 +86,19 @@ type Problem struct {
 	MemoryLimit customfields.Memory `yaml:"MemoryLimit"`
 
 	TestsNumber uint64 `yaml:"TestsNumber"`
+	// TestGroups ignored for ICPC problems
+	TestGroups []TestGroup
 
 	// WallTimeLimit specifies maximum execution and wait time.
 	// By default, it is max(5s, TimeLimit * 2)
 	WallTimeLimit *customfields.Time `yaml:"WallTimeLimit,omitempty"`
 
-	// MaxOpenFiles specifies maximum number of files, opened by testing system.
+	// MaxOpenFiles specifies the maximum number of files, opened by testing system.
 	// By default, it is 64
 	MaxOpenFiles *uint64 `yaml:"MaxOpenFiles,omitempty"`
 
-	// MaxThreads specifies maximum number of threads and/or processes
-	// By default, it is single thread
+	// MaxThreads specifies the maximum number of threads and/or processes;
+	// By default, it is a single thread
 	// If MaxThreads equals to -1, any number of threads allowed
 	MaxThreads *int64 `yaml:"MaxThreads,omitempty"`
 
