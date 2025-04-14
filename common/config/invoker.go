@@ -1,12 +1,19 @@
 package config
 
+import "time"
+
 type InvokerConfig struct {
+	// PublicAddress defines address for public access to invoker from master if the server is set up locally with some proxy
+	PublicAddress *string `yaml:"PublicAddress,omitempty"`
+
 	Threads   uint64 `yaml:"Threads"`
 	Sandboxes uint64 `yaml:"Sandboxes"`
 	QueueSize uint64 `yaml:"QueueSize"`
 
 	SandboxType     string `yaml:"SandboxType"`
 	SandboxHomePath string `yaml:"SandboxHomePath"`
+
+	MasterPingInterval time.Duration `yaml:"MasterPingInterval"`
 
 	CacheSize uint64 `yaml:"CacheSize"`
 	CachePath string `yaml:"CachePath"`
@@ -39,6 +46,9 @@ func FillInInvokerConfig(config *InvokerConfig) {
 		default:
 			panic("unsupported sandbox type: " + config.SandboxType)
 		}
+	}
+	if config.MasterPingInterval == 0 {
+		config.MasterPingInterval = time.Second * 10
 	}
 	if len(config.CachePath) == 0 {
 		panic("No invoker cache path specified")
