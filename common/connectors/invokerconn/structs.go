@@ -20,4 +20,5 @@ type StatusResponse struct {
 	MaxNewJobs   uint64   `json:"MaxNewJobs"`
 	ActiveJobIDs []string `json:"ActiveJobIDs"`
 	Epoch        string   `json:"Epoch"`
+	Address      string   `json:"Address"`
 }

@@ -3,6 +3,9 @@ package config
 import "time"
 
 type InvokerConfig struct {
+	// PublicAddress defines address for public access to invoker from master if the server is set up locally with some proxy
+	PublicAddress *string `yaml:"PublicAddress,omitempty"`
+
 	Threads   uint64 `yaml:"Threads"`
 	Sandboxes uint64 `yaml:"Sandboxes"`
 	QueueSize uint64 `yaml:"QueueSize"`

@@ -3,6 +3,7 @@ package invoker
 import (
 	"fmt"
 	"github.com/google/uuid"
+	"strconv"
 	"sync"
 	"testing_system/common"
 	"testing_system/common/connectors/invokerconn"
@@ -24,6 +25,8 @@ type Invoker struct {
 	ActiveJobs map[string]*Job
 	MaxJobs    uint64
 	Mutex      sync.Mutex
+
+	Address string
 }
 
 func SetupInvoker(ts *common.TestingSystem) error {
@@ -37,6 +40,7 @@ func SetupInvoker(ts *common.TestingSystem) error {
 		RunQueue:   make(chan func(), ts.Config.Invoker.Threads),
 		ActiveJobs: make(map[string]*Job),
 	}
+	invoker.setupAddress()
 
 	invoker.MaxJobs = ts.Config.Invoker.QueueSize + ts.Config.Invoker.Sandboxes
 	invoker.JobQueue = make(chan *Job, invoker.MaxJobs*2)
@@ -61,13 +65,28 @@ func SetupInvoker(ts *common.TestingSystem) error {
 	return nil
 }
 
+func (i *Invoker) setupAddress() {
+	if i.TS.Config.Invoker.PublicAddress != nil {
+		i.Address = *i.TS.Config.Invoker.PublicAddress
+	} else {
+		// TODO: Handle master and invoker on same server
+		var host string
+		if i.TS.Config.Host != nil {
+			host = *i.TS.Config.Host
+		} else {
+			host = "localhost"
+		}
+		i.Address = host + ":" + strconv.Itoa(i.TS.Config.Port)
+	}
+}
+
 func (i *Invoker) getStatus() *invokerconn.StatusResponse {
 	i.Mutex.Lock()
 	defer i.Mutex.Unlock()
 	status := new(invokerconn.StatusResponse)
+	status.Address = i.Address
 
-	// V6 uid is slower than v7, but v7 is compared within milliseconds,
-	// and v6 is compared by seconds and clock sequence, which will give us better ordering if milliseconds are same
+	// V6 uid is slower than v7, but gives us better ordering
 	epochID, err := uuid.NewV6()
 	if err != nil {
 		logger.Panic("Can not generate status ID, error: %v", err.Error())
