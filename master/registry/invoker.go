@@ -2,8 +2,10 @@ package registry
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"testing_system/common"
+	"testing_system/common/config"
 	"testing_system/common/connectors/invokerconn"
 	"testing_system/lib/logger"
 	"time"
@@ -14,7 +16,7 @@ type JobType int
 const (
 	SendingJob JobType = iota // job is sending
 	TestingJob                // job is testing
-	NoReplyJob                // job is tested, but not veryfied
+	NoReplyJob                // job is tested, but not verified
 	UnknownJob                // no information about the job
 )
 
@@ -33,17 +35,20 @@ type Invoker struct {
 	failed bool
 }
 
-func newInvoker(connector *invokerconn.Connector, registry *InvokerRegistry, ts *common.TestingSystem) *Invoker {
+func newInvoker(status *invokerconn.StatusResponse, registry *InvokerRegistry, ts *common.TestingSystem) *Invoker {
+	logger.Info("registering new invoker: %s", status.Address)
+
 	invoker := Invoker{
-		connector:     connector,
+		connector:     invokerconn.NewConnector(&config.Connection{Address: status.Address}),
 		registry:      registry,
 		jobTypeByID:   make(map[string]JobType),
 		jobTypesCount: make(map[JobType]int),
+		status:        status,
 	}
 
 	var ctx context.Context
 	ctx, invoker.cancel = context.WithCancel(ts.StopCtx)
-	ts.Go(func() { invoker.PingLoop(ctx) })
+	ts.Go(func() { invoker.pingLoop(ctx) })
 
 	return &invoker
 }
@@ -62,19 +67,18 @@ func (i *Invoker) ping() {
 	i.updateStatus(status)
 }
 
-func (i *Invoker) PingLoop(ctx context.Context) {
+func (i *Invoker) pingLoop(ctx context.Context) {
 	logger.Info("starting invoker ping loop")
 
 	t := time.Tick(i.ts.Config.Master.InvokersPingInterval)
 
 	for {
-		i.ping()
-
 		select {
 		case <-ctx.Done():
 			logger.Info("stopping invoker ping loop")
 			return
 		case <-t:
+			i.ping()
 		}
 	}
 }
@@ -131,7 +135,7 @@ func (i *Invoker) TrySendJob(job *invokerconn.Job) bool {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	if i.failed || (i.status != nil && i.jobTypesCount[SendingJob]+1 > int(i.status.MaxNewJobs)) {
+	if i.failed || i.jobTypesCount[SendingJob]+1 > int(i.status.MaxNewJobs) {
 		return false
 	}
 
@@ -142,12 +146,7 @@ func (i *Invoker) TrySendJob(job *invokerconn.Job) bool {
 }
 
 func isJobTesting(jobID string, status *invokerconn.StatusResponse) bool {
-	for _, id := range status.ActiveJobIDs {
-		if jobID == id {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(status.ActiveJobIDs, jobID)
 }
 
 func (i *Invoker) ensureJobIsNotLost(jobID string) {
@@ -160,7 +159,7 @@ func (i *Invoker) ensureJobIsNotLost(jobID string) {
 }
 
 func (i *Invoker) updateStatus(status *invokerconn.StatusResponse) {
-	if i.failed || (i.status != nil && i.status.Epoch >= status.Epoch) {
+	if i.failed || i.status.Epoch >= status.Epoch {
 		return
 	}
 
@@ -223,4 +222,16 @@ func (i *Invoker) JobTested(jobID string) bool {
 
 	i.removeJob(jobID)
 	return true
+}
+
+func (i *Invoker) VerifyAndUpdateStatus(status *invokerconn.StatusResponse) bool {
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+
+	if i.status.Address != status.Address {
+		return false
+	}
+
+	i.updateStatus(status)
+	return !i.failed
 }

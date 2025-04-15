@@ -2,21 +2,31 @@ package masterconn
 
 import (
 	"testing_system/common/config"
+	"testing_system/common/connectors"
 	"testing_system/common/connectors/invokerconn"
+	"testing_system/lib/connector"
+
+	"github.com/go-resty/resty/v2"
 )
 
 type Connector struct {
-	// TODO: Add master connection
+	connection *connectors.ConnectorBase
 }
 
 func NewConnector(connection *config.Connection) *Connector {
-	return nil
+	return &Connector{connectors.NewConnectorBase(connection)}
 }
 
 func (c *Connector) InvokerJobResult(result *InvokerJobResult) error {
-	return nil
+	r := c.connection.R()
+	r.SetBody(result)
+
+	return connector.ReceiveEmpty(r, "/master/invoker/job-result", resty.MethodPost)
 }
 
 func (c *Connector) SendInvokerStatus(response *invokerconn.StatusResponse) error {
-	return nil
+	r := c.connection.R()
+	r.SetBody(response)
+
+	return connector.ReceiveEmpty(r, "/master/invoker/ping", resty.MethodPost)
 }

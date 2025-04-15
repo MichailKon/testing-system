@@ -2,6 +2,7 @@ package connector
 
 import (
 	"fmt"
+
 	"github.com/go-resty/resty/v2"
 )
 
@@ -35,4 +36,9 @@ func Receive[T any](r *resty.Request, path string, method string) (*T, error) {
 		}
 	}
 	return result.Data, nil
+}
+
+func ReceiveEmpty(r *resty.Request, path string, method string) error {
+	_, err := Receive[string](r, path, method)
+	return err
 }
