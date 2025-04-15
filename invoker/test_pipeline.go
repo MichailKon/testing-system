@@ -131,7 +131,7 @@ func (s *JobPipelineState) generateTestRunConfig() error {
 
 	// TODO: support interactive problems
 
-	logger.Trace("Generated test run config for %d", s.loggerData)
+	logger.Trace("Generated test run config for %s", s.loggerData)
 	return nil
 }
 
@@ -195,7 +195,7 @@ func (s *JobPipelineState) generateCheckerRunConfig() error {
 	s.test.checkConfig.Args = []string{
 		testInputFile, testOutputFile, testAnswerFile, checkResultFile, checkResultFileArg,
 	}
-	logger.Trace("Generated checker run config for %d", s.loggerData)
+	logger.Trace("Generated checker run config for %s", s.loggerData)
 	return nil
 }
 
