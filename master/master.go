@@ -34,7 +34,7 @@ func SetupMaster(ts *common.TestingSystem) error {
 	// invoker handlers
 	r := router.Group("/invoker")
 	r.POST("/job-result", master.handleInvokerJobResult)
-	r.POST("/ping", master.handleInvokerStatus)
+	r.POST("/status", master.handleInvokerStatus)
 
 	// client handlers
 	router.POST("/submit", master.handleNewSubmission)

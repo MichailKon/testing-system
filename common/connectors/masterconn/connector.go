@@ -17,7 +17,7 @@ func NewConnector(connection *config.Connection) *Connector {
 	return &Connector{connectors.NewConnectorBase(connection)}
 }
 
-func (c *Connector) InvokerJobResult(result *InvokerJobResult) error {
+func (c *Connector) SendInvokerJobResult(result *InvokerJobResult) error {
 	r := c.connection.R()
 	r.SetBody(result)
 
@@ -28,5 +28,5 @@ func (c *Connector) SendInvokerStatus(response *invokerconn.Status) error {
 	r := c.connection.R()
 	r.SetBody(response)
 
-	return connector.ReceiveEmpty(r, "/master/invoker/ping", resty.MethodPost)
+	return connector.ReceiveEmpty(r, "/master/invoker/status", resty.MethodPost)
 }
