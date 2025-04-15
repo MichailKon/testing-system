@@ -22,7 +22,7 @@ type InvokerConfig struct {
 
 	CompilerConfigsFolder string `yaml:"CompilerConfigsFolder"`
 
-	CheckerLimits *RunConfig `yaml:"CheckerLimits,omitempty"`
+	CheckerLimits *RunLimitsConfig `yaml:"CheckerLimits,omitempty"`
 }
 
 func FillInInvokerConfig(config *InvokerConfig) {
@@ -63,7 +63,7 @@ func FillInInvokerConfig(config *InvokerConfig) {
 	}
 
 	if config.CheckerLimits == nil {
-		config.CheckerLimits = &RunConfig{}
+		config.CheckerLimits = &RunLimitsConfig{}
 	}
-	fillInDefaultCheckerRunConfig(config.CheckerLimits)
+	fillInDefaultCheckerRunLimitsConfig(config.CheckerLimits)
 }

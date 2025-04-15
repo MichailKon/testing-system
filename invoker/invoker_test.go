@@ -3,7 +3,6 @@ package invoker
 import (
 	"fmt"
 	"github.com/stretchr/testify/require"
-	"github.com/xorcare/pointer"
 	"gorm.io/gorm"
 	"os"
 	"os/exec"
@@ -12,7 +11,6 @@ import (
 	"testing"
 	"testing_system/common"
 	"testing_system/common/config"
-	_ "testing_system/common/config"
 	"testing_system/common/connectors/invokerconn"
 	"testing_system/common/constants/verdict"
 	"testing_system/common/db/models"
@@ -25,7 +23,7 @@ type testState struct {
 	t        *testing.T
 	TS       *common.TestingSystem
 	Invoker  *Invoker
-	Executor *JobExecutor
+	Sandbox  sandbox.ISandbox
 	Dir      string
 	FilesDir string
 }
@@ -53,13 +51,20 @@ func newTestState(t *testing.T, sandboxType string) *testState {
 		TS:       ts.TS,
 		Storage:  storage.NewInvokerStorage(ts.TS),
 		Compiler: compiler.NewCompiler(ts.TS),
+		RunQueue: make(chan func()),
 	}
+	go func() {
+		for {
+			f := <-ts.Invoker.RunQueue
+			f()
+		}
+	}()
 	require.NoError(t, os.CopyFS(ts.FilesDir, os.DirFS("testdata/files")))
-	ts.Executor = NewJobExecutor(ts.TS, 1)
+	ts.Sandbox = newSandbox(ts.TS, 1)
 	return ts
 }
 
-func (ts *testState) testCompile(submitID uint) (file *string, v verdict.Verdict) {
+func (ts *testState) testCompile(submitID uint) *JobPipelineState {
 	job := &Job{
 		Job: invokerconn.Job{
 			ID:       "JOB",
@@ -79,34 +84,23 @@ func (ts *testState) testCompile(submitID uint) (file *string, v verdict.Verdict
 			Language:  "cpp",
 		},
 	}
-	require.NoError(ts.t, ts.Executor.Sandbox.Init())
 
-	j := compileJob{
-		invoker: ts.Invoker,
-		tester:  ts.Executor,
-		job:     job,
-	}
-
-	require.NoError(ts.t, j.invoker.Storage.Source.Insert(
+	require.NoError(ts.t, ts.Invoker.Storage.Source.Insert(
 		fmt.Sprintf("%s/source/%d/%d.cpp", ts.FilesDir, submitID, submitID),
 		uint64(submitID),
 	))
 
-	require.NoError(ts.t, j.Prepare())
-
-	j.wg.Add(1)
-	j.Execute()
-
-	require.NoError(ts.t, j.compileResult.Err)
-
-	_, err := j.FinalizeVerdict()
-	require.NoError(ts.t, err)
-
-	v = j.compileResult.Verdict
-	if j.compileResult.Verdict == verdict.CD {
-		file = pointer.String(filepath.Join(j.tester.Sandbox.Dir(), j.binaryName))
+	s := &JobPipelineState{
+		invoker:    ts.Invoker,
+		sandbox:    ts.Sandbox,
+		job:        job,
+		compile:    new(pipelineCompileData),
+		loggerData: fmt.Sprintf("compile job: %s submission: %d", job.ID, job.Submission.ID),
 	}
-	return
+
+	require.NoError(ts.t, s.compilationProcessPipeline())
+
+	return s
 }
 
 func TestCompile(t *testing.T) {
@@ -126,20 +120,21 @@ func TestCompile(t *testing.T) {
 func testCompileSandbox(t *testing.T, sandboxType string) {
 	ts := newTestState(t, sandboxType)
 
-	file, v := ts.testCompile(1)
-	require.Equal(t, verdict.CD, v)
+	s := ts.testCompile(1)
+	require.Equal(t, verdict.CD, s.compile.result.Verdict)
 
-	cmd := exec.Command(*file)
+	cmd := exec.Command(filepath.Join(s.sandbox.Dir(), solutionBinaryFile))
 	var stdout strings.Builder
 	cmd.Stdout = &stdout
 
 	require.NoError(t, cmd.Run())
 	require.Equal(t, "1", strings.TrimSpace(stdout.String()))
 
-	ts.Executor.Sandbox.Cleanup()
+	s.deferFunc()
 
-	_, v = ts.testCompile(2)
-	require.Equal(t, verdict.CE, v)
+	s = ts.testCompile(2)
+	require.Equal(t, verdict.CE, s.compile.result.Verdict)
+	s.deferFunc()
 }
 
 func (ts *testState) addProblem(problemID uint) {
@@ -154,6 +149,11 @@ func (ts *testState) addProblem(problemID uint) {
 	))
 
 	checkerDir := fmt.Sprintf("%s/checker/%d", ts.FilesDir, problemID)
+
+	testlib, err := os.ReadFile(filepath.Join(ts.FilesDir, "checker", "testlib.h"))
+	require.NoError(ts.t, err)
+	require.NoError(ts.t, os.WriteFile(filepath.Join(checkerDir, "testlib.h"), testlib, 0666))
+
 	cmd := exec.Command("g++", "check.cpp", "-std=c++17", "-o", "check")
 	cmd.Dir = checkerDir
 	require.NoError(ts.t, cmd.Run())
@@ -193,40 +193,25 @@ func (ts *testState) testRun(submitID uint, problemID uint) *sandbox.RunResult {
 
 	require.NoError(ts.t, ts.Invoker.Storage.Binary.Insert(filepath.Join(sourceDir, "binary"), uint64(submitID)))
 
-	require.NoError(ts.t, ts.Executor.Sandbox.Init())
-	defer ts.Executor.Sandbox.Cleanup()
-
-	j := testJob{
-		invoker: ts.Invoker,
-		tester:  ts.Executor,
+	s := &JobPipelineState{
 		job:     job,
+		invoker: ts.Invoker,
+		sandbox: ts.Sandbox,
+		test:    new(pipelineTestData),
+		loggerData: fmt.Sprintf(
+			"test job: %s submission: %d problem %d test %d",
+			job.ID,
+			job.Submission.ID,
+			job.Problem.ID,
+			job.Test,
+		),
 	}
 
-	require.NoError(ts.t, j.PrepareRun())
+	defer s.deferFunc()
 
-	j.wg.Add(1)
-	j.RunOnTest()
-	require.NoError(ts.t, j.runResult.Err)
+	require.NoError(ts.t, s.testingProcessPipeline())
 
-	if j.runResult.Verdict != verdict.OK {
-		return j.runResult
-	}
-
-	require.NoError(ts.t, j.PrepareCheck())
-
-	j.wg.Add(1)
-	j.RunChecker()
-
-	require.NoError(ts.t, j.checkResult.Err)
-
-	switch j.checkResult.Verdict {
-	case verdict.OK, verdict.RT:
-		j.ParseCheckerOutput()
-	default:
-		ts.t.Fatalf("Wrong checker verdict: %v", j.checkResult.Verdict)
-	}
-
-	return j.runResult
+	return s.test.runResult
 }
 
 func TestRun(t *testing.T) {

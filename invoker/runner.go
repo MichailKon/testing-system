@@ -2,25 +2,19 @@ package invoker
 
 import "testing_system/lib/logger"
 
-type Runner struct {
-	ID uint64
-	// TODO: specify cpu core for extra isolation
-}
-
-func (i *Invoker) StartRunners() {
+func (i *Invoker) startRunners() {
 	// TODO: specify cpu core for extra isolation
 	for id := range i.TS.Config.Invoker.Threads {
-		r := Runner{ID: id}
-		i.TS.AddProcess(func() { i.RunRunnerThread(r) })
+		i.TS.AddProcess(func() { i.runRunnerThread(id) })
 	}
 }
 
-func (i *Invoker) RunRunnerThread(runner Runner) {
-	logger.Info("Started invoker thread %d", runner.ID)
+func (i *Invoker) runRunnerThread(id uint64) {
+	logger.Info("Started invoker thread %d", id)
 	for {
 		select {
 		case <-i.TS.StopCtx.Done():
-			logger.Info("Stopped invoker thread %d", runner.ID)
+			logger.Info("Stopped invoker thread %d", id)
 			break
 		case f := <-i.RunQueue:
 			f()

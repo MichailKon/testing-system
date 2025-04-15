@@ -162,7 +162,9 @@ func (s *Sandbox) prepareRun(config *sandbox.ExecuteConfig) *exec.Cmd {
 		}
 	}
 
-	if config.Stderr != nil {
+	if config.StderrToStdout {
+		cmd.Args = append(cmd.Args, "--stderr-to-stdout")
+	} else if config.Stderr != nil {
 		if config.Stderr.Output != nil {
 			cmd.Stderr = config.Stderr.Output
 		} else {

@@ -115,31 +115,35 @@ func (s *Sandbox) Run(config *sandbox.ExecuteConfig) *sandbox.RunResult {
 	}
 
 	cmd.Dir = s.dir
-	closer, err := s.parseReader(&cmd.Stdin, config.Stdin)
+	stdinCloser, err := s.parseReader(&cmd.Stdin, config.Stdin)
 	if err != nil {
 		result.Err = fmt.Errorf("can not parse stdin: %v", err)
 		return result
 	}
-	if closer != nil {
-		defer closer()
+	if stdinCloser != nil {
+		defer stdinCloser()
 	}
 
-	closer, err = s.parseWriter(&cmd.Stdout, config.Stdout)
+	stdoutCloser, err := s.parseWriter(&cmd.Stdout, config.Stdout)
 	if err != nil {
 		result.Err = fmt.Errorf("can not parse stdout: %v", err)
 		return result
 	}
-	if closer != nil {
-		defer closer()
+	if stdoutCloser != nil {
+		defer stdoutCloser()
 	}
 
-	closer, err = s.parseWriter(&cmd.Stderr, config.Stderr)
-	if err != nil {
-		result.Err = fmt.Errorf("can not parse stderr: %v", err)
-		return result
-	}
-	if closer != nil {
-		defer closer()
+	if config.StderrToStdout {
+		cmd.Stderr = cmd.Stdout
+	} else {
+		stderrCloser, err := s.parseWriter(&cmd.Stderr, config.Stderr)
+		if err != nil {
+			result.Err = fmt.Errorf("can not parse stderr: %v", err)
+			return result
+		}
+		if stderrCloser != nil {
+			defer stderrCloser()
+		}
 	}
 
 	wallTimeLimit := false
