@@ -16,7 +16,7 @@ type Job struct {
 	// TODO: Add job dependency
 }
 
-type StatusResponse struct {
+type Status struct {
 	MaxNewJobs   uint64   `json:"MaxNewJobs"`
 	ActiveJobIDs []string `json:"ActiveJobIDs"`
 	Epoch        string   `json:"Epoch"`

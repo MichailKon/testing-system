@@ -24,7 +24,7 @@ func (c *Connector) InvokerJobResult(result *InvokerJobResult) error {
 	return connector.ReceiveEmpty(r, "/master/invoker/job-result", resty.MethodPost)
 }
 
-func (c *Connector) SendInvokerStatus(response *invokerconn.StatusResponse) error {
+func (c *Connector) SendInvokerStatus(response *invokerconn.Status) error {
 	r := c.connection.R()
 	r.SetBody(response)
 

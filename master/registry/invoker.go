@@ -31,11 +31,11 @@ type Invoker struct {
 	jobTypeByID   map[string]JobType
 	jobTypesCount map[JobType]int
 
-	status *invokerconn.StatusResponse
+	status *invokerconn.Status
 	failed bool
 }
 
-func newInvoker(status *invokerconn.StatusResponse, registry *InvokerRegistry, ts *common.TestingSystem) *Invoker {
+func newInvoker(status *invokerconn.Status, registry *InvokerRegistry, ts *common.TestingSystem) *Invoker {
 	logger.Info("registering new invoker: %s", status.Address)
 
 	invoker := Invoker{
@@ -145,7 +145,7 @@ func (i *Invoker) TrySendJob(job *invokerconn.Job) bool {
 	return true
 }
 
-func isJobTesting(jobID string, status *invokerconn.StatusResponse) bool {
+func isJobTesting(jobID string, status *invokerconn.Status) bool {
 	return slices.Contains(status.ActiveJobIDs, jobID)
 }
 
@@ -158,7 +158,7 @@ func (i *Invoker) ensureJobIsNotLost(jobID string) {
 	}
 }
 
-func (i *Invoker) updateStatus(status *invokerconn.StatusResponse) {
+func (i *Invoker) updateStatus(status *invokerconn.Status) {
 	if i.failed || i.status.Epoch >= status.Epoch {
 		return
 	}
@@ -224,7 +224,7 @@ func (i *Invoker) JobTested(jobID string) bool {
 	return true
 }
 
-func (i *Invoker) VerifyAndUpdateStatus(status *invokerconn.StatusResponse) bool {
+func (i *Invoker) VerifyAndUpdateStatus(status *invokerconn.Status) bool {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 

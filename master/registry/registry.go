@@ -47,7 +47,7 @@ func (r *InvokerRegistry) OnInvokerFailure(invoker *Invoker) {
 	r.invokers = slices.DeleteFunc(r.invokers, func(i *Invoker) bool { return i == invoker })
 }
 
-func (r *InvokerRegistry) UpsertInvoker(status *invokerconn.StatusResponse) {
+func (r *InvokerRegistry) UpsertInvoker(status *invokerconn.Status) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -70,7 +70,7 @@ func (r *InvokerRegistry) HandleInvokerJobResult(result *masterconn.InvokerJobRe
 	invoker, exists := r.invokerByJobID[result.JobID]
 
 	if !exists {
-		logger.Info("old or unknown job %s is tested", result.JobID)
+		logger.Trace("old or unknown job %s is tested", result.JobID)
 		return false
 	}
 

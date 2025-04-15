@@ -2,7 +2,6 @@ package invoker
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	"strconv"
 	"sync"
 	"testing_system/common"
@@ -11,6 +10,8 @@ import (
 	"testing_system/invoker/storage"
 	"testing_system/lib/logger"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Invoker struct {
@@ -80,10 +81,10 @@ func (i *Invoker) setupAddress() {
 	}
 }
 
-func (i *Invoker) getStatus() *invokerconn.StatusResponse {
+func (i *Invoker) getStatus() *invokerconn.Status {
 	i.Mutex.Lock()
 	defer i.Mutex.Unlock()
-	status := new(invokerconn.StatusResponse)
+	status := new(invokerconn.Status)
 	status.Address = i.Address
 
 	// V6 uid is slower than v7, but gives us better ordering

@@ -29,14 +29,15 @@ func SetupMaster(ts *common.TestingSystem) error {
 
 	ts.AddProcess(master.sendingJobsLoop)
 
+	router := ts.Router.Group("/master")
+
 	// invoker handlers
-	r := ts.Router.Group("/master/invoker")
+	r := router.Group("/invoker")
 	r.POST("/job-result", master.handleInvokerJobResult)
-	r.POST("/ping", master.handleInvokerPing)
+	r.POST("/ping", master.handleInvokerStatus)
 
 	// client handlers
-	r = ts.Router.Group("/client")
-	r.POST("/submit", master.handleNewSubmission)
+	router.POST("/submit", master.handleNewSubmission)
 
 	return nil
 }
