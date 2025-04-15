@@ -1,3 +1,5 @@
+//go:generate swag init -g master.go --parseDependency -o ../swag
+
 package master
 
 import (
