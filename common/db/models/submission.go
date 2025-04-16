@@ -16,6 +16,7 @@ type TestResult struct {
 	Verdict    verdict.Verdict     `json:"Verdict" yaml:"Verdict"`
 	Time       customfields.Time   `json:"Time" yaml:"Time"`
 	Memory     customfields.Memory `json:"Memory" yaml:"Memory"`
+	Error      string              `json:"Error,omitempty" yaml:"Error,omitempty"`
 }
 
 type TestResults []TestResult
@@ -42,6 +43,37 @@ func (t TestResults) GormDBDataType(db *gorm.DB, field *schema.Field) string {
 	return ""
 }
 
+type GroupResult struct {
+	GroupName string  `json:"GroupName" yaml:"GroupName"`
+	Points    float64 `json:"Points" yaml:"Points"`
+	Passed    bool    `json:"Passed" yaml:"Passed"`
+	// TODO maybe more fields
+}
+
+type GroupResults []GroupResult
+
+func (t GroupResults) Value() (driver.Value, error) {
+	return json.Marshal(t)
+}
+
+func (t *GroupResults) Scan(value interface{}) error {
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+	return json.Unmarshal(bytes, t)
+}
+
+func (t GroupResults) GormDBDataType(db *gorm.DB, field *schema.Field) string {
+	switch db.Dialector.Name() {
+	case "mysql", "sqlite":
+		return "JSON"
+	case "postgres":
+		return "JSONB"
+	}
+	return ""
+}
+
 type Submission struct {
 	gorm.Model
 	ProblemID uint64 `json:"ProblemID" yaml:"ProblemID"`
@@ -50,4 +82,5 @@ type Submission struct {
 	Score       float64         `json:"Score" yaml:"Score"`
 	Verdict     verdict.Verdict `json:"Verdict" yaml:"Verdict"`
 	TestResults TestResults     `gorm:"type:jsonb" json:"TestResults" yaml:"TestResults"`
+	GroupResults GroupResults
 }

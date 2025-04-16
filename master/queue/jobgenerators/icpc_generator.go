@@ -11,20 +11,12 @@ import (
 	"testing_system/lib/logger"
 )
 
-type state int
-
-const (
-	compilationNotStarted state = iota
-	compilationStarted
-	compilationFinished
-)
-
 type ICPCGenerator struct {
 	id          string
 	mutex       sync.Mutex
 	submission  *models.Submission
 	problem     *models.Problem
-	state       state
+	state       generatorState
 	hasFails    bool
 	givenJobs   map[string]*invokerconn.Job
 	futureTests []uint64
@@ -170,6 +162,7 @@ func newICPCGenerator(problem *models.Problem, submission *models.Submission) (G
 	return &ICPCGenerator{
 		id:          id.String(),
 		submission:  submission,
+		state:       compilationNotStarted,
 		problem:     problem,
 		givenJobs:   make(map[string]*invokerconn.Job),
 		futureTests: futureTests,

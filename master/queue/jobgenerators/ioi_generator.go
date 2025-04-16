@@ -3,6 +3,7 @@ package jobgenerators
 import (
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/xorcare/pointer"
 	"slices"
 	"sync"
 	"testing_system/common/connectors/invokerconn"
@@ -17,80 +18,201 @@ type IOIGenerator struct {
 	mutex      sync.Mutex
 	submission *models.Submission
 	problem    *models.Problem
-	state      state
+	state      generatorState
 	givenJobs  map[string]*invokerconn.Job
 
-	groupNameToGroup        map[string]*models.TestGroup
-	groupNamesToBeGiven     []string
-	groupNameToDependencies map[string][]*models.TestGroup
+	// groupNameToOrigGroup should be set once at the creating of the generator and should not be changed further
+	groupNameToOrigGroup map[string]*models.TestGroup
+	// origGroupNamesToBeGiven should be set once at the creating of the generator and should not be changed further
+	origGroupNamesToBeGiven []string
+
+	groupNameToGroup       map[string]*models.TestGroup
+	groupNameToGroupResult map[string]*models.GroupResult
+	groupNamesToBeGiven    []string
+}
+
+type problemWalkthroughResults struct {
+	order    []string
+	hasCycle bool
+	used     map[string]int
+}
+
+func (i *IOIGenerator) walkThroughGroups(curGroup *models.TestGroup, result *problemWalkthroughResults) {
+	result.used[curGroup.Name] = 1
+	for _, requiredGroupName := range curGroup.RequiredGroupNames {
+		requiredGroup := i.groupNameToGroup[requiredGroupName]
+		if val, ok := result.used[requiredGroup.Name]; !ok {
+			i.walkThroughGroups(requiredGroup, result)
+		} else if val == 1 {
+			result.hasCycle = true
+		}
+	}
+	result.order = append(result.order, curGroup.Name)
+	result.used[curGroup.Name] = 2
+}
+
+func (i *IOIGenerator) getWalkthroughResults() *problemWalkthroughResults {
+	result := &problemWalkthroughResults{
+		order:    make([]string, 0),
+		hasCycle: false,
+		used:     make(map[string]int),
+	}
+	for _, group := range i.groupNameToGroup {
+		if _, ok := result.used[group.Name]; !ok {
+			i.walkThroughGroups(group, result)
+		}
+	}
+	return result
+}
+
+func (i *IOIGenerator) prepareGenerator() error {
+	problem := i.problem
+	if problem.ProblemType != models.ProblemTypeIOI {
+		return fmt.Errorf("problem %v is not an IOI problem", problem.ID)
+	}
+	// must copy groups in order to not break the problem
+	for _, group := range problem.TestGroups {
+		if _, ok := i.groupNameToGroup[group.Name]; ok {
+			return fmt.Errorf("group %v presented twice in problem", problem.ID)
+		}
+		group1 := group
+		i.groupNameToGroup[group1.Name] = &group1
+		group2 := group1
+		i.groupNameToOrigGroup[group2.Name] = &group2
+	}
+	// each group with TestGroupScoringTypeEachTest must have TestScore
+	for _, group := range problem.TestGroups {
+		switch group.ScoringType {
+		case models.TestGroupScoringTypeComplete:
+			if group.Score == nil {
+				return fmt.Errorf("group %v in problem %v doesn't have Score", group.Name, problem.ID)
+			}
+		case models.TestGroupScoringTypeEachTest:
+			if group.TestScore == nil {
+				return fmt.Errorf("group %v in problem %v doesn't have TestScore", group.Name, problem.ID)
+			}
+		case models.TestGroupScoringTypeMin:
+		default:
+			return fmt.Errorf("unknown TestGroupScoringType %v", group.ScoringType)
+		}
+	}
+	{
+		// simple check that each test is in exactly one group
+		for testNumber := range i.problem.TestsNumber {
+			cnt := 0
+			for _, group := range i.problem.TestGroups {
+				if uint64(group.FirstTest) <= testNumber+1 && testNumber+1 <= uint64(group.LastTest) {
+					cnt += 1
+				}
+			}
+			if cnt != 1 {
+				return fmt.Errorf("test %v is presented in %v groups in problem %v", testNumber, problem.ID, cnt)
+			}
+		}
+	}
+	{
+		// check for cycles and build topsort of the groups
+		result := i.getWalkthroughResults()
+		if result.hasCycle {
+			return fmt.Errorf("cycle detected in problem %v", problem.ID)
+		}
+		i.groupNamesToBeGiven = result.order
+		i.origGroupNamesToBeGiven = result.order
+	}
+	{
+		testResults := make([]models.TestResult, 0, problem.TestsNumber)
+		for testNumber := range problem.TestsNumber {
+			testResults = append(testResults, models.TestResult{
+				TestNumber: testNumber + 1,
+				Verdict:    verdict.SK,
+				Time:       0,
+				Memory:     0,
+			})
+		}
+		i.submission.TestResults = testResults
+	}
+	return nil
 }
 
 func (i *IOIGenerator) finalizeResults() {
-	for _, group := range i.groupNameToGroup {
+	totalScore := 0.0
+	i.submission.Verdict = verdict.OK
+	for _, groupName := range i.origGroupNamesToBeGiven {
+		group := i.groupNameToOrigGroup[groupName]
+		if _, ok := i.groupNameToGroupResult[group.Name]; !ok {
+			i.groupNameToGroupResult[group.Name] = &models.GroupResult{
+				GroupName: group.Name,
+				Passed:    false,
+			}
+		}
+		groupResult := i.groupNameToGroupResult[group.Name]
+
+		allRequiredPassed := true
+		for _, requiredGroupName := range group.RequiredGroupNames {
+			if !i.groupNameToGroupResult[requiredGroupName].Passed {
+				allRequiredPassed = false
+				break
+			}
+		}
+		if !allRequiredPassed {
+			groupResult.Passed = false
+			groupResult.Points = 0.
+			for j := group.FirstTest - 1; j < group.LastTest; j++ {
+				i.submission.TestResults[j].Verdict = verdict.SK
+				i.submission.TestResults[j].Points = pointer.Float64(0.0)
+				i.submission.TestResults[j].Error = ""
+			}
+			i.groupNameToGroupResult[groupName] = groupResult
+			continue
+		}
+
+		{
+			groupTestResults := i.submission.TestResults[group.FirstTest-1 : group.LastTest]
+			allOK := slices.IndexFunc(groupTestResults, func(result models.TestResult) bool {
+				return result.Verdict != verdict.OK
+			}) == -1
+			groupResult.Passed = allOK
+			if !allOK {
+				i.submission.Verdict = verdict.PT
+			}
+		}
+		if groupResult.Passed && group.ScoringType == models.TestGroupScoringTypeComplete {
+			totalScore += *group.Score
+			groupResult.Points = *group.Score
+		}
+
 		switch group.ScoringType {
 		case models.TestGroupScoringTypeComplete:
 			setSkipped := false
-			for j := range i.submission.TestResults[group.FirstTest-1 : group.LastTest] {
+			for j := group.FirstTest - 1; j < group.LastTest; j++ {
 				if setSkipped {
 					i.submission.TestResults[j].Verdict = verdict.SK
 					continue
 				}
-				if i.submission.TestResults[j].Verdict == verdict.OK || i.submission.TestResults[j].Verdict == verdict.SK {
+				if i.submission.TestResults[j].Verdict == verdict.OK ||
+					i.submission.TestResults[j].Verdict == verdict.SK {
 					continue
 				}
 				setSkipped = true
-				i.submission.Verdict = i.submission.TestResults[j].Verdict
-			}
-			if !setSkipped {
-				if group.Score == nil {
-					logger.Panic("Group '%v' in problemId=%v has TypeComplete, but score is nil",
-						group.Name, i.problem.ID)
-				}
-				i.submission.TestResults[group.LastTest-1].Points = group.Score
 			}
 		case models.TestGroupScoringTypeEachTest:
-			// TODO
+			fallthrough
 		case models.TestGroupScoringTypeMin:
-			// TODO
-		}
-	}
-	notOkInd := slices.IndexFunc(i.submission.TestResults, func(result models.TestResult) bool {
-		return result.Verdict != verdict.OK
-	})
-	if notOkInd == -1 {
-		i.submission.Verdict = verdict.OK
-	} else {
-		i.submission.Verdict = i.submission.TestResults[notOkInd].Verdict
-	}
-	totalScore := 0.
-	for _, result := range i.submission.TestResults {
-		if result.Points != nil {
-			totalScore += *result.Points
-		}
-	}
-	i.submission.Score = totalScore
-}
-
-func (i *IOIGenerator) fetchGroupDependencies(curGroup *models.TestGroup) map[string]struct{} {
-	used := make(map[string]struct{})
-	q := make([]*models.TestGroup, 0)
-	q = append(q, curGroup)
-	used[curGroup.Name] = struct{}{}
-	for len(q) > 0 {
-		group := q[0]
-		q = q[1:]
-		for _, nextGroup := range i.groupNameToDependencies[group.Name] {
-			if _, ok := used[nextGroup.Name]; !ok {
-				q = append(q, nextGroup)
-				used[nextGroup.Name] = struct{}{}
+			for j := group.FirstTest - 1; j < group.LastTest; j++ {
+				groupResult.Points += *i.submission.TestResults[j].Points
+				totalScore += *i.submission.TestResults[j].Points
 			}
 		}
+		i.groupNameToGroupResult[groupName] = groupResult
 	}
-	return used
+	i.submission.Score = totalScore
+	for _, group := range i.problem.TestGroups {
+		i.submission.GroupResults = append(i.submission.GroupResults, *i.groupNameToGroupResult[group.Name])
+	}
 }
 
 func (i *IOIGenerator) testNumberToGroup(testNumber uint64) *models.TestGroup {
-	for _, group := range i.groupNameToGroup {
+	for _, group := range i.groupNameToOrigGroup {
 		if group.FirstTest <= int(testNumber) && int(testNumber) <= group.LastTest {
 			return group
 		}
@@ -122,19 +244,34 @@ func (i *IOIGenerator) NextJob() *invokerconn.Job {
 	if i.state == compilationNotStarted {
 		job.Type = invokerconn.CompileJob
 		i.state = compilationStarted
+		i.givenJobs[job.ID] = job
 		return job
 	}
-	curGroupName := i.groupNamesToBeGiven[0]
-	group := i.groupNameToGroup[curGroupName]
 	job.Type = invokerconn.TestJob
-	job.Test = uint64(group.FirstTest)
-	if group.FirstTest == group.LastTest {
-		i.groupNamesToBeGiven = i.groupNamesToBeGiven[1:]
-	} else {
-		group.FirstTest++
+	for len(i.groupNamesToBeGiven) > 0 {
+		curGroup := i.groupNamesToBeGiven[0]
+		shouldSkip := false
+		group := i.groupNameToGroup[curGroup]
+		for _, requiredGroupName := range group.RequiredGroupNames {
+			if result, ok := i.groupNameToGroupResult[requiredGroupName]; ok && !result.Passed {
+				shouldSkip = true
+				break
+			}
+		}
+		if shouldSkip {
+			i.groupNamesToBeGiven = i.groupNamesToBeGiven[1:]
+			continue
+		}
+		job.Test = uint64(group.FirstTest)
+		if group.FirstTest == group.LastTest {
+			i.groupNamesToBeGiven = i.groupNamesToBeGiven[1:]
+		} else {
+			group.FirstTest++
+		}
+		i.givenJobs[job.ID] = job
+		return job
 	}
-	i.givenJobs[job.ID] = job
-	return job
+	return nil
 }
 
 // compileJobCompleted must be done with acquired mutex
@@ -147,6 +284,7 @@ func (i *IOIGenerator) compileJobCompleted(job *invokerconn.Job, result *masterc
 		i.state = compilationFinished
 		return nil, nil
 	case verdict.CE:
+		i.finalizeResults()
 		i.submission.Verdict = result.Verdict
 		return i.submission, nil
 	default:
@@ -157,7 +295,7 @@ func (i *IOIGenerator) compileJobCompleted(job *invokerconn.Job, result *masterc
 // testJobCompleted must be done with acquired mutex
 func (i *IOIGenerator) testJobCompleted(job *invokerconn.Job, result *masterconn.InvokerJobResult) (*models.Submission, error) {
 	if job.Type != invokerconn.TestJob {
-		return nil, fmt.Errorf("job type %s is not test job", job.ID)
+		return nil, fmt.Errorf("job type %v is not test job", job.ID)
 	}
 	group := i.testNumberToGroup(job.Test)
 	if group == nil {
@@ -165,47 +303,87 @@ func (i *IOIGenerator) testJobCompleted(job *invokerconn.Job, result *masterconn
 		return nil, nil // just for goland to chill
 	}
 
+	if group.ScoringType == models.TestGroupScoringTypeEachTest &&
+		(result.Points == nil || *result.Points > *group.TestScore) {
+		if len(result.Error) > 0 {
+			result.Error += "; "
+		}
+		result.Error += fmt.Sprintf("checker returned score=%v, but testScore=%v in problemId=%v, group=%v",
+			result.Points, *group.TestScore, job.ID, i.problem.ID)
+		result.Verdict = verdict.CF
+	}
+	if group.ScoringType == models.TestGroupScoringTypeMin && result.Points == nil {
+		if len(result.Error) > 0 {
+			result.Error += "; "
+		}
+		result.Error += fmt.Sprintf("checker returned score=%v, but testScore=%v in problemId=%v, group=%v",
+			result.Points, *group.TestScore, job.ID, i.problem.ID)
+		result.Verdict = verdict.CF
+	}
+
 	i.submission.TestResults[job.Test-1].Verdict = result.Verdict
 
 	switch result.Verdict {
 	case verdict.OK:
-		if group.ScoringType == models.TestGroupScoringTypeEachTest {
-			if group.TestScore == nil {
-				logger.Panic("Group '%v' has type EachTest, but TestScore is nil in problemId=%v",
-					group.Name, i.problem.ID)
+	case verdict.CF:
+		i.submission.TestResults[job.Test-1].Error = result.Error
+		fallthrough
+	case verdict.PT, verdict.WA, verdict.RT, verdict.ML, verdict.TL, verdict.WL, verdict.SE:
+		if _, ok := i.groupNameToGroupResult[group.Name]; !ok {
+			i.groupNameToGroupResult[group.Name] = &models.GroupResult{
+				GroupName: group.Name,
+				Passed:    false,
 			}
-			i.submission.TestResults[job.Test-1].Points = group.TestScore
-		} else if group.ScoringType == models.TestGroupScoringTypeMin {
-			if result.Points == nil {
-				logger.Panic("Group '%v' has type Min, but checker didn't set points in problemId=%v, jobId=%v",
-					group.Name, i.problem.ID, job.ID)
-			}
-			i.submission.TestResults[job.Test-1].Points = result.Points
 		}
-		if len(i.givenJobs) == 0 && len(i.groupNamesToBeGiven) == 0 {
-			i.finalizeResults()
-			return i.submission, nil
+	default:
+		return nil, fmt.Errorf("unknown verdict for test %v in job %v", job.Test, job.ID)
+	}
+
+	if result.Verdict == verdict.OK || result.Verdict == verdict.PT {
+		switch group.ScoringType {
+		case models.TestGroupScoringTypeEachTest, models.TestGroupScoringTypeMin:
+			i.submission.TestResults[job.Test-1].Points = group.Score
+		case models.TestGroupScoringTypeComplete:
 		}
-		return nil, nil
-	case verdict.PT, verdict.WA, verdict.RT, verdict.ML, verdict.TL, verdict.WL, verdict.SE, verdict.CF:
-		dependencies := i.fetchGroupDependencies(group)
+	}
+
+	/*
+		  scenario:
+			group1: complete, tests: 1-1
+			group2: complete, tests: 2-2
+		  	1. NextJob returns the test from the first group
+			2. WA it
+			3. It is expected that we already know testing result
+		  so we have to go through all the groups and check for their required groups if they are not passed already
+	*/
+	{
 		newGroupNamesToBeGiven := make([]string, 0)
-		for _, s := range i.groupNamesToBeGiven {
-			if _, ok := dependencies[s]; !ok {
-				newGroupNamesToBeGiven = append(newGroupNamesToBeGiven, s)
-			} else if s == group.Name && group.ScoringType != models.TestGroupScoringTypeComplete {
-				newGroupNamesToBeGiven = append(newGroupNamesToBeGiven, s)
+		for _, groupName := range i.groupNamesToBeGiven {
+			group = i.groupNameToOrigGroup[groupName]
+			shouldTest := true
+			for _, requiredGroupName := range group.RequiredGroupNames {
+				if _, ok := i.groupNameToGroupResult[requiredGroupName]; ok {
+					// if the group is presented in this map, then it is failed already
+					shouldTest = false
+					break
+				}
+			}
+			if _, ok := i.groupNameToGroupResult[groupName]; ok &&
+				group.ScoringType == models.TestGroupScoringTypeComplete {
+				shouldTest = false
+			}
+			if shouldTest {
+				newGroupNamesToBeGiven = append(newGroupNamesToBeGiven, groupName)
 			}
 		}
 		i.groupNamesToBeGiven = newGroupNamesToBeGiven
-		if len(i.givenJobs) == 0 && len(i.groupNamesToBeGiven) == 0 {
-			i.finalizeResults()
-			return i.submission, nil
-		}
-		return nil, nil
-	default:
-		return nil, fmt.Errorf("unknown verdict for testing completed: %v", result.Verdict)
 	}
+
+	if len(i.givenJobs) == 0 && len(i.groupNamesToBeGiven) == 0 {
+		i.finalizeResults()
+		return i.submission, nil
+	}
+	return nil, nil
 }
 
 func (i *IOIGenerator) JobCompleted(jobResult *masterconn.InvokerJobResult) (*models.Submission, error) {
@@ -227,5 +405,24 @@ func (i *IOIGenerator) JobCompleted(jobResult *masterconn.InvokerJobResult) (*mo
 }
 
 func NewIOIGenerator(problem *models.Problem, submission *models.Submission) (Generator, error) {
-	return &IOIGenerator{}, nil
+	id, err := uuid.NewV7()
+	if err != nil {
+		logger.Panic("Can't generate generator id: %w", err)
+	}
+	generator := &IOIGenerator{
+		id:                     id.String(),
+		submission:             submission,
+		problem:                problem,
+		state:                  compilationNotStarted,
+		givenJobs:              make(map[string]*invokerconn.Job),
+		groupNameToGroupResult: make(map[string]*models.GroupResult),
+		// these fields will be filled in prepareGenerator
+		groupNameToOrigGroup: make(map[string]*models.TestGroup),
+		groupNameToGroup:     make(map[string]*models.TestGroup),
+		groupNamesToBeGiven:  nil,
+	}
+	if err = generator.prepareGenerator(); err != nil {
+		return nil, err
+	}
+	return generator, nil
 }

@@ -49,10 +49,10 @@ type TestGroup struct {
 	// TestScore meaningful only in case of TestGroupScoringTypeEachTest
 	TestScore *float64 `json:"test_score" yaml:"test_score"`
 	// Score meaningful only in case of TestGroupScoringTypeComplete
-	Score          *float64              `json:"score" yaml:"score"`
-	ScoringType    TestGroupScoringType  `json:"scoring_type" yaml:"scoring_type"`
-	FeedbackType   TestGroupFeedbackType `json:"feedback_type" yaml:"feedback_type"`
-	RequiredGroups []string              `json:"required_groups" yaml:"required_groups"`
+	Score              *float64              `json:"score" yaml:"score"`
+	ScoringType        TestGroupScoringType  `json:"scoring_type" yaml:"scoring_type"`
+	FeedbackType       TestGroupFeedbackType `json:"feedback_type" yaml:"feedback_type"`
+	RequiredGroupNames []string              `json:"required_groups" yaml:"required_groups"`
 }
 
 func (t TestGroup) Value() (driver.Value, error) {
@@ -80,6 +80,7 @@ func (t TestGroup) GormDBDataType(db *gorm.DB, field *schema.Field) string {
 type Problem struct {
 	gorm.Model
 
+<<<<<<< HEAD
 	ProblemType ProblemType `yaml:"ProblemType"`
 
 	TimeLimit   customfields.Time   `yaml:"TimeLimit"`
@@ -88,14 +89,23 @@ type Problem struct {
 	TestsNumber uint64 `yaml:"TestsNumber"`
 	// TestGroups ignored for ICPC problems
 	TestGroups []TestGroup
+=======
+	ProblemType ProblemType
+>>>>>>> f1bf2b0 (fixes and tests)
 
 	// WallTimeLimit specifies maximum execution and wait time.
 	// By default, it is max(5s, TimeLimit * 2)
 	WallTimeLimit *customfields.Time `yaml:"WallTimeLimit,omitempty"`
 
+<<<<<<< HEAD
 	// MaxOpenFiles specifies the maximum number of files, opened by testing system.
 	// By default, it is 64
 	MaxOpenFiles *uint64 `yaml:"MaxOpenFiles,omitempty"`
+=======
+	TestsNumber uint64
+	// TestGroups ignored for ICPC problems
+	TestGroups []TestGroup
+>>>>>>> f1bf2b0 (fixes and tests)
 
 	// MaxThreads specifies the maximum number of threads and/or processes;
 	// By default, it is a single thread
