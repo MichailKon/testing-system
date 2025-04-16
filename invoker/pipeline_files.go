@@ -30,7 +30,7 @@ func (s *JobPipelineState) loadSolutionBinary() error {
 	}
 	err = s.copyFileToSandbox(*binary, solutionBinaryFile, 0755)
 	if err != nil {
-		return fmt.Errorf("can not copy solution binary, error: %v", err)
+		return fmt.Errorf("can not copy solution binary to sandbox, error: %v", err)
 	}
 	logger.Trace("Loaded solution binary to sandbox for %s", s.loggerData)
 	return nil
