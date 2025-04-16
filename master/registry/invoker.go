@@ -60,6 +60,7 @@ func (i *Invoker) ping() {
 	defer i.mutex.Unlock()
 
 	if err != nil {
+		logger.Info("invoker %s did not response on ping, error: %s", i.status.Address, err.Error())
 		i.markFailed()
 		return
 	}
@@ -81,6 +82,10 @@ func (i *Invoker) pingLoop(ctx context.Context) {
 			i.ping()
 		}
 	}
+}
+
+func (i *Invoker) address() string {
+	return i.status.Address
 }
 
 func (i *Invoker) getJobType(jobID string) JobType {
@@ -114,6 +119,7 @@ func (i *Invoker) completeSendJob(job *invokerconn.Job) {
 	defer i.mutex.Unlock()
 
 	if err != nil {
+		logger.Info("failed to send job to invoker %s, error: %s", i.address(), err.Error())
 		i.markFailed()
 		return
 	}
@@ -139,6 +145,7 @@ func (i *Invoker) TrySendJob(job *invokerconn.Job) bool {
 		return false
 	}
 
+	logger.Trace("sending job %s to invoker %s", job.ID, i.address())
 	i.addJob(job.ID, SendingJob)
 	i.ts.Go(func() { i.completeSendJob(job) })
 
@@ -154,6 +161,7 @@ func (i *Invoker) ensureJobIsNotLost(jobID string) {
 	defer i.mutex.Unlock()
 
 	if i.getJobType(jobID) == NoReplyJob {
+		logger.Info("invoker %s has lost job %s", i.address(), jobID)
 		i.markFailed()
 	}
 }
@@ -171,12 +179,13 @@ func (i *Invoker) updateStatus(status *invokerconn.Status) {
 			// pass
 		case TestingJob:
 			if !isJobTesting(jobID, status) {
+				logger.Trace("job %s disappeared from the status of invoker %s", jobID, i.address())
 				i.setJobType(jobID, NoReplyJob)
 				time.AfterFunc(i.ts.Config.Master.LostJobTimeout, func() { i.ensureJobIsNotLost(jobID) })
 			}
 		case NoReplyJob:
 			if isJobTesting(jobID, status) {
-				logger.Info("job %s disappeared from status, but then reappeared", jobID)
+				logger.Info("job %s disappeared from status, but then reappeared, invoker: %s", jobID, i.address())
 				i.markFailed()
 				return
 			}
@@ -191,6 +200,7 @@ func (i *Invoker) markFailed() {
 		return
 	}
 
+	logger.Info("marking invoker %s as failed", i.address())
 	i.failed = true
 	i.cancel()
 	i.ts.Go(func() { i.registry.OnInvokerFailure(i) })
@@ -220,6 +230,7 @@ func (i *Invoker) JobTested(jobID string) bool {
 		return false
 	}
 
+	logger.Trace("job %s successfully tested on invoker %s", jobID, i.address())
 	i.removeJob(jobID)
 	return true
 }
@@ -228,7 +239,7 @@ func (i *Invoker) VerifyAndUpdateStatus(status *invokerconn.Status) bool {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	if i.status.Address != status.Address {
+	if i.address() != status.Address {
 		return false
 	}
 
