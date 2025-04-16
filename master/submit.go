@@ -26,7 +26,7 @@ type SubmissionResponse struct {
 // @Success 200 {object} SubmissionResponse
 // @Failure 400 {object} string
 // @Failure 404 {object} string
-// @Failure 500
+// @Failure 500 {object} string
 // @Router /client/submit [post]
 func (m *Master) handleNewSubmission(c *gin.Context) {
 	problemIDStr := c.PostForm("ProblemId")
