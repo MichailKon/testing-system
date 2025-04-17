@@ -35,7 +35,7 @@ func (i *Invoker) FailJob(j *Job, errf string, args ...interface{}) {
 		Error:         fmt.Sprintf(errf, args...),
 		InvokerStatus: i.getStatus(),
 	}
-	err := i.TS.MasterConn.InvokerJobResult(request)
+	err := i.TS.MasterConn.SendInvokerJobResult(request)
 	if err != nil {
 		logger.Panic("Can not send invoker request, error: %s", err.Error())
 		// TODO: Add normal handling of this error
@@ -53,7 +53,7 @@ func (i *Invoker) SuccessJob(j *Job, runResult *sandbox.RunResult) {
 		Statistics:    runResult.Statistics,
 		InvokerStatus: i.getStatus(),
 	}
-	err := i.TS.MasterConn.InvokerJobResult(request)
+	err := i.TS.MasterConn.SendInvokerJobResult(request)
 	if err != nil {
 		logger.Panic("Can not send invoker request, error: %s", err.Error())
 		// TODO: Add normal handling of this error

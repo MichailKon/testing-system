@@ -2,8 +2,9 @@ package connector
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 type ErrResponse struct {
@@ -11,10 +12,10 @@ type ErrResponse struct {
 	Error string `json:"error,omitempty"`
 }
 
-func RespOK[T any](c *gin.Context, data *T) {
+func RespOK(c *gin.Context, data any) {
 	resp := &struct {
 		OK   bool `json:"ok"`
-		Data *T   `json:"data,omitempty"`
+		Data any  `json:"data,omitempty"`
 	}{
 		OK:   true,
 		Data: data,

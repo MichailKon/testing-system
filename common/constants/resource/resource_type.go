@@ -1,6 +1,6 @@
-package resource
+//go:generate go run golang.org/x/tools/cmd/stringer@latest -type=Type
 
-//go:generate stringer -type=Type
+package resource
 
 type Type int
 
