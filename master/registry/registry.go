@@ -14,7 +14,7 @@ type InvokerRegistry struct {
 	ts *common.TestingSystem
 
 	queue queue.IQueue
-	mutex sync.RWMutex
+	mutex sync.Mutex
 
 	invokers       []*Invoker
 	invokerByJobID map[string]*Invoker
@@ -79,8 +79,8 @@ func (r *InvokerRegistry) HandleInvokerJobResult(result *masterconn.InvokerJobRe
 }
 
 func (r *InvokerRegistry) SendJobs() {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 
 	for _, invoker := range r.invokers {
 		for {

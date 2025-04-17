@@ -60,7 +60,7 @@ func (i *Invoker) ping() {
 	defer i.mutex.Unlock()
 
 	if err != nil {
-		logger.Info("invoker %s did not response on ping, error: %s", i.status.Address, err.Error())
+		logger.Warn("invoker %s did not response on ping, error: %s", i.status.Address, err.Error())
 		i.markFailed()
 		return
 	}
@@ -119,7 +119,7 @@ func (i *Invoker) completeSendJob(job *invokerconn.Job) {
 	defer i.mutex.Unlock()
 
 	if err != nil {
-		logger.Info("failed to send job to invoker %s, error: %s", i.address(), err.Error())
+		logger.Warn("failed to send job to invoker %s, error: %s", i.address(), err.Error())
 		i.markFailed()
 		return
 	}
@@ -135,6 +135,8 @@ func (i *Invoker) completeSendJob(job *invokerconn.Job) {
 	}
 
 	i.updateStatus(status)
+
+	logger.Trace("job %s is sended to invoker %s", job.ID, i.address())
 }
 
 func (i *Invoker) TrySendJob(job *invokerconn.Job) bool {
@@ -161,7 +163,7 @@ func (i *Invoker) ensureJobIsNotLost(jobID string) {
 	defer i.mutex.Unlock()
 
 	if i.getJobType(jobID) == NoReplyJob {
-		logger.Info("invoker %s has lost job %s", i.address(), jobID)
+		logger.Warn("invoker %s has lost job %s", i.address(), jobID)
 		i.markFailed()
 	}
 }
@@ -185,7 +187,7 @@ func (i *Invoker) updateStatus(status *invokerconn.Status) {
 			}
 		case NoReplyJob:
 			if isJobTesting(jobID, status) {
-				logger.Info("job %s disappeared from status, but then reappeared, invoker: %s", jobID, i.address())
+				logger.Warn("job %s disappeared from status, but then reappeared, invoker: %s", jobID, i.address())
 				i.markFailed()
 				return
 			}
@@ -193,6 +195,13 @@ func (i *Invoker) updateStatus(status *invokerconn.Status) {
 			logger.Panic("invoker shouldn't store job of type UnknownJob")
 		}
 	}
+
+	logger.Trace(
+		"status of invoker %s is updated; active jobs: %d, max new jobs: %d",
+		i.address(),
+		len(status.ActiveJobIDs),
+		status.MaxNewJobs,
+	)
 }
 
 func (i *Invoker) markFailed() {
@@ -200,7 +209,7 @@ func (i *Invoker) markFailed() {
 		return
 	}
 
-	logger.Info("marking invoker %s as failed", i.address())
+	logger.Warn("marking invoker %s as failed", i.address())
 	i.failed = true
 	i.cancel()
 	i.ts.Go(func() { i.registry.OnInvokerFailure(i) })
