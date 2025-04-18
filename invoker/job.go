@@ -20,7 +20,7 @@ type Job struct {
 	Defers []func() `json:"-"`
 }
 
-func (j *Job) DeferFunc() {
+func (j *Job) deferFunc() {
 	slices.Reverse(j.Defers)
 	for _, f := range j.Defers {
 		f()
@@ -28,7 +28,7 @@ func (j *Job) DeferFunc() {
 	j.Defers = nil
 }
 
-func (i *Invoker) FailJob(j *Job, errf string, args ...interface{}) {
+func (i *Invoker) failJob(j *Job, errf string, args ...interface{}) {
 	request := &masterconn.InvokerJobResult{
 		JobID:         j.ID,
 		Verdict:       verdict.CF,
@@ -45,7 +45,7 @@ func (i *Invoker) FailJob(j *Job, errf string, args ...interface{}) {
 	delete(i.ActiveJobs, j.ID)
 }
 
-func (i *Invoker) SuccessJob(j *Job, runResult *sandbox.RunResult) {
+func (i *Invoker) successJob(j *Job, runResult *sandbox.RunResult) {
 	request := &masterconn.InvokerJobResult{
 		JobID:         j.ID,
 		Verdict:       runResult.Verdict,

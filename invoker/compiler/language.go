@@ -34,10 +34,10 @@ func (l *Language) GenerateScript(source string, binary string) ([]byte, error) 
 	return script.Bytes(), nil
 }
 
-func (l *Language) GenerateExecuteConfig(stdout *bytes.Buffer) *sandbox.ExecuteConfig {
+func (l *Language) GenerateExecuteConfig(outputFile string) *sandbox.ExecuteConfig {
 	c := *l.Limits
-	c.Stdout = &sandbox.IORedirect{Output: stdout}
-	c.Stderr = &sandbox.IORedirect{Output: stdout}
+	c.Stdout = &sandbox.IORedirect{FileName: outputFile}
+	c.StderrToStdout = true
 	return &c
 }
 

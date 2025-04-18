@@ -8,14 +8,15 @@ import (
 )
 
 type ExecuteConfig struct {
-	config.RunConfig `yaml:",inline"`
+	config.RunLimitsConfig `yaml:",inline"`
 
 	Command string   `yaml:"-"`
 	Args    []string `yaml:"-"` // Except zero argument (command name itself)
 
-	Stdin  *IORedirect `yaml:"-"`
-	Stdout *IORedirect `yaml:"-"`
-	Stderr *IORedirect `yaml:"-"`
+	Stdin          *IORedirect `yaml:"-"`
+	Stdout         *IORedirect `yaml:"-"`
+	Stderr         *IORedirect `yaml:"-"`
+	StderrToStdout bool        `yaml:"-"`
 }
 
 // IORedirect specifies files to read/write to.

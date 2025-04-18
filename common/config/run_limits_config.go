@@ -2,7 +2,7 @@ package config
 
 import "testing_system/lib/customfields"
 
-type RunConfig struct {
+type RunLimitsConfig struct {
 	TimeLimit     customfields.Time   `yaml:"TimeLimit" json:"TimeLimit"`
 	MemoryLimit   customfields.Memory `yaml:"MemoryLimit" json:"MemoryLimit"`
 	WallTimeLimit customfields.Time   `yaml:"WallTimeLimit" json:"WallTimeLimit"`
@@ -21,7 +21,7 @@ type RunConfig struct {
 	MaxOutputSize customfields.Memory `yaml:"MaxOutputSize" json:"MaxOutputSize"`
 }
 
-func fillInDefaultCheckerRunConfig(config *RunConfig) {
+func fillInDefaultCheckerRunLimitsConfig(config *RunLimitsConfig) {
 	if config.TimeLimit == 0 {
 		config.TimeLimit.FromStr("15s")
 	}

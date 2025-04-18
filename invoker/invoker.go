@@ -47,20 +47,18 @@ func SetupInvoker(ts *common.TestingSystem) error {
 	invoker.JobQueue = make(chan *Job, invoker.MaxJobs*2)
 
 	for i := range ts.Config.Invoker.Sandboxes {
-		jobExecutor := NewJobExecutor(ts, i)
-		ts.AddProcess(func() { invoker.RunJobExecutorThread(jobExecutor) })
-		ts.AddDefer(jobExecutor.Delete)
+		sandbox := newSandbox(ts, i)
+		ts.AddProcess(func() { invoker.runSandboxThread(sandbox, i) })
+		ts.AddDefer(sandbox.Delete)
 	}
 
-	invoker.StartRunners()
+	invoker.startRunners()
 
 	r := ts.Router.Group("/invoker/")
 	r.GET("/status", invoker.HandleStatus)
 	r.POST("/job/new", invoker.HandleNewJob)
 
 	ts.AddProcess(invoker.runStatusLoop)
-
-	// TODO Add master initial connection and invoker keepalive thread
 
 	logger.Info("Configured invoker")
 	return nil
