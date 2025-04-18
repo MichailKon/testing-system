@@ -12,6 +12,12 @@ type Request struct {
 	// Should be always specified
 	Resource resource.Type `json:"resource"`
 
+	/*
+		Resource must always has exactly one of ProblemId and SubmitID
+		Including, only TestID cannot be specified
+		ID=0 is considered absent
+	*/
+
 	// If resource is part of problem, ProblemID is used
 	ProblemID uint64 `json:"problemID"`
 	// If resource is part of submit, SubmitID is used
@@ -22,8 +28,14 @@ type Request struct {
 	// For any download, BaseFolder should be specified. The files with original filenames will be placed there
 	BaseFolder string `json:"-"`
 
-	// For uploads, Files should be specified. Filename is key in map, file data should be read from value
-	Files map[string]io.Reader `json:"-"`
+	// Specify a custom filename for the downloaded file
+	DownloadFilename *string `json:"-"`
+
+	// For uploads, File should be specified
+	File io.Reader `json:"-"`
+
+	// If StorageFilename is not specified, Storage tries to get the filename automatically
+	StorageFilename string `json:"storageFilename"`
 }
 
 type Response struct {
@@ -31,37 +43,42 @@ type Response struct {
 	Error error
 }
 
-type ResponseFiles struct {
+type FileResponse struct {
 	Response
-	fileNames []string
-	Size      uint64
+	Filename   string `json:"filename"`
+	BaseFolder string `json:"basefolder"`
+	Size       uint64 `json:"size"`
 }
 
-func (r *ResponseFiles) File() (string, bool) {
-	if len(r.fileNames) == 0 {
+func NewFileResponse(request Request) *FileResponse {
+	return &FileResponse{
+		Response:   Response{R: request, Error: nil},
+		Filename:   "",
+		BaseFolder: "",
+		Size:       0,
+	}
+}
+
+func (r *FileResponse) GetFilePath() (string, bool) {
+	if r.BaseFolder == "" || r.Filename == "" {
 		return "", false
 	}
-	return filepath.Join(r.R.BaseFolder, r.fileNames[0]), true
+	return filepath.Join(r.BaseFolder, r.Filename), true
 }
 
-func (r *ResponseFiles) Get(fileName string) (string, bool) {
-	for _, f := range r.fileNames {
-		if fileName == f {
-			return filepath.Join(r.R.BaseFolder, f), true
-		}
-	}
-	return "", false
-}
-
-func (r *ResponseFiles) CleanUp() {
+// Removes BaseFolder with all files
+func (r *FileResponse) CleanUp() {
 	if r.Error != nil {
+		logger.Error("CleanUp was called for failed FileResponse: %v", r.Error)
 		return
 	}
-	if len(r.R.BaseFolder) == 0 {
+	if r.BaseFolder == "" {
+		logger.Error("CleanUp was called for empty BaseFolder name")
 		return
 	}
-	err := os.RemoveAll(r.R.BaseFolder)
+
+	err := os.RemoveAll(r.BaseFolder)
 	if err != nil {
-		logger.Panic("Can not remove resource folder, error: %s", err.Error())
+		logger.Error("Cannot remove resource folder %s: %s", r.BaseFolder, err.Error())
 	}
 }

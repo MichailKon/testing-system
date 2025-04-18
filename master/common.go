@@ -2,7 +2,6 @@ package master
 
 import (
 	"errors"
-	"io"
 	"mime/multipart"
 	"net/http"
 	"testing_system/common/connectors/storageconn"
@@ -45,9 +44,7 @@ func (m *Master) saveSubmissionInStorage(c *gin.Context, problemID uint64, file 
 	request := &storageconn.Request{
 		Resource:  resource.SourceCode,
 		ProblemID: problemID,
-		Files: map[string]io.Reader{
-			file.Filename: reader,
-		},
+		File:      reader,
 	}
 
 	if err := m.ts.StorageConn.Upload(request).Error; err != nil {

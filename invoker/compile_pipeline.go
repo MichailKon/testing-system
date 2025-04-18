@@ -2,7 +2,6 @@ package invoker
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -190,9 +189,7 @@ func (s *JobPipelineState) uploadCompileResult() error {
 	compileOutputStoreRequest := &storageconn.Request{
 		Resource: resource.CompileOutput,
 		SubmitID: uint64(s.job.Submission.ID),
-		Files: map[string]io.Reader{
-			compilationMessageFile: s.compile.messageReader,
-		},
+		File:     s.compile.messageReader,
 	}
 	resp := s.invoker.TS.StorageConn.Upload(compileOutputStoreRequest)
 	if resp.Error != nil {

@@ -1,4 +1,5 @@
 //go:generate go run golang.org/x/tools/cmd/stringer@latest -type=Type
+//go:generate go run golang.org/x/tools/cmd/stringer@latest -type=DataType
 
 package resource
 
@@ -15,5 +16,15 @@ const (
 	Checker
 	CheckerOutput
 	Interactor
+	// Will be increased
+	// Don't forget to add a new type to storage/filesystem/resource_info.go
+)
+
+type DataType int
+
+const (
+	UnknownDataType DataType = iota
+	Problem
+	Submission
 	// Will be increased
 )

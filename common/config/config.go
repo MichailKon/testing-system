@@ -16,6 +16,7 @@ type Config struct {
 
 	Invoker *InvokerConfig `yaml:"Invoker,omitempty"`
 	Master  *MasterConfig  `yaml:"Master,omitempty"`
+	Storage *StorageConfig `yaml:"Storage,omitempty"`
 	// TODO: Add instances here
 
 	DB DBConfig `yaml:"DB"`
@@ -48,5 +49,6 @@ func fillInConfig(config *Config) {
 
 	fillInConnections(config)
 	fillInMasterConfig(config.Master)
+	fillInStorageConfig(config.Storage)
 	FillInInvokerConfig(config.Invoker)
 }

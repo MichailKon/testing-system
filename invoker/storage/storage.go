@@ -59,15 +59,14 @@ func (s *InvokerStorage) getFiles(key cacheKey) (*string, error, uint64) {
 		TestID:    key.TestID,
 	}
 	setRequestBaseFolder(request, s.ts.Config.Invoker.CachePath)
-	files := s.ts.StorageConn.Download(request)
-	if files.Error != nil {
-		return nil, files.Error, 0
-	} else {
-		file, ok := files.File()
-		if !ok {
+	response := s.ts.StorageConn.Download(request)
+	if response.Error != nil {
+		if response.Error == storageconn.ErrStorageFileNotFound {
 			return nil, fmt.Errorf("file not exists"), 0
 		}
-		return pointer.String(filepath.Join(request.BaseFolder, file)), nil, files.Size
+		return nil, response.Error, 0
+	} else {
+		return pointer.String(filepath.Join(request.BaseFolder, response.Filename)), nil, response.Size
 	}
 }
 

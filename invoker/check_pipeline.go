@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"golang.org/x/net/html/charset"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -178,9 +177,7 @@ func (s *JobPipelineState) uploadCheckerOutput() error {
 		Resource: resource.CheckerOutput,
 		SubmitID: uint64(s.job.Submission.ID),
 		TestID:   s.job.Test,
-		Files: map[string]io.Reader{
-			checkOutputFile: s.test.checkerOutputReader,
-		},
+		File:     s.test.checkerOutputReader,
 	}
 	resp := s.invoker.TS.StorageConn.Upload(checkerOutputRequest)
 	if resp.Error != nil {

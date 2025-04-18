@@ -83,9 +83,7 @@ func (s *JobPipelineState) uploadBinary() error {
 	binaryStoreRequest := &storageconn.Request{
 		Resource: resource.CompiledBinary,
 		SubmitID: uint64(s.job.Submission.ID),
-		Files: map[string]io.Reader{
-			solutionBinaryFile: reader,
-		},
+		File:     reader,
 	}
 	resp := s.invoker.TS.StorageConn.Upload(binaryStoreRequest)
 	if resp.Error != nil {
@@ -105,9 +103,7 @@ func (s *JobPipelineState) uploadOutput(fileName string, resourceType resource.T
 		Resource: resourceType,
 		SubmitID: uint64(s.job.Submission.ID),
 		TestID:   s.job.Test,
-		Files: map[string]io.Reader{
-			fileName: reader,
-		},
+		File:     reader,
 	}
 	resp := s.invoker.TS.StorageConn.Upload(outputStoreRequest)
 	if resp.Error != nil {
