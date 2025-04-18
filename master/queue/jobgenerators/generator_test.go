@@ -26,16 +26,16 @@ func fixtureSubmission() *models.Submission {
 
 func nextJob(t *testing.T, g Generator, SubmitID uint, jobType invokerconn.JobType, test uint64) *invokerconn.Job {
 	job := g.NextJob()
-	assert.NotNil(t, job)
-	assert.Equal(t, job.Type, jobType)
-	assert.Equal(t, SubmitID, job.SubmitID)
-	assert.Equal(t, test, job.Test)
+	require.NotNil(t, job)
+	require.Equal(t, job.Type, jobType)
+	require.Equal(t, SubmitID, job.SubmitID)
+	require.Equal(t, test, job.Test)
 	return job
 }
 
 func noJobs(t *testing.T, g Generator) {
 	job := g.NextJob()
-	assert.Nil(t, job)
+	require.Nil(t, job)
 }
 
 func TestICPCGenerator(t *testing.T) {
@@ -413,13 +413,13 @@ func TestIOIGenerator(t *testing.T) {
 			require.Equal(t, uint64(i)+1, result.TestNumber)
 		}
 		require.Equal(t, wasProblem, problemWithOneGroup)
-		require.Equal(t, sub.GroupResults, models.GroupResults{
+		require.Equal(t, models.GroupResults{
 			{
 				GroupName: "group1",
 				Points:    0.,
 				Passed:    false,
 			},
-		})
+		}, sub.GroupResults)
 	})
 
 	t.Run("Straight task finishing", func(t *testing.T) {
@@ -707,6 +707,249 @@ func TestIOIGenerator(t *testing.T) {
 					GroupName: "group1",
 					Points:    0.,
 					Passed:    false,
+				},
+			})
+		})
+	})
+
+	t.Run("Fails in TestGroupScoringTypeEachTest", func(t *testing.T) {
+		t.Run("WA in the middle of the group", func(t *testing.T) {
+			problem := models.Problem{
+				ProblemType: models.ProblemTypeIOI,
+				TestsNumber: 3,
+				TestGroups: []models.TestGroup{
+					{
+						Name:               "group1",
+						FirstTest:          1,
+						LastTest:           3,
+						TestScore:          pointer.Float64(20),
+						ScoringType:        models.TestGroupScoringTypeEachTest,
+						RequiredGroupNames: make([]string, 0),
+					},
+				},
+			}
+			g, err := NewIOIGenerator(&problem, fixtureSubmission())
+			require.NoError(t, err)
+			job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
+			require.NotNil(t, job)
+			require.Nil(t, g.NextJob())
+			sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:   job.ID,
+				Verdict: verdict.CD,
+			})
+			require.NoError(t, err)
+			require.Nil(t, sub)
+			// test
+			job = nextJob(t, g, 1, invokerconn.TestJob, 1)
+			require.NotNil(t, job)
+			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:   job.ID,
+				Verdict: verdict.OK,
+			})
+			job2 := nextJob(t, g, 1, invokerconn.TestJob, 2)
+			require.NotNil(t, job2)
+			job3 := nextJob(t, g, 1, invokerconn.TestJob, 3)
+			require.NotNil(t, job3)
+			require.Nil(t, g.NextJob())
+			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:   job2.ID,
+				Verdict: verdict.WA,
+			})
+			require.NoError(t, err)
+			require.Nil(t, sub)
+			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:   job3.ID,
+				Verdict: verdict.OK,
+			})
+			require.NoError(t, err)
+			require.NotNil(t, sub)
+
+			require.Equal(t, verdict.PT, sub.Verdict)
+			require.Equal(t, 40., sub.Score)
+			require.Equal(t, verdict.OK, sub.TestResults[0].Verdict)
+			require.Equal(t, verdict.WA, sub.TestResults[1].Verdict)
+			require.Equal(t, verdict.OK, sub.TestResults[2].Verdict)
+			require.Equal(t, sub.GroupResults, models.GroupResults{
+				{
+					GroupName: "group1",
+					Points:    40.,
+					Passed:    false,
+				},
+			})
+		})
+	})
+
+	t.Run("TestGroupScoringTypeMin", func(t *testing.T) {
+		prepare := func() models.Problem {
+			return models.Problem{
+				ProblemType: models.ProblemTypeIOI,
+				TestsNumber: 3,
+				TestGroups: []models.TestGroup{
+					{
+						Name:               "group1",
+						FirstTest:          1,
+						LastTest:           3,
+						Score:              pointer.Float64(20),
+						ScoringType:        models.TestGroupScoringTypeMin,
+						RequiredGroupNames: make([]string, 0),
+					},
+				},
+			}
+		}
+
+		t.Run("WA in the middle of the group", func(t *testing.T) {
+			problem := prepare()
+			g, err := NewIOIGenerator(&problem, fixtureSubmission())
+			require.NoError(t, err)
+			job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
+			require.NotNil(t, job)
+			require.Nil(t, g.NextJob())
+			sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:   job.ID,
+				Verdict: verdict.CD,
+			})
+			require.NoError(t, err)
+			require.Nil(t, sub)
+			// test
+			job = nextJob(t, g, 1, invokerconn.TestJob, 1)
+			require.NotNil(t, job)
+			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:   job.ID,
+				Verdict: verdict.OK,
+			})
+			job2 := nextJob(t, g, 1, invokerconn.TestJob, 2)
+			require.NotNil(t, job2)
+			job3 := nextJob(t, g, 1, invokerconn.TestJob, 3)
+			require.NotNil(t, job3)
+			require.Nil(t, g.NextJob())
+			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:   job2.ID,
+				Verdict: verdict.WA,
+			})
+			require.NoError(t, err)
+			require.Nil(t, sub)
+			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:   job3.ID,
+				Verdict: verdict.OK,
+			})
+			require.NoError(t, err)
+			require.NotNil(t, sub)
+
+			require.Equal(t, verdict.PT, sub.Verdict)
+			require.Equal(t, 0., sub.Score)
+			require.Equal(t, verdict.OK, sub.TestResults[0].Verdict)
+			require.Equal(t, verdict.WA, sub.TestResults[1].Verdict)
+			require.Equal(t, verdict.SK, sub.TestResults[2].Verdict)
+			require.Equal(t, sub.GroupResults, models.GroupResults{
+				{
+					GroupName: "group1",
+					Points:    0.,
+					Passed:    false,
+				},
+			})
+		})
+
+		t.Run("PT in the middle of the group", func(t *testing.T) {
+			problem := prepare()
+			g, err := NewIOIGenerator(&problem, fixtureSubmission())
+			require.NoError(t, err)
+			job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
+			require.NotNil(t, job)
+			require.Nil(t, g.NextJob())
+			sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:   job.ID,
+				Verdict: verdict.CD,
+			})
+			require.NoError(t, err)
+			require.Nil(t, sub)
+			// test
+			job = nextJob(t, g, 1, invokerconn.TestJob, 1)
+			require.NotNil(t, job)
+			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:   job.ID,
+				Verdict: verdict.OK,
+			})
+			job2 := nextJob(t, g, 1, invokerconn.TestJob, 2)
+			require.NotNil(t, job2)
+			job3 := nextJob(t, g, 1, invokerconn.TestJob, 3)
+			require.NotNil(t, job3)
+			require.Nil(t, g.NextJob())
+			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:   job2.ID,
+				Verdict: verdict.PT,
+				Points:  pointer.Float64(10),
+			})
+			require.NoError(t, err)
+			require.Nil(t, sub)
+			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:   job3.ID,
+				Verdict: verdict.OK,
+			})
+			require.NoError(t, err)
+			require.NotNil(t, sub)
+
+			require.Equal(t, verdict.PT, sub.Verdict)
+			require.Equal(t, 10., sub.Score)
+			require.Equal(t, verdict.OK, sub.TestResults[0].Verdict)
+			require.Equal(t, verdict.PT, sub.TestResults[1].Verdict)
+			require.Equal(t, verdict.OK, sub.TestResults[2].Verdict)
+			require.Equal(t, sub.GroupResults, models.GroupResults{
+				{
+					GroupName: "group1",
+					Points:    10.,
+					Passed:    false,
+				},
+			})
+		})
+
+		t.Run("no fails", func(t *testing.T) {
+			problem := prepare()
+			g, err := NewIOIGenerator(&problem, fixtureSubmission())
+			require.NoError(t, err)
+			job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
+			require.NotNil(t, job)
+			require.Nil(t, g.NextJob())
+			sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:   job.ID,
+				Verdict: verdict.CD,
+			})
+			require.NoError(t, err)
+			require.Nil(t, sub)
+			// test
+			job = nextJob(t, g, 1, invokerconn.TestJob, 1)
+			require.NotNil(t, job)
+			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:   job.ID,
+				Verdict: verdict.OK,
+			})
+			job2 := nextJob(t, g, 1, invokerconn.TestJob, 2)
+			require.NotNil(t, job2)
+			job3 := nextJob(t, g, 1, invokerconn.TestJob, 3)
+			require.NotNil(t, job3)
+			require.Nil(t, g.NextJob())
+			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:   job2.ID,
+				Verdict: verdict.OK,
+			})
+			require.NoError(t, err)
+			require.Nil(t, sub)
+			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:   job3.ID,
+				Verdict: verdict.OK,
+			})
+			require.NoError(t, err)
+			require.NotNil(t, sub)
+
+			require.Equal(t, verdict.OK, sub.Verdict)
+			require.Equal(t, 20., sub.Score)
+			require.Equal(t, verdict.OK, sub.TestResults[0].Verdict)
+			require.Equal(t, verdict.OK, sub.TestResults[1].Verdict)
+			require.Equal(t, verdict.OK, sub.TestResults[2].Verdict)
+			require.Equal(t, sub.GroupResults, models.GroupResults{
+				{
+					GroupName: "group1",
+					Points:    20.,
+					Passed:    true,
 				},
 			})
 		})

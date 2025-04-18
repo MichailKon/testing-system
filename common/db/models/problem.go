@@ -44,15 +44,15 @@ const (
 
 type TestGroup struct {
 	Name      string `json:"name" yaml:"name"`
-	FirstTest int    `json:"first_test" yaml:"first_test"`
-	LastTest  int    `json:"last_test" yaml:"last_test"`
+	FirstTest int    `json:"FirstTest" yaml:"FirstTest"`
+	LastTest  int    `json:"LastTest" yaml:"LastTest"`
 	// TestScore meaningful only in case of TestGroupScoringTypeEachTest
-	TestScore *float64 `json:"test_score" yaml:"test_score"`
+	TestScore *float64 `json:"TestScore" yaml:"TestScore"`
 	// Score meaningful only in case of TestGroupScoringTypeComplete
-	Score              *float64              `json:"score" yaml:"score"`
-	ScoringType        TestGroupScoringType  `json:"scoring_type" yaml:"scoring_type"`
-	FeedbackType       TestGroupFeedbackType `json:"feedback_type" yaml:"feedback_type"`
-	RequiredGroupNames []string              `json:"required_groups" yaml:"required_groups"`
+	Score              *float64              `json:"Score" yaml:"Score"`
+	ScoringType        TestGroupScoringType  `json:"ScoringType" yaml:"ScoringType"`
+	FeedbackType       TestGroupFeedbackType `json:"FeedbackType" yaml:"FeedbackType"`
+	RequiredGroupNames []string              `json:"RequiredGroupNames" yaml:"RequiredGroupNames"`
 }
 
 func (t TestGroup) Value() (driver.Value, error) {
