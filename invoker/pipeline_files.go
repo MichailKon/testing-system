@@ -1,6 +1,7 @@
 package invoker
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -19,8 +20,9 @@ const (
 	testErrorFile          = "stderr.txt"
 	testAnswerFile         = "answer.txt"
 	checkerBinaryFile      = "check"
-	checkResultFile        = "check_result.xml"
+	testlibResultFile      = "testlib_result.xml"
 	checkOutputFile        = "checker_output.txt"
+	interactorBinaryFile   = "interactor"
 )
 
 func (s *JobPipelineState) loadSolutionBinary() error {
@@ -75,6 +77,19 @@ func (s *JobPipelineState) loadTestAnswerFile() error {
 	return nil
 }
 
+func (s *JobPipelineState) loadInteractorBinaryFile() error {
+	interactor, err := s.invoker.Storage.Interactor.Get(uint64(s.job.Problem.ID))
+	if err != nil {
+		return fmt.Errorf("can not get interactor, error: %s", err.Error())
+	}
+	err = s.copyFileToSandbox(*interactor, interactorBinaryFile, 0755)
+	if err != nil {
+		return fmt.Errorf("can not copy interactor to sandbox, error: %s", err.Error())
+	}
+	logger.Trace("Loaded interactor to sandbox for %s", s.loggerData)
+	return nil
+}
+
 func (s *JobPipelineState) uploadBinary() error {
 	reader, err := s.openSandboxFile(solutionBinaryFile, false)
 	if err != nil {
@@ -113,6 +128,15 @@ func (s *JobPipelineState) uploadOutput(fileName string, resourceType resource.T
 	return nil
 }
 
+func (s *JobPipelineState) removeSandboxFile(fileName string) error {
+	err := os.Remove(filepath.Join(s.sandbox.Dir(), fileName))
+	if err != nil {
+		return fmt.Errorf("can not remove %v, error: %v", fileName, err)
+	}
+	logger.Trace("Removed %v from sandbox for %s", fileName, s.loggerData)
+	return nil
+}
+
 func (s *JobPipelineState) copyFileToSandbox(src string, dst string, perm os.FileMode) error {
 	srcReader, err := os.Open(src)
 	if err != nil {
@@ -131,7 +155,11 @@ func (s *JobPipelineState) copyFileToSandbox(src string, dst string, perm os.Fil
 func (s *JobPipelineState) openSandboxFile(fileName string, limit bool) (io.Reader, error) {
 	file, err := os.Open(filepath.Join(s.sandbox.Dir(), fileName))
 	if err != nil {
-		return nil, err
+		if os.IsNotExist(err) {
+			return bytes.NewReader(nil), nil
+		} else {
+			return nil, err
+		}
 	}
 	s.defers = append(s.defers, func() { file.Close() })
 	if limit {

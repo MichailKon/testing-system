@@ -99,6 +99,7 @@ func (s *Sandbox) Delete() {
 }
 
 func (s *Sandbox) Run(config *sandbox.ExecuteConfig) *sandbox.RunResult {
+	defer config.DeferFunc()
 	cmd := s.prepareRun(config)
 
 	result := &sandbox.RunResult{
@@ -170,6 +171,10 @@ func (s *Sandbox) prepareRun(config *sandbox.ExecuteConfig) *exec.Cmd {
 		} else {
 			cmd.Args = append(cmd.Args, "--stderr="+config.Stderr.FileName)
 		}
+	}
+
+	if config.Interactive {
+		cmd.Args = append(cmd.Args, "--tty-hack")
 	}
 
 	cmd.Args = append(cmd.Args, "--")

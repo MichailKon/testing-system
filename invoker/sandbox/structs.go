@@ -2,6 +2,7 @@ package sandbox
 
 import (
 	"io"
+	"slices"
 	"testing_system/common/config"
 	"testing_system/common/connectors/masterconn"
 	"testing_system/common/constants/verdict"
@@ -17,6 +18,17 @@ type ExecuteConfig struct {
 	Stdout         *IORedirect `yaml:"-"`
 	Stderr         *IORedirect `yaml:"-"`
 	StderrToStdout bool        `yaml:"-"`
+	Interactive    bool        `yaml:"-"`
+
+	Defers []func() `yaml:"-"`
+}
+
+func (c *ExecuteConfig) DeferFunc() {
+	slices.Reverse(c.Defers)
+	for _, f := range c.Defers {
+		f()
+	}
+	c.Defers = nil
 }
 
 // IORedirect specifies files to read/write to.

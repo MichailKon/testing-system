@@ -44,7 +44,7 @@ func SetupInvoker(ts *common.TestingSystem) error {
 	invoker.setupAddress()
 
 	invoker.MaxJobs = ts.Config.Invoker.QueueSize + ts.Config.Invoker.Sandboxes
-	invoker.JobQueue = make(chan *Job, invoker.MaxJobs*2)
+	invoker.JobQueue = make(chan *Job, invoker.MaxJobs*4)
 
 	for i := range ts.Config.Invoker.Sandboxes {
 		sandbox := newSandbox(ts, i)

@@ -42,6 +42,10 @@ func (i *Invoker) runSandboxThread(sandbox sandbox.ISandbox, id uint64) {
 				i.fullCompilationPipeline(sandbox, job)
 			case invokerconn.TestJob:
 				i.fullTestingPipeline(sandbox, job)
+			case invokerconn.InteractiveSolutionJob:
+				i.fullInteractiveSolutionPipeline(sandbox, job)
+			case invokerconn.InteractiveInteractorJob:
+				i.fullInteractiveInteractorPipeline(sandbox, job)
 			default:
 				logger.Panic("Unknown job type %d", job.Type)
 			}

@@ -9,10 +9,6 @@ import (
 	"testing_system/lib/logger"
 )
 
-const (
-	checkResultFileArg = "-appes"
-)
-
 func (i *Invoker) fullTestingPipeline(sandbox sandbox.ISandbox, job *Job) {
 	s := &JobPipelineState{
 		job:     job,
@@ -33,7 +29,7 @@ func (i *Invoker) fullTestingPipeline(sandbox sandbox.ISandbox, job *Job) {
 	s.defers = append(s.defers, job.deferFunc)
 	defer s.deferFunc()
 
-	err := s.testingProcessPipeline()
+	err := s.standardTestingPipeline()
 	if err != nil {
 		logger.Error("Error in %s error: %v", s.loggerData, err)
 		i.failJob(job, "job %s error: %v", job.ID, err)
@@ -52,7 +48,7 @@ func (i *Invoker) fullTestingPipeline(sandbox sandbox.ISandbox, job *Job) {
 	i.successJob(job, s.test.runResult)
 }
 
-func (s *JobPipelineState) testingProcessPipeline() error {
+func (s *JobPipelineState) standardTestingPipeline() error {
 	err := s.initSandbox()
 	if err != nil {
 		return err
@@ -68,12 +64,12 @@ func (s *JobPipelineState) testingProcessPipeline() error {
 		return err
 	}
 
-	err = s.generateTestRunConfig()
+	err = s.generateStandartTestRunConfig()
 	if err != nil {
 		return err
 	}
 
-	err = s.executeTestRunCommand()
+	err = s.executeStandardTestRunCommand()
 	if err != nil {
 		return err
 	}
@@ -84,7 +80,7 @@ func (s *JobPipelineState) testingProcessPipeline() error {
 	}
 	s.test.hasResources = true
 
-	err = s.fullCheckPipeline()
+	err = s.fullCheckPipeline(true)
 	if err != nil {
 		return err
 	}
@@ -92,7 +88,7 @@ func (s *JobPipelineState) testingProcessPipeline() error {
 	return nil
 }
 
-func (s *JobPipelineState) generateTestRunConfig() error {
+func (s *JobPipelineState) generateStandartTestRunConfig() error {
 	s.test.runConfig = new(sandbox.ExecuteConfig)
 	fillInTestRunConfigLimits(s.test.runConfig, s.job.Problem)
 
@@ -141,7 +137,7 @@ func fillInTestRunConfigLimits(c *sandbox.ExecuteConfig, problem *models.Problem
 	}
 }
 
-func (s *JobPipelineState) executeTestRunCommand() error {
+func (s *JobPipelineState) executeStandardTestRunCommand() error {
 	s.executeWaitGroup.Add(1)
 	s.invoker.RunQueue <- s.runSolution
 	s.executeWaitGroup.Wait()

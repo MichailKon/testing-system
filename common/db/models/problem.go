@@ -8,14 +8,22 @@ import (
 type ProblemType int
 
 const (
-	ProblemType_ICPC ProblemType = iota + 1
-	ProblemType_IOI
+	ProblemTypeStandard ProblemType = iota + 1
+	ProblemTypeInteractive
+)
+
+type ScoringType int
+
+const (
+	ScoringTypeICPC ScoringType = iota + 1
+	ScoringTypeIOI
 )
 
 type Problem struct {
 	gorm.Model
 
-	ProblemType ProblemType
+	ProblemType ProblemType `gorm:"not null"`
+	ScoringType ScoringType `gorm:"not null"`
 
 	TimeLimit   customfields.Time
 	MemoryLimit customfields.Memory

@@ -29,7 +29,25 @@ func fillInDefaultCheckerRunLimitsConfig(config *RunLimitsConfig) {
 		config.MemoryLimit.FromStr("1g")
 	}
 	if config.WallTimeLimit == 0 {
-		config.WallTimeLimit.FromStr("30s")
+		config.WallTimeLimit.FromStr("20s")
+	}
+	if config.MaxOpenFiles == 0 {
+		config.MaxOpenFiles = 64
+	}
+	if config.MaxOutputSize == 0 {
+		config.MaxOutputSize.FromStr("1g")
+	}
+}
+
+func fillInDefaultInteractorRunLimitsConfig(config *RunLimitsConfig) {
+	if config.TimeLimit == 0 {
+		config.TimeLimit.FromStr("15s")
+	}
+	if config.MemoryLimit == 0 {
+		config.MemoryLimit.FromStr("1g")
+	}
+	if config.WallTimeLimit == 0 {
+		config.WallTimeLimit.FromStr("20s")
 	}
 	if config.MaxOpenFiles == 0 {
 		config.MaxOpenFiles = 64

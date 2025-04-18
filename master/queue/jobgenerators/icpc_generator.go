@@ -150,7 +150,7 @@ func newICPCGenerator(problem *models.Problem, submission *models.Submission) (G
 		logger.Panic("Can't generate generator id: %w", err)
 	}
 
-	if problem.ProblemType != models.ProblemType_ICPC {
+	if problem.ScoringType != models.ScoringTypeICPC {
 		return nil, fmt.Errorf("problem %v is not ICPC", problem.ID)
 	}
 	futureTests := make([]uint64, 0, problem.TestsNumber)
