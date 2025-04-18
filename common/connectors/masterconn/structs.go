@@ -16,7 +16,7 @@ type InvokerJobResult struct {
 
 	Statistics *JobResultStatistics `json:"Statistics"`
 
-	InvokerStatus *invokerconn.StatusResponse `json:"InvokerStatus"`
+	InvokerStatus *invokerconn.Status `json:"InvokerStatus"`
 }
 
 type JobResultStatistics struct {

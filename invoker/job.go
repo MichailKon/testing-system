@@ -20,7 +20,7 @@ type Job struct {
 	Defers []func() `json:"-"`
 }
 
-func (j *Job) DeferFunc() {
+func (j *Job) deferFunc() {
 	slices.Reverse(j.Defers)
 	for _, f := range j.Defers {
 		f()
@@ -28,14 +28,14 @@ func (j *Job) DeferFunc() {
 	j.Defers = nil
 }
 
-func (i *Invoker) FailJob(j *Job, errf string, args ...interface{}) {
+func (i *Invoker) failJob(j *Job, errf string, args ...interface{}) {
 	request := &masterconn.InvokerJobResult{
 		JobID:         j.ID,
 		Verdict:       verdict.CF,
 		Error:         fmt.Sprintf(errf, args...),
 		InvokerStatus: i.getStatus(),
 	}
-	err := i.TS.MasterConn.InvokerJobResult(request)
+	err := i.TS.MasterConn.SendInvokerJobResult(request)
 	if err != nil {
 		logger.Panic("Can not send invoker request, error: %s", err.Error())
 		// TODO: Add normal handling of this error
@@ -45,7 +45,7 @@ func (i *Invoker) FailJob(j *Job, errf string, args ...interface{}) {
 	delete(i.ActiveJobs, j.ID)
 }
 
-func (i *Invoker) SuccessJob(j *Job, runResult *sandbox.RunResult) {
+func (i *Invoker) successJob(j *Job, runResult *sandbox.RunResult) {
 	request := &masterconn.InvokerJobResult{
 		JobID:         j.ID,
 		Verdict:       runResult.Verdict,
@@ -53,7 +53,7 @@ func (i *Invoker) SuccessJob(j *Job, runResult *sandbox.RunResult) {
 		Statistics:    runResult.Statistics,
 		InvokerStatus: i.getStatus(),
 	}
-	err := i.TS.MasterConn.InvokerJobResult(request)
+	err := i.TS.MasterConn.SendInvokerJobResult(request)
 	if err != nil {
 		logger.Panic("Can not send invoker request, error: %s", err.Error())
 		// TODO: Add normal handling of this error

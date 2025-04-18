@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing_system/common"
 	"testing_system/common/connectors/invokerconn"
+	"testing_system/common/connectors/masterconn"
 	"testing_system/lib/logger"
 	"testing_system/master/queue"
 )
@@ -46,41 +47,35 @@ func (r *InvokerRegistry) OnInvokerFailure(invoker *Invoker) {
 	r.invokers = slices.DeleteFunc(r.invokers, func(i *Invoker) bool { return i == invoker })
 }
 
-func (r *InvokerRegistry) RegisterNewInvoker(connector *invokerconn.Connector) {
-	invoker := newInvoker(connector, r, r.ts)
-
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	r.invokers = append(r.invokers, invoker)
-}
-
-func (r *InvokerRegistry) JobTested(jobID string) bool {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	invoker, exists := r.invokerByJobID[jobID]
-
-	if !exists {
-		logger.Info("old or unknown job %s is tested", jobID)
-		return false
-	}
-
-	delete(r.invokerByJobID, jobID)
-	return invoker.JobTested(jobID)
-}
-
-func (r *InvokerRegistry) trySendJob(job *invokerconn.Job) bool {
+func (r *InvokerRegistry) UpsertInvoker(status *invokerconn.Status) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
 	for _, invoker := range r.invokers {
-		if invoker.TrySendJob(job) {
-			return true
+		if invoker.VerifyAndUpdateStatus(status) {
+			return
 		}
 	}
 
-	return false
+	invoker := newInvoker(status, r, r.ts)
+	r.invokers = append(r.invokers, invoker)
+}
+
+func (r *InvokerRegistry) HandleInvokerJobResult(result *masterconn.InvokerJobResult) bool {
+	defer r.UpsertInvoker(result.InvokerStatus)
+
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	invoker, exists := r.invokerByJobID[result.JobID]
+
+	if !exists {
+		logger.Trace("old or unknown job %s is tested", result.JobID)
+		return false
+	}
+
+	delete(r.invokerByJobID, result.JobID)
+	return invoker.JobTested(result.JobID)
 }
 
 func (r *InvokerRegistry) SendJobs() {

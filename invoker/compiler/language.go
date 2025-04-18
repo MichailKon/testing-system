@@ -34,10 +34,10 @@ func (l *Language) GenerateScript(source string, binary string) ([]byte, error) 
 	return script.Bytes(), nil
 }
 
-func (l *Language) GenerateExecuteConfig(stdout *bytes.Buffer) *sandbox.ExecuteConfig {
+func (l *Language) GenerateExecuteConfig(outputFile string) *sandbox.ExecuteConfig {
 	c := *l.Limits
-	c.Stdout = stdout
-	c.Stderr = stdout
+	c.Stdout = &sandbox.IORedirect{FileName: outputFile}
+	c.StderrToStdout = true
 	return &c
 }
 
@@ -52,10 +52,10 @@ func fillInCompileExecuteConfig(c *sandbox.ExecuteConfig) {
 		c.MemoryLimit.FromStr("1g")
 	}
 	if c.MaxOpenFiles == 0 {
-		c.MaxOpenFiles = 1000
+		c.MaxOpenFiles = 64
 	}
 	if c.MaxThreads == 0 {
-		c.MaxThreads = 64
+		c.MaxThreads = -1
 	}
 	if c.MaxOutputSize == 0 {
 		c.MaxOutputSize.FromStr("1g")

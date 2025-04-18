@@ -15,6 +15,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+
+	_ "testing_system/swag"
+
+	swaggo "github.com/swaggo/files"
+	ginswagger "github.com/swaggo/gin-swagger"
 )
 
 type TestingSystem struct {
@@ -38,7 +43,9 @@ func InitTestingSystem(configPath string) *TestingSystem {
 		Config: config.ReadConfig(configPath),
 	}
 	logger.InitLogger(ts.Config)
+
 	ts.Router = gin.Default() // TODO: Add router options (e.g debug)
+	ts.Router.GET("/swagger/*any", ginswagger.WrapHandler(swaggo.Handler))
 
 	var err error
 	ts.DB, err = db.NewDB(ts.Config.DB)

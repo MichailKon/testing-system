@@ -2,8 +2,10 @@ package registry
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"testing_system/common"
+	"testing_system/common/config"
 	"testing_system/common/connectors/invokerconn"
 	"testing_system/lib/logger"
 	"time"
@@ -14,7 +16,7 @@ type JobType int
 const (
 	SendingJob JobType = iota // job is sending
 	TestingJob                // job is testing
-	NoReplyJob                // job is tested, but not veryfied
+	NoReplyJob                // job is tested, but not verified
 	UnknownJob                // no information about the job
 )
 
@@ -29,21 +31,24 @@ type Invoker struct {
 	jobTypeByID   map[string]JobType
 	jobTypesCount map[JobType]int
 
-	status *invokerconn.StatusResponse
+	status *invokerconn.Status
 	failed bool
 }
 
-func newInvoker(connector *invokerconn.Connector, registry *InvokerRegistry, ts *common.TestingSystem) *Invoker {
+func newInvoker(status *invokerconn.Status, registry *InvokerRegistry, ts *common.TestingSystem) *Invoker {
+	logger.Info("registering new invoker: %s", status.Address)
+
 	invoker := Invoker{
-		connector:     connector,
+		connector:     invokerconn.NewConnector(&config.Connection{Address: status.Address}),
 		registry:      registry,
 		jobTypeByID:   make(map[string]JobType),
 		jobTypesCount: make(map[JobType]int),
+		status:        status,
 	}
 
 	var ctx context.Context
 	ctx, invoker.cancel = context.WithCancel(ts.StopCtx)
-	ts.Go(func() { invoker.PingLoop(ctx) })
+	ts.Go(func() { invoker.pingLoop(ctx) })
 
 	return &invoker
 }
@@ -55,6 +60,7 @@ func (i *Invoker) ping() {
 	defer i.mutex.Unlock()
 
 	if err != nil {
+		logger.Warn("invoker %s did not response on ping, error: %s", i.status.Address, err.Error())
 		i.markFailed()
 		return
 	}
@@ -62,21 +68,24 @@ func (i *Invoker) ping() {
 	i.updateStatus(status)
 }
 
-func (i *Invoker) PingLoop(ctx context.Context) {
+func (i *Invoker) pingLoop(ctx context.Context) {
 	logger.Info("starting invoker ping loop")
 
 	t := time.Tick(i.ts.Config.Master.InvokersPingInterval)
 
 	for {
-		i.ping()
-
 		select {
 		case <-ctx.Done():
 			logger.Info("stopping invoker ping loop")
 			return
 		case <-t:
+			i.ping()
 		}
 	}
+}
+
+func (i *Invoker) address() string {
+	return i.status.Address
 }
 
 func (i *Invoker) getJobType(jobID string) JobType {
@@ -110,6 +119,7 @@ func (i *Invoker) completeSendJob(job *invokerconn.Job) {
 	defer i.mutex.Unlock()
 
 	if err != nil {
+		logger.Warn("failed to send job to invoker %s, error: %s", i.address(), err.Error())
 		i.markFailed()
 		return
 	}
@@ -125,29 +135,27 @@ func (i *Invoker) completeSendJob(job *invokerconn.Job) {
 	}
 
 	i.updateStatus(status)
+
+	logger.Trace("job %s is sended to invoker %s", job.ID, i.address())
 }
 
 func (i *Invoker) TrySendJob(job *invokerconn.Job) bool {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	if i.failed || (i.status != nil && i.jobTypesCount[SendingJob]+1 > int(i.status.MaxNewJobs)) {
+	if i.failed || i.jobTypesCount[SendingJob]+1 > int(i.status.MaxNewJobs) {
 		return false
 	}
 
+	logger.Trace("sending job %s to invoker %s", job.ID, i.address())
 	i.addJob(job.ID, SendingJob)
 	i.ts.Go(func() { i.completeSendJob(job) })
 
 	return true
 }
 
-func isJobTesting(jobID string, status *invokerconn.StatusResponse) bool {
-	for _, id := range status.ActiveJobIDs {
-		if jobID == id {
-			return true
-		}
-	}
-	return false
+func isJobTesting(jobID string, status *invokerconn.Status) bool {
+	return slices.Contains(status.ActiveJobIDs, jobID)
 }
 
 func (i *Invoker) ensureJobIsNotLost(jobID string) {
@@ -155,12 +163,13 @@ func (i *Invoker) ensureJobIsNotLost(jobID string) {
 	defer i.mutex.Unlock()
 
 	if i.getJobType(jobID) == NoReplyJob {
+		logger.Warn("invoker %s has lost job %s", i.address(), jobID)
 		i.markFailed()
 	}
 }
 
-func (i *Invoker) updateStatus(status *invokerconn.StatusResponse) {
-	if i.failed || (i.status != nil && i.status.Epoch >= status.Epoch) {
+func (i *Invoker) updateStatus(status *invokerconn.Status) {
+	if i.failed || i.status.Epoch >= status.Epoch {
 		return
 	}
 
@@ -172,12 +181,13 @@ func (i *Invoker) updateStatus(status *invokerconn.StatusResponse) {
 			// pass
 		case TestingJob:
 			if !isJobTesting(jobID, status) {
+				logger.Trace("job %s disappeared from the status of invoker %s", jobID, i.address())
 				i.setJobType(jobID, NoReplyJob)
 				time.AfterFunc(i.ts.Config.Master.LostJobTimeout, func() { i.ensureJobIsNotLost(jobID) })
 			}
 		case NoReplyJob:
 			if isJobTesting(jobID, status) {
-				logger.Info("job %s disappeared from status, but then reappeared", jobID)
+				logger.Warn("job %s disappeared from status, but then reappeared, invoker: %s", jobID, i.address())
 				i.markFailed()
 				return
 			}
@@ -185,6 +195,13 @@ func (i *Invoker) updateStatus(status *invokerconn.StatusResponse) {
 			logger.Panic("invoker shouldn't store job of type UnknownJob")
 		}
 	}
+
+	logger.Trace(
+		"status of invoker %s is updated; active jobs: %d, max new jobs: %d",
+		i.address(),
+		len(status.ActiveJobIDs),
+		status.MaxNewJobs,
+	)
 }
 
 func (i *Invoker) markFailed() {
@@ -192,6 +209,7 @@ func (i *Invoker) markFailed() {
 		return
 	}
 
+	logger.Warn("marking invoker %s as failed", i.address())
 	i.failed = true
 	i.cancel()
 	i.ts.Go(func() { i.registry.OnInvokerFailure(i) })
@@ -221,6 +239,19 @@ func (i *Invoker) JobTested(jobID string) bool {
 		return false
 	}
 
+	logger.Trace("job %s successfully tested on invoker %s", jobID, i.address())
 	i.removeJob(jobID)
 	return true
+}
+
+func (i *Invoker) VerifyAndUpdateStatus(status *invokerconn.Status) bool {
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+
+	if i.address() != status.Address {
+		return false
+	}
+
+	i.updateStatus(status)
+	return !i.failed
 }
