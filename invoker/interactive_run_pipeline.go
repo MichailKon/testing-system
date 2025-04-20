@@ -11,7 +11,20 @@ import (
 
 // For interactive problems, we use two sandboxes, one for interactor and another one for solution.
 // Interactor creates most of the files, so all the work is associated with interactor sandbox.
-// Solution sandbox just initializes and gives ownership to interactor sandbox, which will release check sandbox when all the work is done.
+// Solution sandbox just initializes and gives ownership to interactor sandbox,
+// which will release check sandbox when all the work is done.
+//
+// We use following synchronisation points:
+//
+// Job.InteractiveData.PipelineReadyWG - used for InteractiveInteractorJob to wait for InteractiveSolutionJob to initialize itself.
+// After this WaitGroup is ready, the ownership of InteractiveSolutionJob is transfered to InteractiveInteractorJob.
+//
+// JobPipelineState.interaction.solutionReleaseWaitGroup - used for InteractiveSolutionJob
+// to wait until the job is released by InteractiveInteractorJob.
+//
+// JobPipelineState.interaction.runWaitGroup - used to start running of both interactor and solution processes simultaneously.
+// The running of processes is done in runner threads, and this threads can be free at different points of time.
+// So before the running begins, we wait until other process is also ready to run.
 
 func (i *Invoker) fullInteractiveSolutionPipeline(sandbox sandbox.ISandbox, job *Job) {
 	s := &JobPipelineState{

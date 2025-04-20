@@ -77,7 +77,7 @@ func (s *JobPipelineState) loadSource() error {
 		return fmt.Errorf("can not get submission source, error: %v", err)
 	}
 	s.compile.sourceName = "source_" + filepath.Base(*source)
-	err = s.copyFileToSandbox(*source, s.compile.sourceName, 0644)
+	err = s.copyFileToSandbox(*source, s.compile.sourceName, fileModeText)
 	if err != nil {
 		return fmt.Errorf("can not copy submission source to sandbox, error: %v", err)
 	}
@@ -95,11 +95,12 @@ func (s *JobPipelineState) setupCompileScript() error {
 	if err != nil {
 		return fmt.Errorf("can not generate compile script, error: %v", err)
 	}
-	err = os.WriteFile(filepath.Join(s.sandbox.Dir(), compileScriptFile), script, 0755)
+	err = os.WriteFile(filepath.Join(s.sandbox.Dir(), compileScriptFile), script, fileModeBinary)
 	if err != nil {
 		return fmt.Errorf("can not write compile script to sandbox, error: %v", err)
 	}
 
+	s.compile.config = s.compile.language.GenerateExecuteConfig(compilationMessageFile)
 	s.compile.config = s.compile.language.GenerateExecuteConfig(compilationMessageFile)
 	s.compile.config.Command = "compile.sh"
 	logger.Trace("Prepared compilation for %s", s.loggerData)

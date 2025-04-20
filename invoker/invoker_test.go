@@ -140,7 +140,7 @@ func testCompileSandbox(t *testing.T, sandboxType string) {
 	s.deferFunc()
 }
 
-func (ts *testState) addProblem(problemID uint, interactive bool) {
+func (ts *testState) addProblem(problemID uint, problemType models.ProblemType) {
 	require.NoError(ts.t, ts.Invoker.Storage.TestInput.Insert(
 		fmt.Sprintf("%s/test_input/%d-1/1", ts.FilesDir, problemID),
 		uint64(problemID), 1,
@@ -155,16 +155,16 @@ func (ts *testState) addProblem(problemID uint, interactive bool) {
 
 	testlib, err := os.ReadFile(filepath.Join(ts.FilesDir, "testlib.h"))
 	require.NoError(ts.t, err)
-	require.NoError(ts.t, os.WriteFile(filepath.Join(checkerDir, "testlib.h"), testlib, 0666))
+	require.NoError(ts.t, os.WriteFile(filepath.Join(checkerDir, "testlib.h"), testlib, fileModeText))
 
 	cmd := exec.Command("g++", "check.cpp", "-std=c++17", "-o", "check")
 	cmd.Dir = checkerDir
 	require.NoError(ts.t, cmd.Run())
 	require.NoError(ts.t, ts.Invoker.Storage.Checker.Insert(filepath.Join(checkerDir, "check"), uint64(problemID)))
 
-	if interactive {
+	if problemType == models.ProblemTypeInteractive {
 		interactorDir := fmt.Sprintf("%s/interactor/%d", ts.FilesDir, problemID)
-		require.NoError(ts.t, os.WriteFile(filepath.Join(interactorDir, "testlib.h"), testlib, 0666))
+		require.NoError(ts.t, os.WriteFile(filepath.Join(interactorDir, "testlib.h"), testlib, fileModeText))
 
 		cmd = exec.Command("g++", "interactor.cpp", "-std=c++17", "-o", "interactor")
 		cmd.Dir = interactorDir
@@ -284,7 +284,7 @@ func TestStandardRun(t *testing.T) {
 
 func testSandboxStandardRun(t *testing.T, sandboxType string) {
 	ts := newTestState(t, sandboxType)
-	ts.addProblem(1, false)
+	ts.addProblem(1, models.ProblemTypeStandard)
 
 	res := ts.testRun(3, 1, models.ProblemTypeStandard)
 	require.Equal(t, verdict.OK, res.Verdict)
@@ -301,7 +301,7 @@ func testSandboxStandardRun(t *testing.T, sandboxType string) {
 	res = ts.testRun(7, 1, models.ProblemTypeStandard)
 	require.Equal(t, verdict.ML, res.Verdict)
 
-	ts.addProblem(2, false)
+	ts.addProblem(2, models.ProblemTypeStandard)
 	res = ts.testRun(8, 2, models.ProblemTypeStandard)
 	require.Equal(t, verdict.PT, res.Verdict)
 	require.EqualValues(t, 5, *res.Points)
@@ -322,7 +322,7 @@ func TestInteractiveRun(t *testing.T) {
 
 func testSandboxInteractiveRun(t *testing.T, sandboxType string) {
 	ts := newTestState(t, sandboxType)
-	ts.addProblem(3, true)
+	ts.addProblem(3, models.ProblemTypeInteractive)
 
 	res := ts.testRun(9, 3, models.ProblemTypeInteractive)
 	require.Equal(t, verdict.OK, res.Verdict)

@@ -25,12 +25,17 @@ const (
 	interactorBinaryFile   = "interactor"
 )
 
+const (
+	fileModeBinary os.FileMode = 0755
+	fileModeText   os.FileMode = 0644
+)
+
 func (s *JobPipelineState) loadSolutionBinary() error {
 	binary, err := s.invoker.Storage.Binary.Get(uint64(s.job.Submission.ID))
 	if err != nil {
 		return fmt.Errorf("can not get solution binary, error: %v", err)
 	}
-	err = s.copyFileToSandbox(*binary, solutionBinaryFile, 0755)
+	err = s.copyFileToSandbox(*binary, solutionBinaryFile, fileModeBinary)
 	if err != nil {
 		return fmt.Errorf("can not copy solution binary to sandbox, error: %v", err)
 	}
@@ -43,7 +48,7 @@ func (s *JobPipelineState) loadTestInput() error {
 	if err != nil {
 		return fmt.Errorf("can not get test input, error: %v", err)
 	}
-	err = s.copyFileToSandbox(*testInput, testInputFile, 0644)
+	err = s.copyFileToSandbox(*testInput, testInputFile, fileModeText)
 	if err != nil {
 		return fmt.Errorf("can not copy test input to sandbox, error: %v", err)
 	}
@@ -56,7 +61,7 @@ func (s *JobPipelineState) loadCheckerBinaryFile() error {
 	if err != nil {
 		return fmt.Errorf("can not get checker binary, error: %v", err)
 	}
-	err = s.copyFileToSandbox(*checker, checkerBinaryFile, 0755)
+	err = s.copyFileToSandbox(*checker, checkerBinaryFile, fileModeBinary)
 	if err != nil {
 		return fmt.Errorf("can not copy checker binary to sandbox, error: %v", err)
 	}
@@ -69,7 +74,7 @@ func (s *JobPipelineState) loadTestAnswerFile() error {
 	if err != nil {
 		return fmt.Errorf("can not get test answer, error: %s", err.Error())
 	}
-	err = s.copyFileToSandbox(*testAnswer, testAnswerFile, 0644)
+	err = s.copyFileToSandbox(*testAnswer, testAnswerFile, fileModeText)
 	if err != nil {
 		return fmt.Errorf("can not copy test answer to sandbox, error: %s", err.Error())
 	}
@@ -82,7 +87,7 @@ func (s *JobPipelineState) loadInteractorBinaryFile() error {
 	if err != nil {
 		return fmt.Errorf("can not get interactor, error: %s", err.Error())
 	}
-	err = s.copyFileToSandbox(*interactor, interactorBinaryFile, 0755)
+	err = s.copyFileToSandbox(*interactor, interactorBinaryFile, fileModeBinary)
 	if err != nil {
 		return fmt.Errorf("can not copy interactor to sandbox, error: %s", err.Error())
 	}
