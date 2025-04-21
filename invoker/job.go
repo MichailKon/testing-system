@@ -29,6 +29,10 @@ func (j *Job) deferFunc() {
 }
 
 func (i *Invoker) failJob(j *Job, errf string, args ...interface{}) {
+	i.Mutex.Lock()
+	delete(i.ActiveJobs, j.ID)
+	i.Mutex.Unlock()
+
 	request := &masterconn.InvokerJobResult{
 		JobID:         j.ID,
 		Verdict:       verdict.CF,
@@ -37,15 +41,15 @@ func (i *Invoker) failJob(j *Job, errf string, args ...interface{}) {
 	}
 	err := i.TS.MasterConn.SendInvokerJobResult(request)
 	if err != nil {
-		logger.Panic("Can not send invoker request, error: %s", err.Error())
-		// TODO: Add normal handling of this error
+		logger.Error("Can not send job %s result, error: %s", j.ID, err.Error())
 	}
-	i.Mutex.Lock()
-	defer i.Mutex.Unlock()
-	delete(i.ActiveJobs, j.ID)
 }
 
 func (i *Invoker) successJob(j *Job, runResult *sandbox.RunResult) {
+	i.Mutex.Lock()
+	delete(i.ActiveJobs, j.ID)
+	i.Mutex.Unlock()
+
 	request := &masterconn.InvokerJobResult{
 		JobID:         j.ID,
 		Verdict:       runResult.Verdict,
@@ -55,10 +59,6 @@ func (i *Invoker) successJob(j *Job, runResult *sandbox.RunResult) {
 	}
 	err := i.TS.MasterConn.SendInvokerJobResult(request)
 	if err != nil {
-		logger.Panic("Can not send invoker request, error: %s", err.Error())
-		// TODO: Add normal handling of this error
+		logger.Error("Can not send job %s result, error: %s", j.ID, err.Error())
 	}
-	i.Mutex.Lock()
-	defer i.Mutex.Unlock()
-	delete(i.ActiveJobs, j.ID)
 }

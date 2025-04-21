@@ -47,11 +47,7 @@ func (m *Master) handleInvokerJobResult(c *gin.Context) {
 
 	if submission != nil {
 		logger.Trace("submission #%d is tested, saving results to db", submission.ID)
-		if err := m.ts.DB.WithContext(c).Save(submission).Error; err != nil {
-			logger.Error("while saving submission to the database error happened: %s", err.Error())
-			connector.RespErr(c, http.StatusInternalServerError, "DB error")
-			return
-		}
+		m.retryUntilOK(c, m.updateSubmission, submission)
 	}
 
 	connector.RespOK(c, nil)

@@ -2,9 +2,10 @@ package common
 
 import (
 	"context"
-	"net/http"
+	"fmt"
 	"os/signal"
-	"strconv"
+	"runtime"
+	"slices"
 	"sync"
 	"syscall"
 	"testing_system/common/config"
@@ -17,9 +18,6 @@ import (
 	"gorm.io/gorm"
 
 	_ "testing_system/swag"
-
-	swaggo "github.com/swaggo/files"
-	ginswagger "github.com/swaggo/gin-swagger"
 )
 
 type TestingSystem struct {
@@ -36,6 +34,9 @@ type TestingSystem struct {
 	StopCtx  context.Context
 	stopFunc context.CancelFunc
 	stopWG   sync.WaitGroup
+
+	panics     []any
+	panicsLock sync.Mutex
 }
 
 func InitTestingSystem(configPath string) *TestingSystem {
@@ -44,8 +45,7 @@ func InitTestingSystem(configPath string) *TestingSystem {
 	}
 	logger.InitLogger(ts.Config)
 
-	ts.Router = gin.Default() // TODO: Add router options (e.g debug)
-	ts.Router.GET("/swagger/*any", ginswagger.WrapHandler(swaggo.Handler))
+	ts.InitServer()
 
 	var err error
 	ts.DB, err = db.NewDB(ts.Config.DB)
@@ -82,27 +82,20 @@ func (ts *TestingSystem) Run() {
 
 	ts.stopWG.Wait()
 
+	slices.Reverse(ts.defers)
 	for _, d := range ts.defers {
 		d()
 	}
+
+	ts.panicsLock.Lock()
+	defer ts.panicsLock.Unlock()
+	if len(ts.panics) > 0 {
+		logger.Panic("Server running finished with panic: %v", ts.panics)
+	}
 }
 
-func (ts *TestingSystem) runServer() {
-	addr := ":" + strconv.Itoa(ts.Config.Port)
-	if ts.Config.Host != nil {
-		addr = *ts.Config.Host + addr
-	}
-	logger.Info("Starting server at " + addr)
-	server := http.Server{
-		Addr:    addr,
-		Handler: ts.Router,
-	}
-	go func() {
-		<-ts.StopCtx.Done()
-		logger.Info("Shutting down server")
-		server.Shutdown(context.Background())
-	}()
-	server.ListenAndServe()
+func (ts *TestingSystem) Stop() {
+	ts.stopFunc()
 }
 
 func (ts *TestingSystem) Go(f func()) {
@@ -114,8 +107,21 @@ func (ts *TestingSystem) runProcess(f func()) {
 	defer func() {
 		v := recover()
 		if v != nil {
-			logger.Error("One process got panic, shutting down all processes gracefully")
+			stackTrace := ""
+			for i := 1; ; i++ {
+				_, file, line, ok := runtime.Caller(i)
+				if !ok {
+					break
+				}
+				stackTrace += fmt.Sprintf("%s:%d\n", file, line)
+			}
+			logger.Error("One process got panic: %v, stack trace:\n%s", v, stackTrace)
+			logger.Error("Shutting down all processes gracefully")
 			ts.stopFunc()
+
+			ts.panicsLock.Lock()
+			defer ts.panicsLock.Unlock()
+			ts.panics = append(ts.panics, v)
 		}
 		ts.stopWG.Done()
 	}()

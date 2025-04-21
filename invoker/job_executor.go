@@ -1,6 +1,7 @@
 package invoker
 
 import (
+	"os"
 	"path/filepath"
 	"strconv"
 	"testing_system/common"
@@ -12,14 +13,17 @@ import (
 )
 
 func newSandbox(ts *common.TestingSystem, id uint64) sandbox.ISandbox {
+	err := os.MkdirAll(ts.Config.Invoker.SandboxHomePath, 0755)
+	if err != nil {
+		logger.Panic("Can not create sandbox home dir, error: %v", err)
+	}
+
 	var s sandbox.ISandbox
-	var err error
 	switch ts.Config.Invoker.SandboxType {
 	case "simple":
 		s, err = simple.NewSandbox(filepath.Join(ts.Config.Invoker.SandboxHomePath, strconv.FormatUint(id, 10)))
 	case "isolate":
 		s, err = isolate.NewSandbox(id, ts.Config.Invoker.SandboxHomePath)
-
 	default:
 		logger.Panic("Unsupported sandbox type: %s", ts.Config.Invoker.SandboxType)
 	}
@@ -35,7 +39,7 @@ func (i *Invoker) runSandboxThread(sandbox sandbox.ISandbox, id uint64) {
 		select {
 		case <-i.TS.StopCtx.Done():
 			logger.Info("Stopped sandbox %d", id)
-			break
+			return
 		case job := <-i.JobQueue:
 			switch job.Type {
 			case invokerconn.CompileJob:

@@ -15,7 +15,7 @@ func (i *Invoker) runRunnerThread(id uint64) {
 		select {
 		case <-i.TS.StopCtx.Done():
 			logger.Info("Stopped invoker thread %d", id)
-			break
+			return
 		case f := <-i.RunQueue:
 			f()
 		}

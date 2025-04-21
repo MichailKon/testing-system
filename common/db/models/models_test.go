@@ -37,7 +37,7 @@ func TestTestResultSerialization(t *testing.T) {
 	t.Run("json", func(t *testing.T) {
 		b, err := json.Marshal(testResult)
 		require.Nil(t, err)
-		require.Equal(t, `{"testNumber":1,"verdict":"OK","time":"5s","memory":"5m"}`, string(b))
+		require.Equal(t, `{"TestNumber":1,"Verdict":"OK","Time":"5s","Memory":"5m"}`, string(b))
 
 		var newTestResult TestResult
 		err = json.Unmarshal(b, &newTestResult)
@@ -48,10 +48,10 @@ func TestTestResultSerialization(t *testing.T) {
 	t.Run("yaml", func(t *testing.T) {
 		b, err := yaml.Marshal(testResult)
 		require.Nil(t, err)
-		require.Equal(t, `testNumber: 1
-verdict: OK
-time: 5s
-memory: 5m
+		require.Equal(t, `TestNumber: 1
+Verdict: OK
+Time: 5s
+Memory: 5m
 `, string(b))
 		var newTestResult TestResult
 		err = yaml.Unmarshal(b, &newTestResult)

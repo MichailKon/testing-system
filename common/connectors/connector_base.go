@@ -15,7 +15,7 @@ func NewConnectorBase(connection *config.Connection) *ConnectorBase {
 		Connection: connection,
 		client:     resty.New(),
 	}
-	// TODO: Add host initialization from connection
+	c.client.SetBaseURL(connection.Address)
 	// TODO: Add auth
 	// TODO: Add retry configuration
 	return c

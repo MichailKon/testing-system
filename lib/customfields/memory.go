@@ -56,8 +56,8 @@ func (m *Memory) Scan(value interface{}) error {
 	return nil
 }
 
-func (m *Memory) Value() (driver.Value, error) {
-	return int64(*m), nil
+func (m Memory) Value() (driver.Value, error) {
+	return int64(m), nil
 }
 
 func (m *Memory) GormDataType() string {

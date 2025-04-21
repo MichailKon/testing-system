@@ -2,6 +2,7 @@ package logger
 
 import (
 	"fmt"
+	"io"
 	baselog "log"
 	"os"
 	"testing_system/common/config"
@@ -20,6 +21,10 @@ var (
 	log      = baselog.New(os.Stdout, "", baselog.Ldate|baselog.Ltime)
 	logErr   = baselog.New(os.Stderr, "", baselog.Ldate|baselog.Ltime)
 )
+
+func GetLevel() int {
+	return logLevel
+}
 
 func Trace(format string, values ...interface{}) {
 	logPrint(LogLevelTrace, format, values...)
@@ -47,6 +52,23 @@ func Panic(format string, values ...any) {
 	logPrint(LogLevelError, format, values...)
 	logErr.Printf(logErrPrefix(0)+format, values...)
 	panic(fmt.Errorf(format, values...))
+}
+
+type logWriter struct {
+	level  int
+	prefix string
+}
+
+func (w *logWriter) Write(p []byte) (n int, err error) {
+	logPrint(w.level, "%s %s", w.prefix, string(p))
+	return len(p), nil
+}
+
+func CreateWriter(level int, prefix string) io.Writer {
+	return &logWriter{
+		level:  level,
+		prefix: prefix,
+	}
 }
 
 // PanicLevel will output to log the code line which is reachable by level call depth. May be applied in some library code

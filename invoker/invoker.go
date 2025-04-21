@@ -38,7 +38,7 @@ func SetupInvoker(ts *common.TestingSystem) error {
 		TS:         ts,
 		Storage:    storage.NewInvokerStorage(ts),
 		Compiler:   compiler.NewCompiler(ts),
-		RunQueue:   make(chan func(), ts.Config.Invoker.Threads),
+		RunQueue:   make(chan func(), ts.Config.Invoker.Sandboxes),
 		ActiveJobs: make(map[string]*Job),
 	}
 	invoker.setupAddress()
@@ -54,7 +54,7 @@ func SetupInvoker(ts *common.TestingSystem) error {
 
 	invoker.startRunners()
 
-	r := ts.Router.Group("/invoker/")
+	r := ts.Router.Group("/invoker")
 	r.GET("/status", invoker.HandleStatus)
 	r.POST("/job/new", invoker.HandleNewJob)
 
@@ -75,7 +75,7 @@ func (i *Invoker) setupAddress() {
 		} else {
 			host = "localhost"
 		}
-		i.Address = host + ":" + strconv.Itoa(i.TS.Config.Port)
+		i.Address = "http://" + host + ":" + strconv.Itoa(i.TS.Config.Port)
 	}
 }
 

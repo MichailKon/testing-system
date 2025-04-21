@@ -54,8 +54,8 @@ func (t *Time) Scan(value interface{}) error {
 	return nil
 }
 
-func (t *Time) Value() (driver.Value, error) {
-	return int64(*t), nil
+func (t Time) Value() (driver.Value, error) {
+	return int64(t), nil
 }
 
 func (t *Time) GormDataType() string {

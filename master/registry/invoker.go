@@ -39,6 +39,7 @@ func newInvoker(status *invokerconn.Status, registry *InvokerRegistry, ts *commo
 	logger.Info("registering new invoker: %s", status.Address)
 
 	invoker := Invoker{
+		ts:            ts,
 		connector:     invokerconn.NewConnector(&config.Connection{Address: status.Address}),
 		registry:      registry,
 		jobTypeByID:   make(map[string]JobType),
