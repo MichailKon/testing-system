@@ -4,4 +4,6 @@ int main() {
   int a;
   std::cin >> a;
   std::cout << a + 1 << std::endl;
+  std::cin >> a;
+  std::cout << a + 1 << std::endl;
 }

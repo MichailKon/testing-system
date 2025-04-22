@@ -21,7 +21,8 @@ type Invoker struct {
 	Compiler *compiler.Compiler
 
 	JobQueue chan *Job
-	RunQueue chan func()
+
+	Runner *Runner
 
 	ActiveJobs map[string]*Job
 	MaxJobs    uint64
@@ -38,21 +39,19 @@ func SetupInvoker(ts *common.TestingSystem) error {
 		TS:         ts,
 		Storage:    storage.NewInvokerStorage(ts),
 		Compiler:   compiler.NewCompiler(ts),
-		RunQueue:   make(chan func(), ts.Config.Invoker.Threads),
+		Runner:     newRunner(ts),
 		ActiveJobs: make(map[string]*Job),
 	}
 	invoker.setupAddress()
 
 	invoker.MaxJobs = ts.Config.Invoker.QueueSize + ts.Config.Invoker.Sandboxes
-	invoker.JobQueue = make(chan *Job, invoker.MaxJobs*2)
+	invoker.JobQueue = make(chan *Job, invoker.MaxJobs*4)
 
 	for i := range ts.Config.Invoker.Sandboxes {
 		sandbox := newSandbox(ts, i)
 		ts.AddProcess(func() { invoker.runSandboxThread(sandbox, i) })
 		ts.AddDefer(sandbox.Delete)
 	}
-
-	invoker.startRunners()
 
 	r := ts.Router.Group("/invoker/")
 	r.GET("/status", invoker.HandleStatus)

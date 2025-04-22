@@ -15,13 +15,19 @@ import (
 	"testing_system/lib/logger"
 )
 
-func (s *JobPipelineState) fullCheckPipeline() error {
-	err := s.loadCheckerBinaryFile()
-	if err != nil {
-		return err
+const (
+	xmlTestlibCommandOption = "-appes"
+)
+
+func (s *JobPipelineState) fullCheckPipeline(needAnswer bool) error {
+	if needAnswer {
+		err := s.loadTestAnswerFile()
+		if err != nil {
+			return err
+		}
 	}
 
-	err = s.loadTestAnswerFile()
+	err := s.loadCheckerBinaryFile()
 	if err != nil {
 		return err
 	}
@@ -50,7 +56,7 @@ func (s *JobPipelineState) generateCheckerRunConfig() error {
 
 	s.test.checkConfig.Command = checkerBinaryFile
 	s.test.checkConfig.Args = []string{
-		testInputFile, testOutputFile, testAnswerFile, checkResultFile, checkResultFileArg,
+		testInputFile, testOutputFile, testAnswerFile, testlibResultFile, xmlTestlibCommandOption,
 	}
 	logger.Trace("Generated checker run config for %s", s.loggerData)
 	return nil
@@ -58,25 +64,34 @@ func (s *JobPipelineState) generateCheckerRunConfig() error {
 
 func (s *JobPipelineState) executeCheckerRunCommand() error {
 	s.executeWaitGroup.Add(1)
-	s.invoker.RunQueue <- s.runChecker
+	s.invoker.Runner.queue <- []func(){s.runChecker}
 	s.executeWaitGroup.Wait()
 
 	if s.test.checkResult.Err != nil {
 		return fmt.Errorf("can not run checker in sandbox, error: %v", s.test.checkResult.Err)
 	}
 
-	switch s.test.checkResult.Verdict {
+	err := s.verifyHelperCommandVerdict("checker", s.test.checkResult.Verdict)
+	if err != nil {
+		return err
+	}
+
+	logger.Trace("Finished checker run for %s", s.loggerData)
+	return nil
+}
+
+func (s *JobPipelineState) verifyHelperCommandVerdict(cmd string, v verdict.Verdict) error {
+	switch v {
 	case verdict.OK, verdict.RT:
-		logger.Trace("Finished checker run for %s", s.loggerData)
 		return nil
 	case verdict.TL:
-		return fmt.Errorf("checker running took more than %v time", s.test.checkConfig.TimeLimit)
+		return fmt.Errorf("%s running took more than %v time", cmd, s.test.checkConfig.TimeLimit)
 	case verdict.ML:
-		return fmt.Errorf("checker running took more than %v memory", s.test.checkConfig.MemoryLimit)
+		return fmt.Errorf("%s running took more than %v memory", cmd, s.test.checkConfig.MemoryLimit)
 	case verdict.WL:
-		return fmt.Errorf("checker running took more than %v wall time", s.test.checkConfig.WallTimeLimit)
+		return fmt.Errorf("%s running took more than %v wall time", cmd, s.test.checkConfig.WallTimeLimit)
 	case verdict.SE:
-		return fmt.Errorf("checker security violation")
+		return fmt.Errorf("%s security violation", cmd)
 	default:
 		return fmt.Errorf("unknown checker sandbox run verdict: %s", s.test.checkResult.Verdict)
 	}
@@ -88,9 +103,9 @@ func (s *JobPipelineState) runChecker() {
 }
 
 func (s *JobPipelineState) parseCheckerResult() error {
-	_, err := os.Stat(filepath.Join(s.sandbox.Dir(), checkResultFile))
+	_, err := os.Stat(filepath.Join(s.sandbox.Dir(), testlibResultFile))
 	if err == nil {
-		return s.parseTestlibCheckerResult()
+		return s.parseTestlibResult("checker", s.test.checkResult)
 	} else if errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("no checker result file found, non testlib checkers are not supported")
 	} else {
@@ -98,58 +113,58 @@ func (s *JobPipelineState) parseCheckerResult() error {
 	}
 }
 
-func (s *JobPipelineState) parseTestlibCheckerResult() error {
-	checkResultReader, err := os.Open(filepath.Join(s.sandbox.Dir(), checkResultFile))
+func (s *JobPipelineState) parseTestlibResult(cmd string, runResult *sandbox.RunResult) error {
+	resultReader, err := os.Open(filepath.Join(s.sandbox.Dir(), testlibResultFile))
 	if err != nil {
 		return fmt.Errorf(
-			"checker exited with exit code %d, can not parse checker result xml file in appes mode",
-			s.test.checkResult.Statistics.ExitCode,
+			"%s exited with exit code %d, can not read result xml file in appes mode",
+			cmd, runResult.Statistics.ExitCode,
 		)
 	}
-	defer checkResultReader.Close()
+	defer resultReader.Close()
 
-	var checkerResult CheckerResultXML
-	xmlReader := xml.NewDecoder(checkResultReader)
+	var testlibResult TestlibResultXML
+	xmlReader := xml.NewDecoder(resultReader)
 	xmlReader.CharsetReader = charset.NewReaderLabel
-	err = xmlReader.Decode(&checkerResult)
+	err = xmlReader.Decode(&testlibResult)
 	if err != nil {
 		return fmt.Errorf(
-			"can not parse checker result xml file in appes mode: %s",
+			"can not parse testlib result xml file in appes mode: %s",
 			err.Error(),
 		)
 	}
 
-	s.test.checkerOutputReader = s.limitedReader(strings.NewReader(checkerResult.Value))
-	switch checkerResult.Outcome {
+	s.test.checkerOutputReader = s.limitedReader(strings.NewReader(testlibResult.Value))
+	switch testlibResult.Outcome {
 	case "accepted":
 		s.test.runResult.Verdict = verdict.OK
 	case "wrong-answer", "presentation-error", "unexpected-eof": // We will treat PE as WA as all testing systems now do
 		s.test.runResult.Verdict = verdict.WA
 	case "fail":
-		// Only in case of checker CF verdict we accept job as successful
+		// Only in case of checker/interactor CF verdict we accept job as successful
 		s.test.runResult.Verdict = verdict.CF
 	case "points", "relative-scoring":
-		if checkerResult.Points == nil {
+		if testlibResult.Points == nil {
 			return fmt.Errorf(
-				"checker exited with exit code %d and verdict %s, but no points specified",
-				s.test.checkResult.Statistics.ExitCode,
-				checkerResult.Outcome,
+				"%s exited with exit code %d and verdict %s, but no points specified",
+				cmd, runResult.Statistics.ExitCode, testlibResult.Outcome,
 			)
 		} else {
 			s.test.runResult.Verdict = verdict.PT
-			s.test.runResult.Points = checkerResult.Points
+			s.test.runResult.Points = testlibResult.Points
 		}
 	default:
 		return fmt.Errorf(
-			"unknown checker verdict %s, checker exited with exit code %d",
-			checkerResult.Outcome,
-			s.test.checkResult.Statistics.ExitCode,
+			"unknown testlib verdict %s, testlib %s exited with exit code %d",
+			cmd,
+			testlibResult.Outcome,
+			runResult.Statistics.ExitCode,
 		)
 	}
 
 	logger.Trace(
-		"Parsed testlib checker result for %s, checker verdict is %s",
-		s.loggerData, s.test.checkResult.Verdict,
+		"Parsed %s testlib result for %s, solution verdict is %s",
+		cmd, s.loggerData, s.test.runResult.Verdict,
 	)
 	return nil
 }
@@ -187,7 +202,7 @@ func (s *JobPipelineState) uploadCheckerOutput() error {
 	return nil
 }
 
-type CheckerResultXML struct {
+type TestlibResultXML struct {
 	Outcome string   `xml:"outcome,attr"`
 	Points  *float64 `xml:"points,attr,omitempty"`
 	Value   string   `xml:",chardata"`

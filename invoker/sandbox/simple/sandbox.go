@@ -102,6 +102,7 @@ func (s *Sandbox) parseWriter(r *io.Writer, conf *sandbox.IORedirect) (func() er
 }
 
 func (s *Sandbox) Run(config *sandbox.ExecuteConfig) *sandbox.RunResult {
+	defer config.DeferFunc()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.WallTimeLimit))
 	defer cancel()
 	cmd := exec.CommandContext(

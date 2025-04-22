@@ -54,11 +54,11 @@ func TestQueueWork(t *testing.T) {
 	q := NewQueue(nil).(*Queue)
 	problem1 := models.Problem{
 		TestsNumber: 2,
-		ProblemType: models.ProblemType_ICPC,
+		ScoringType: models.ScoringTypeICPC,
 	}
 	problem2 := models.Problem{
 		TestsNumber: 2,
-		ProblemType: models.ProblemType_ICPC,
+		ScoringType: models.ScoringTypeICPC,
 	}
 	problem1.ID, problem2.ID = 1, 2
 	submission1 := models.Submission{}
@@ -77,11 +77,11 @@ func TestQueueFairness(t *testing.T) {
 	q := NewQueue(nil).(*Queue)
 	problem1 := models.Problem{
 		TestsNumber: 500,
-		ProblemType: models.ProblemType_ICPC,
+		ScoringType: models.ScoringTypeICPC,
 	}
 	problem2 := models.Problem{
 		TestsNumber: 10,
-		ProblemType: models.ProblemType_ICPC,
+		ScoringType: models.ScoringTypeICPC,
 	}
 	problem1.ID, problem2.ID = 1, 2
 	submission1 := models.Submission{}
@@ -104,7 +104,7 @@ func TestQueue_RescheduleJob(t *testing.T) {
 		require.True(t, isQueueEmpty(q))
 		problem1 := models.Problem{
 			TestsNumber: 1,
-			ProblemType: models.ProblemType_ICPC,
+			ScoringType: models.ScoringTypeICPC,
 		}
 		problem2 := problem1
 		submission1 := models.Submission{}

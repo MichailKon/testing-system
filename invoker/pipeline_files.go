@@ -1,6 +1,7 @@
 package invoker
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -19,8 +20,14 @@ const (
 	testErrorFile          = "stderr.txt"
 	testAnswerFile         = "answer.txt"
 	checkerBinaryFile      = "check"
-	checkResultFile        = "check_result.xml"
+	testlibResultFile      = "testlib_result.xml"
 	checkOutputFile        = "checker_output.txt"
+	interactorBinaryFile   = "interactor"
+)
+
+const (
+	fileModeBinary os.FileMode = 0755
+	fileModeText   os.FileMode = 0644
 )
 
 func (s *JobPipelineState) loadSolutionBinary() error {
@@ -28,7 +35,7 @@ func (s *JobPipelineState) loadSolutionBinary() error {
 	if err != nil {
 		return fmt.Errorf("can not get solution binary, error: %v", err)
 	}
-	err = s.copyFileToSandbox(*binary, solutionBinaryFile, 0755)
+	err = s.copyFileToSandbox(*binary, solutionBinaryFile, fileModeBinary)
 	if err != nil {
 		return fmt.Errorf("can not copy solution binary to sandbox, error: %v", err)
 	}
@@ -41,7 +48,7 @@ func (s *JobPipelineState) loadTestInput() error {
 	if err != nil {
 		return fmt.Errorf("can not get test input, error: %v", err)
 	}
-	err = s.copyFileToSandbox(*testInput, testInputFile, 0644)
+	err = s.copyFileToSandbox(*testInput, testInputFile, fileModeText)
 	if err != nil {
 		return fmt.Errorf("can not copy test input to sandbox, error: %v", err)
 	}
@@ -54,7 +61,7 @@ func (s *JobPipelineState) loadCheckerBinaryFile() error {
 	if err != nil {
 		return fmt.Errorf("can not get checker binary, error: %v", err)
 	}
-	err = s.copyFileToSandbox(*checker, checkerBinaryFile, 0755)
+	err = s.copyFileToSandbox(*checker, checkerBinaryFile, fileModeBinary)
 	if err != nil {
 		return fmt.Errorf("can not copy checker binary to sandbox, error: %v", err)
 	}
@@ -67,11 +74,24 @@ func (s *JobPipelineState) loadTestAnswerFile() error {
 	if err != nil {
 		return fmt.Errorf("can not get test answer, error: %s", err.Error())
 	}
-	err = s.copyFileToSandbox(*testAnswer, testAnswerFile, 0644)
+	err = s.copyFileToSandbox(*testAnswer, testAnswerFile, fileModeText)
 	if err != nil {
 		return fmt.Errorf("can not copy test answer to sandbox, error: %s", err.Error())
 	}
 	logger.Trace("Loaded test answer to sandbox for %s", s.loggerData)
+	return nil
+}
+
+func (s *JobPipelineState) loadInteractorBinaryFile() error {
+	interactor, err := s.invoker.Storage.Interactor.Get(uint64(s.job.Problem.ID))
+	if err != nil {
+		return fmt.Errorf("can not get interactor, error: %s", err.Error())
+	}
+	err = s.copyFileToSandbox(*interactor, interactorBinaryFile, fileModeBinary)
+	if err != nil {
+		return fmt.Errorf("can not copy interactor to sandbox, error: %s", err.Error())
+	}
+	logger.Trace("Loaded interactor to sandbox for %s", s.loggerData)
 	return nil
 }
 
@@ -113,6 +133,15 @@ func (s *JobPipelineState) uploadOutput(fileName string, resourceType resource.T
 	return nil
 }
 
+func (s *JobPipelineState) removeSandboxFile(fileName string) error {
+	err := os.Remove(filepath.Join(s.sandbox.Dir(), fileName))
+	if err != nil {
+		return fmt.Errorf("can not remove %v, error: %v", fileName, err)
+	}
+	logger.Trace("Removed %v from sandbox for %s", fileName, s.loggerData)
+	return nil
+}
+
 func (s *JobPipelineState) copyFileToSandbox(src string, dst string, perm os.FileMode) error {
 	srcReader, err := os.Open(src)
 	if err != nil {
@@ -131,7 +160,11 @@ func (s *JobPipelineState) copyFileToSandbox(src string, dst string, perm os.Fil
 func (s *JobPipelineState) openSandboxFile(fileName string, limit bool) (io.Reader, error) {
 	file, err := os.Open(filepath.Join(s.sandbox.Dir(), fileName))
 	if err != nil {
-		return nil, err
+		if os.IsNotExist(err) {
+			return bytes.NewReader(nil), nil
+		} else {
+			return nil, err
+		}
 	}
 	s.defers = append(s.defers, func() { file.Close() })
 	if limit {

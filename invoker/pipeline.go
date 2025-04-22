@@ -19,6 +19,9 @@ type JobPipelineState struct {
 	compile *pipelineCompileData
 	test    *pipelineTestData
 
+	// interaction is shared data between solution and interactor jobs
+	interaction *pipelineInteractionData
+
 	loggerData string
 
 	defers []func()
@@ -50,6 +53,17 @@ type pipelineTestData struct {
 
 	checkerOutputReader io.Reader
 	hasResources        bool
+}
+
+type pipelineInteractionData struct {
+	solution     *JobPipelineState
+	runWaitGroup sync.WaitGroup
+
+	interactorConfig *sandbox.ExecuteConfig
+	interactorResult *sandbox.RunResult
+
+	solutionReleaseWaitGroup sync.WaitGroup
+	solutionRelease          func()
 }
 
 func (s *JobPipelineState) initSandbox() error {

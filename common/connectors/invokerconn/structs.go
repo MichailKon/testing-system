@@ -5,6 +5,10 @@ type JobType int
 const (
 	CompileJob JobType = iota
 	TestJob
+
+	// JobTypes below are for internal use only
+	InteractiveSolutionJob = iota + 1000
+	InteractiveInteractorJob
 )
 
 type Job struct {

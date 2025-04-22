@@ -20,10 +20,10 @@ type Generator interface {
 }
 
 func NewGenerator(problem *models.Problem, submission *models.Submission) (Generator, error) {
-	switch problem.ProblemType {
-	case models.ProblemType_ICPC:
+	switch problem.ScoringType {
+	case models.ScoringTypeICPC:
 		return newICPCGenerator(problem, submission)
 	default:
-		return nil, fmt.Errorf("unknown problem type %v", problem.ProblemType)
+		return nil, fmt.Errorf("unknown problem type %v", problem.ScoringType)
 	}
 }
