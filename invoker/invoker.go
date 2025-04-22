@@ -1,6 +1,7 @@
 package invoker
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"sync"
@@ -23,6 +24,10 @@ type Invoker struct {
 	JobQueue chan *Job
 	RunQueue chan func()
 
+	RunnerStop   func()
+	RunnerCtx    context.Context
+	SandboxCount uint64
+
 	ActiveJobs map[string]*Job
 	MaxJobs    uint64
 	Mutex      sync.Mutex
@@ -35,16 +40,18 @@ func SetupInvoker(ts *common.TestingSystem) error {
 		return fmt.Errorf("invoker is not configured")
 	}
 	invoker := &Invoker{
-		TS:         ts,
-		Storage:    storage.NewInvokerStorage(ts),
-		Compiler:   compiler.NewCompiler(ts),
-		RunQueue:   make(chan func(), ts.Config.Invoker.Sandboxes),
-		ActiveJobs: make(map[string]*Job),
+		TS:           ts,
+		Storage:      storage.NewInvokerStorage(ts),
+		Compiler:     compiler.NewCompiler(ts),
+		RunQueue:     make(chan func(), ts.Config.Invoker.Threads),
+		SandboxCount: ts.Config.Invoker.Sandboxes,
+		ActiveJobs:   make(map[string]*Job),
 	}
 	invoker.setupAddress()
 
 	invoker.MaxJobs = ts.Config.Invoker.QueueSize + ts.Config.Invoker.Sandboxes
 	invoker.JobQueue = make(chan *Job, invoker.MaxJobs*2)
+	invoker.RunnerCtx, invoker.RunnerStop = context.WithCancel(context.Background())
 
 	for i := range ts.Config.Invoker.Sandboxes {
 		sandbox := newSandbox(ts, i)
@@ -85,8 +92,7 @@ func (i *Invoker) getStatus() *invokerconn.Status {
 	status := new(invokerconn.Status)
 	status.Address = i.Address
 
-	// V6 uid is slower than v7, but gives us better ordering
-	epochID, err := uuid.NewV6()
+	epochID, err := uuid.NewV7()
 	if err != nil {
 		logger.Panic("Can not generate status ID, error: %v", err.Error())
 	}

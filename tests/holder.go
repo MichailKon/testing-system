@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/require"
 	"github.com/xorcare/pointer"
@@ -115,7 +116,9 @@ func (h *TSHolder) addProblem(id uint) {
 
 	cmd := exec.Command("g++", "check.cpp", "-std=c++17", "-o", "../checker/check")
 	cmd.Dir = filepath.Join(probPath, "sources")
-	require.NoError(h.t, cmd.Run())
+	out, err := cmd.CombinedOutput()
+	fmt.Println(string(out))
+	require.NoError(h.t, err)
 }
 
 func (h *TSHolder) stop() {

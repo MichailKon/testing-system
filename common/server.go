@@ -9,6 +9,7 @@ import (
 
 	swaggo "github.com/swaggo/files"
 	ginswagger "github.com/swaggo/gin-swagger"
+	_ "testing_system/swag"
 )
 
 func (ts *TestingSystem) recoverRequest(c *gin.Context, err any) {

@@ -19,16 +19,11 @@ import (
 
 // Some functions should always be executed even when fail happens. We will retry these functions here
 func (m *Master) retryUntilOK(
-	firstTryCtx context.Context,
 	f func(ctx context.Context, submission *models.Submission) error,
 	submission *models.Submission,
 ) {
-	err := f(firstTryCtx, submission)
-	if err == nil {
-		return
-	}
 	m.ts.Go(func() {
-		_, err = backoff.Retry(
+		_, err := backoff.Retry(
 			m.ts.StopCtx,
 			func() (*struct{}, error) {
 				return nil, f(m.ts.StopCtx, submission)

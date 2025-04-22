@@ -16,8 +16,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-
-	_ "testing_system/swag"
 )
 
 type TestingSystem struct {

@@ -13,8 +13,8 @@ func (i *Invoker) runRunnerThread(id uint64) {
 	logger.Info("Started invoker thread %d", id)
 	for {
 		select {
-		case <-i.TS.StopCtx.Done():
-			logger.Info("Stopped invoker thread %d", id)
+		case <-i.RunnerCtx.Done():
+			logger.Info("Stopped invoker runner thread %d", id)
 			return
 		case f := <-i.RunQueue:
 			f()

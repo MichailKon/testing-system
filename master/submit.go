@@ -27,7 +27,7 @@ type SubmissionResponse struct {
 // @Failure 400 {object} string
 // @Failure 404 {object} string
 // @Failure 500 {object} string
-// @Router /client/submit [post]
+// @Router /master/submit [post]
 func (m *Master) handleNewSubmission(c *gin.Context) {
 	problemIDStr := c.PostForm("ProblemID")
 	language := c.PostForm("Language")
@@ -55,15 +55,15 @@ func (m *Master) handleNewSubmission(c *gin.Context) {
 	}
 
 	if !m.saveSubmissionInStorage(c, submission, file) {
-		m.retryUntilOK(c, m.removeSubmissionFromDB, submission)
+		m.retryUntilOK(m.removeSubmissionFromDB, submission)
 		return
 	}
 
 	logger.Trace("new submission, id: %d, problem: %d, language: %s", submission.ID, problem.ID, language)
 
 	if err = m.queue.Submit(problem, submission); err != nil {
-		m.retryUntilOK(c, m.removeSubmissionFromDB, submission)
-		m.retryUntilOK(c, m.removeSubmissionFromStorage, submission)
+		m.retryUntilOK(m.removeSubmissionFromDB, submission)
+		m.retryUntilOK(m.removeSubmissionFromStorage, submission)
 
 		logger.Error("failed to submit to queue, error: %s", err.Error())
 		connector.RespErr(c, http.StatusInternalServerError, "internal error")

@@ -47,7 +47,7 @@ func (m *Master) handleInvokerJobResult(c *gin.Context) {
 
 	if submission != nil {
 		logger.Trace("submission #%d is tested, saving results to db", submission.ID)
-		m.retryUntilOK(c, m.updateSubmission, submission)
+		m.retryUntilOK(m.updateSubmission, submission)
 	}
 
 	connector.RespOK(c, nil)
