@@ -82,6 +82,8 @@ func (r *InvokerRegistry) SendJobs() {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
+	logger.Trace("Sending new jobs from master to invoker")
+
 	for _, invoker := range r.invokers {
 		for {
 			if r.nextJob == nil {
@@ -94,6 +96,7 @@ func (r *InvokerRegistry) SendJobs() {
 			if !invoker.TrySendJob(r.nextJob) {
 				break
 			}
+			r.invokerByJobID[r.nextJob.ID] = invoker
 			r.nextJob = nil
 		}
 	}

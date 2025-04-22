@@ -1,0 +1,12 @@
+ProblemID: 1
+Language: cpp
+SourceFile: "source.cpp"
+
+RequiredResult:
+  Verdict: OK
+  Score: 1
+  TestResults:
+    - TestNumber: 1
+      Verdict: OK
+    - TestNumber: 2
+      Verdict: OK

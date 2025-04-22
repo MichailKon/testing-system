@@ -20,16 +20,16 @@ type SubmissionResponse struct {
 // @Tags Client
 // @Accept multipart/form-data
 // @Produce json
-// @Param ProblemId formData uint true "Problem ID" example:"228"
+// @Param ProblemID formData uint true "Problem ID" example:"228"
 // @Param Language formData string true "Programming language" example:"g++"
 // @Param Solution formData file true "Source code"
 // @Success 200 {object} SubmissionResponse
 // @Failure 400 {object} string
 // @Failure 404 {object} string
 // @Failure 500 {object} string
-// @Router /client/submit [post]
+// @Router /master/submit [post]
 func (m *Master) handleNewSubmission(c *gin.Context) {
-	problemIDStr := c.PostForm("ProblemId")
+	problemIDStr := c.PostForm("ProblemID")
 	language := c.PostForm("Language")
 
 	problemID, err := strconv.ParseUint(problemIDStr, 10, 0)
@@ -49,18 +49,22 @@ func (m *Master) handleNewSubmission(c *gin.Context) {
 		return
 	}
 
-	if !m.saveSubmissionInStorage(c, problemID, file) {
-		return
-	}
-
 	submission := m.saveSubmissionInDB(c, problemID, language)
 	if submission == nil {
 		return
 	}
 
+	if !m.saveSubmissionInStorage(c, submission, file) {
+		m.retryUntilOK(m.removeSubmissionFromDB, submission)
+		return
+	}
+
 	logger.Trace("new submission, id: %d, problem: %d, language: %s", submission.ID, problem.ID, language)
 
-	if err := m.queue.Submit(problem, submission); err != nil {
+	if err = m.queue.Submit(problem, submission); err != nil {
+		m.retryUntilOK(m.removeSubmissionFromDB, submission)
+		m.retryUntilOK(m.removeSubmissionFromStorage, submission)
+
 		logger.Error("failed to submit to queue, error: %s", err.Error())
 		connector.RespErr(c, http.StatusInternalServerError, "internal error")
 		return
@@ -68,7 +72,5 @@ func (m *Master) handleNewSubmission(c *gin.Context) {
 
 	m.invokerRegistry.SendJobs()
 
-	connector.RespOK(c, &SubmissionResponse{
-		SubmissionID: submission.ID,
-	})
+	c.JSON(http.StatusOK, SubmissionResponse{submission.ID})
 }

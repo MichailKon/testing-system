@@ -1,6 +1,7 @@
 package storageconn
 
 import (
+	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,7 +14,7 @@ type Request struct {
 	Resource resource.Type `json:"resource"`
 
 	/*
-		Resource must always has exactly one of ProblemId and SubmitID
+		Resource must always have exactly one of ProblemId and SubmitID
 		Including, only TestID cannot be specified
 		ID=0 is considered absent
 	*/
@@ -36,6 +37,9 @@ type Request struct {
 
 	// If StorageFilename is not specified, Storage tries to get the filename automatically
 	StorageFilename string `json:"storageFilename"`
+
+	// Context may be specified for requests
+	Ctx context.Context `json:"-"`
 }
 
 type Response struct {

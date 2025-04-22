@@ -22,7 +22,5 @@ const (
 	CF Verdict = "CF" // Check failed
 	SK Verdict = "SK" // Skipped
 
-	QD Verdict = "QD" // Queued
-	CL Verdict = "CL" // Compiling
 	RU Verdict = "RU" // Running
 )

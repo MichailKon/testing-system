@@ -9,7 +9,7 @@ import (
 
 type ErrResponse struct {
 	OK    bool   `json:"ok"`
-	Error string `json:"error,omitempty"`
+	Error string `json:"error"`
 }
 
 func RespOK(c *gin.Context, data any) {

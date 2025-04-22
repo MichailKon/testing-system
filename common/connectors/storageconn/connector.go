@@ -3,6 +3,7 @@ package storageconn
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/go-resty/resty/v2"
 	"io"
 	"mime"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"testing_system/common/config"
 	"testing_system/common/connectors"
+	"testing_system/lib/connector"
 )
 
 type Connector struct {
@@ -31,8 +33,11 @@ func (s *Connector) Download(request *Request) *FileResponse {
 		return response
 	}
 
-	path := "/storage/get"
 	r := s.connection.R()
+
+	if request.Ctx != nil {
+		r.SetContext(request.Ctx)
+	}
 
 	requestJSON, err := json.Marshal(request)
 	if err != nil {
@@ -43,8 +48,9 @@ func (s *Connector) Download(request *Request) *FileResponse {
 	r.SetQueryParams(map[string]string{
 		"request": string(requestJSON),
 	})
+	r.SetDoNotParseResponse(true)
 
-	resp, err := r.SetDoNotParseResponse(true).Execute("GET", path)
+	resp, err := r.Get("/storage/get")
 	if err != nil {
 		response.Error = fmt.Errorf("failed to send request: %v", err)
 		return response
@@ -55,7 +61,15 @@ func (s *Connector) Download(request *Request) *FileResponse {
 		if resp.StatusCode() == http.StatusNotFound {
 			response.Error = ErrStorageFileNotFound
 		} else {
-			response.Error = fmt.Errorf("get request failed with status: %v", resp.Status())
+			body, err := io.ReadAll(resp.RawBody())
+			if err != nil {
+				response.Error = &connector.Error{
+					Code:    resp.StatusCode(),
+					Message: err.Error(),
+					Path:    resp.Request.URL,
+				}
+			}
+			response.Error = connector.ParseRespError(body, resp)
 		}
 		return response
 	}
@@ -107,8 +121,10 @@ func (s *Connector) Upload(request *Request) *Response {
 		return response
 	}
 
-	path := "/storage/upload"
 	r := s.connection.R()
+	if request.Ctx != nil {
+		r.SetContext(request.Ctx)
+	}
 
 	requestJSON, err := json.Marshal(request)
 	if err != nil {
@@ -120,28 +136,24 @@ func (s *Connector) Upload(request *Request) *Response {
 		"request": string(requestJSON),
 	})
 
-	// request.StorageFilename can be empty
-	r.SetFileReader("file", request.StorageFilename, request.File)
-
-	resp, err := r.Post(path)
-	if err != nil {
-		response.Error = fmt.Errorf("failed to send request: %v", err)
-		return response
+	requestFileName := request.StorageFilename
+	// request.StorageFilename can be empty but http requires filename to be specified
+	if requestFileName == "" {
+		requestFileName = "noname"
 	}
+	r.SetFileReader("file", requestFileName, request.File)
 
-	if resp.IsError() {
-		response.Error = fmt.Errorf("upload failed with status: %v", resp.Status())
-		return response
-	}
-
+	response.Error = connector.ReceiveEmpty(r, "/storage/upload", resty.MethodPost)
 	return response
 }
 
 func (s *Connector) Delete(request *Request) *Response {
 	response := &Response{R: *request}
 
-	path := "/storage/remove"
 	r := s.connection.R()
+	if request.Ctx != nil {
+		r.SetContext(request.Ctx)
+	}
 
 	requestJSON, err := json.Marshal(request)
 	if err != nil {
@@ -153,16 +165,7 @@ func (s *Connector) Delete(request *Request) *Response {
 		"request": string(requestJSON),
 	})
 
-	resp, err := r.Delete(path)
-	if err != nil {
-		response.Error = fmt.Errorf("failed to send request: %v", err)
-		return response
-	}
-
-	if resp.IsError() {
-		response.Error = fmt.Errorf("delete failed with status: %v", resp.Status())
-		return response
-	}
+	response.Error = connector.ReceiveEmpty(r, "/storage/remove", resty.MethodDelete)
 
 	return response
 }

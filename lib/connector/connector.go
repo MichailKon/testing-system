@@ -1,6 +1,7 @@
 package connector
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/go-resty/resty/v2"
@@ -22,18 +23,15 @@ func Receive[T any](r *resty.Request, path string, method string) (*T, error) {
 		Error string `json:"error,omitempty"`
 		Data  *T     `json:"data,omitempty"`
 	}
+
 	r.SetResult(&result)
-	r.SetError(&result) // I hope it works
+
 	resp, err := r.Execute(method, path)
 	if err != nil {
 		return nil, err
 	}
 	if resp.IsError() || !result.OK {
-		return nil, &Error{
-			Code:    resp.StatusCode(),
-			Message: result.Error,
-			Path:    path,
-		}
+		return nil, ParseRespError(resp.Body(), resp)
 	}
 	return result.Data, nil
 }
@@ -41,4 +39,22 @@ func Receive[T any](r *resty.Request, path string, method string) (*T, error) {
 func ReceiveEmpty(r *resty.Request, path string, method string) error {
 	_, err := Receive[string](r, path, method)
 	return err
+}
+
+func ParseRespError(body []byte, resp *resty.Response) error {
+	var errResp ErrResponse
+	err := json.Unmarshal(body, &errResp)
+	if err != nil {
+		return &Error{
+			Code:    resp.StatusCode(),
+			Message: fmt.Sprintf("failed to unmarshal response, error: %v", err),
+			Path:    resp.Request.URL,
+		}
+	}
+
+	return &Error{
+		Code:    resp.StatusCode(),
+		Message: errResp.Error,
+		Path:    resp.Request.URL,
+	}
 }

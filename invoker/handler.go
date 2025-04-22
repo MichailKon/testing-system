@@ -20,7 +20,7 @@ func (i *Invoker) HandleNewJob(c *gin.Context) {
 	job := new(Job)
 	err := c.BindJSON(&job.Job)
 	if err != nil {
-		connector.RespErr(c, http.StatusBadRequest, "Can not parse invoker jobs, error: %s", err.Error())
+		connector.RespErr(c, http.StatusBadRequest, "Can not parse invoker job, error: %s", err.Error())
 		return
 	}
 	if !i.initJob(c, job) {

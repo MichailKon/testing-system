@@ -1,0 +1,28 @@
+Port: 8483
+
+Invoker:
+  Threads: 1
+  Sandboxes: 2
+  QueueSize: 2
+  SandboxType: "TODO"
+  SandboxHomePath: "TODO"
+  CacheSize: 1000000000
+  CachePath: "TODO"
+  SaveOutputHead: 100
+  CompilerConfigsFolder: "TODO"
+
+Master:
+  InvokersPingInterval: 1s
+
+Storage:
+  StoragePath: "TODO"
+  BlockSize: 10
+
+DB:
+  InMemory: true
+
+MasterConnection:
+  Address: "http://localhost:8483"
+
+StorageConnection:
+  Address: "http://localhost:8483"

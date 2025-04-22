@@ -36,6 +36,7 @@ func (q *Queue) Submit(problem *models.Problem, submission *models.Submission) e
 	defer q.mutex.Unlock()
 	q.activeGenerators.PushBack(generator)
 	q.activeGeneratorIDs[generator.ID()] = struct{}{}
+	logger.Trace("Registered submission %d for problem %d in queue", submission.ID, problem.ID)
 	return nil
 }
 
@@ -61,6 +62,12 @@ func (q *Queue) JobCompleted(jobResult *masterconn.InvokerJobResult) (submission
 	}
 	delete(q.originalJobIDToJob, jobResult.JobID)
 	delete(q.originalJobIDToGenerator, jobResult.JobID)
+
+	if _, ok = q.activeGeneratorIDs[generator.ID()]; !ok {
+		q.activeGenerators.PushBack(generator)
+	}
+
+	logger.Trace("Job %s result is received by queue", wasID)
 	return generator.JobCompleted(jobResult)
 }
 
@@ -90,6 +97,8 @@ func (q *Queue) RescheduleJob(jobID string) error {
 	origJob.ID = newUUID.String()
 	q.jobIDToOriginalJobID[origJob.ID] = jobID
 	q.newFailedJobs = append(q.newFailedJobs, origJob)
+
+	logger.Trace("Rescheduled job %s, new id: %s", wasID, newUUID)
 	return nil
 }
 
@@ -99,6 +108,7 @@ func (q *Queue) NextJob() *invokerconn.Job {
 	if len(q.newFailedJobs) > 0 {
 		job := q.newFailedJobs[0]
 		q.newFailedJobs = q.newFailedJobs[1:]
+		logger.Trace("Queue returns rescheduled job %v", job)
 		return job
 	}
 	attempts := q.activeGenerators.Len()
@@ -114,6 +124,7 @@ func (q *Queue) NextJob() *invokerconn.Job {
 		q.activeGenerators.MoveToBack(generatorListElement)
 		q.originalJobIDToGenerator[job.ID] = generator
 		q.originalJobIDToJob[job.ID] = job
+		logger.Trace("Queue returns new job %v", job)
 		return job
 	}
 	return nil

@@ -11,11 +11,11 @@ import (
 )
 
 type TestResult struct {
-	TestNumber uint64              `json:"testNumber" yaml:"testNumber"`
-	Points     *float64            `json:"points,omitempty" yaml:"points,omitempty"`
-	Verdict    verdict.Verdict     `json:"verdict" yaml:"verdict"`
-	Time       customfields.Time   `json:"time" yaml:"time"`
-	Memory     customfields.Memory `json:"memory" yaml:"memory"`
+	TestNumber uint64              `json:"TestNumber" yaml:"TestNumber"`
+	Points     *float64            `json:"Points,omitempty" yaml:"Points,omitempty"`
+	Verdict    verdict.Verdict     `json:"Verdict" yaml:"Verdict"`
+	Time       customfields.Time   `json:"Time" yaml:"Time"`
+	Memory     customfields.Memory `json:"Memory" yaml:"Memory"`
 }
 
 type TestResults []TestResult
@@ -44,10 +44,10 @@ func (t TestResults) GormDBDataType(db *gorm.DB, field *schema.Field) string {
 
 type Submission struct {
 	gorm.Model
-	ProblemID uint64
-	Language  string
+	ProblemID uint64 `json:"ProblemID" yaml:"ProblemID"`
+	Language  string `json:"Language" yaml:"Language"`
 
-	Score       float64
-	Verdict     verdict.Verdict
-	TestResults TestResults `gorm:"type:jsonb"`
+	Score       float64         `json:"Score" yaml:"Score"`
+	Verdict     verdict.Verdict `json:"Verdict" yaml:"Verdict"`
+	TestResults TestResults     `gorm:"type:jsonb" json:"TestResults" yaml:"TestResults"`
 }
