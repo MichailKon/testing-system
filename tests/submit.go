@@ -129,7 +129,7 @@ func (h *TSHolder) waitTesting(s *submitTest) {
 
 		// We retry sending submits because in memory sqlite sucks and may lock db for each request
 		var err error
-		for _ = range 10 {
+		for _ = range 100 {
 			if err = h.ts.DB.Find(submission, s.ID).Error; err == nil {
 				break
 			}
