@@ -64,7 +64,7 @@ func (s *JobPipelineState) generateCheckerRunConfig() error {
 
 func (s *JobPipelineState) executeCheckerRunCommand() error {
 	s.executeWaitGroup.Add(1)
-	s.invoker.RunQueue <- s.runChecker
+	s.invoker.Runner.queue <- []func(){s.runChecker}
 	s.executeWaitGroup.Wait()
 
 	if s.test.checkResult.Err != nil {

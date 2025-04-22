@@ -139,7 +139,7 @@ func fillInTestRunConfigLimits(c *sandbox.ExecuteConfig, problem *models.Problem
 
 func (s *JobPipelineState) executeStandardTestRunCommand() error {
 	s.executeWaitGroup.Add(1)
-	s.invoker.RunQueue <- s.runSolution
+	s.invoker.Runner.queue <- []func(){s.runSolution}
 	s.executeWaitGroup.Wait()
 
 	if s.test.runResult.Err != nil {

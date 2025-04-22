@@ -53,12 +53,22 @@ func newTestState(t *testing.T, sandboxType string) *testState {
 		TS:       ts.TS,
 		Storage:  storage.NewInvokerStorage(ts.TS),
 		Compiler: compiler.NewCompiler(ts.TS),
-		RunQueue: make(chan func()),
+		Runner: &Runner{
+			queue: make(chan []func()),
+		},
 	}
 	go func() {
 		for {
-			f := <-ts.Invoker.RunQueue
-			f()
+			funcs := <-ts.Invoker.Runner.queue
+			var wg sync.WaitGroup
+			wg.Add(len(funcs))
+			for _, f := range funcs {
+				go func() {
+					f()
+					wg.Done()
+				}()
+			}
+			wg.Wait()
 		}
 	}()
 	require.NoError(t, os.CopyFS(ts.FilesDir, os.DirFS("testdata/files")))

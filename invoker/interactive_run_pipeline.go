@@ -232,16 +232,8 @@ func (s *JobPipelineState) executeInteractiveTestRunCommand() error {
 	s.interaction.runWaitGroup.Add(2)
 
 	s.interaction.solution.executeWaitGroup.Add(1)
-	s.invoker.RunQueue <- s.interaction.solution.runInteractiveSolution
-
 	s.executeWaitGroup.Add(1)
-	// If multiple threads are enabled on invoker, we use different thread for interactor
-	// Otherwise, we just run interactor in separate goroutine
-	if s.invoker.TS.Config.Invoker.Threads > 1 {
-		s.invoker.RunQueue <- s.runInteractiveInteractor
-	} else {
-		s.invoker.TS.Go(s.runInteractiveInteractor)
-	}
+	s.invoker.Runner.queue <- []func(){s.interaction.solution.runInteractiveSolution, s.runInteractiveInteractor}
 
 	s.executeWaitGroup.Wait()
 	s.interaction.solution.executeWaitGroup.Wait()

@@ -124,7 +124,7 @@ func (i *Invoker) newTestJob(c *gin.Context, job *Job) bool {
 
 	switch job.Problem.ProblemType {
 	case models.ProblemTypeStandard:
-		return i.finishCreatingTestJob(c, job)
+		return i.finishCreatingStandardJob(c, job)
 	case models.ProblemTypeInteractive:
 		return i.finishCreatingInteractiveJob(c, job)
 	default:
@@ -134,7 +134,7 @@ func (i *Invoker) newTestJob(c *gin.Context, job *Job) bool {
 	}
 }
 
-func (i *Invoker) finishCreatingTestJob(c *gin.Context, job *Job) bool {
+func (i *Invoker) finishCreatingStandardJob(c *gin.Context, job *Job) bool {
 	i.Storage.TestInput.Lock(uint64(job.Problem.ID), job.Test)
 	job.Defers = append(job.Defers, func() { i.Storage.TestInput.Unlock(uint64(job.Problem.ID), job.Test) })
 

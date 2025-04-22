@@ -101,7 +101,6 @@ func (s *JobPipelineState) setupCompileScript() error {
 	}
 
 	s.compile.config = s.compile.language.GenerateExecuteConfig(compilationMessageFile)
-	s.compile.config = s.compile.language.GenerateExecuteConfig(compilationMessageFile)
 	s.compile.config.Command = "compile.sh"
 	logger.Trace("Prepared compilation for %s", s.loggerData)
 	return nil
@@ -109,7 +108,7 @@ func (s *JobPipelineState) setupCompileScript() error {
 
 func (s *JobPipelineState) executeCompilationCommand() error {
 	s.executeWaitGroup.Add(1)
-	s.invoker.RunQueue <- s.runCompilationCommand
+	s.invoker.Runner.queue <- []func(){s.runCompilationCommand}
 	s.executeWaitGroup.Wait()
 
 	if s.compile.result.Err != nil {
