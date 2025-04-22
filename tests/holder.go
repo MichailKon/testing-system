@@ -119,6 +119,7 @@ func (h *TSHolder) addProblem(id uint) {
 
 	checker, err := os.ReadFile(filepath.Join(probPath, "sources", "check"))
 	require.NoError(h.t, err)
+	require.NoError(h.t, os.MkdirAll(filepath.Join(probPath, "checker"), 0755))
 	require.NoError(h.t, os.WriteFile(filepath.Join(probPath, "checker", "check"), checker, 0755))
 }
 
