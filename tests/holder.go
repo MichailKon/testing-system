@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"fmt"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/require"
 	"github.com/xorcare/pointer"
@@ -112,13 +111,15 @@ func (h *TSHolder) addProblem(id uint) {
 
 	testlib, err := os.ReadFile(filepath.Join(h.storageDir, "testlib.h"))
 	require.NoError(h.t, err)
-	require.NoError(h.t, os.WriteFile(filepath.Join(probPath, "sources", "testlib.h"), testlib, 0777))
+	require.NoError(h.t, os.WriteFile(filepath.Join(probPath, "sources", "testlib.h"), testlib, 0644))
 
-	cmd := exec.Command("g++", "check.cpp", "-std=c++17", "-o", "../checker/check")
+	cmd := exec.Command("g++", "check.cpp", "-std=c++17", "-o", "check")
 	cmd.Dir = filepath.Join(probPath, "sources")
-	out, err := cmd.CombinedOutput()
-	fmt.Println(string(out))
+	require.NoError(h.t, cmd.Run())
+
+	checker, err := os.ReadFile(filepath.Join(probPath, "sources", "check"))
 	require.NoError(h.t, err)
+	require.NoError(h.t, os.WriteFile(filepath.Join(probPath, "checker", "check"), checker, 0755))
 }
 
 func (h *TSHolder) stop() {
