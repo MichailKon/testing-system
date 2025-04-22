@@ -222,8 +222,11 @@ func (s *JobPipelineState) createPipe(
 		Output: w,
 	}
 
-	stdinCfg.Defers = append(stdinCfg.Defers, func() { r.Close() })
-	stdoutCfg.Defers = append(stdoutCfg.Defers, func() { w.Close() })
+	// To avoid broken pipe linux error, we close pipe only when writer process exits
+	stdoutCfg.Defers = append(stdoutCfg.Defers, func() {
+		r.Close()
+		w.Close()
+	})
 
 	return nil
 }
