@@ -58,7 +58,9 @@ func InitTestingSystem(configPath string) *TestingSystem {
 	ts.StorageConn = storageconn.NewConnector(ts.Config.StorageConnection)
 
 	ts.Metrics = metrics.NewCollector()
-	ts.Router.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	ts.Router.GET("/metrics", gin.WrapH(promhttp.HandlerFor(ts.Metrics.Registerer, promhttp.HandlerOpts{
+		ErrorLog: logger.CreateWriter(logger.LogLevelError, "[Prometheus]"),
+	})))
 
 	return ts
 }

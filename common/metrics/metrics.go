@@ -11,6 +11,8 @@ const (
 )
 
 type Collector struct {
+	Registerer *prometheus.Registry
+
 	InvokerJobResults                *prometheus.CounterVec
 	InvokerTestingWaitDuration       *prometheus.CounterVec
 	InvokerSandboxOccupationDuration *prometheus.CounterVec
@@ -22,50 +24,52 @@ type Collector struct {
 }
 
 func NewCollector() *Collector {
-	c := &Collector{}
-	c.InvokerJobResults = createInvokerCounter(
+	c := &Collector{
+		Registerer: prometheus.NewRegistry(),
+	}
+	c.InvokerJobResults = c.createInvokerCounter(
 		"job_results_count",
 		"Number of job results received from invoker",
 	)
 
-	c.InvokerTestingWaitDuration = createInvokerCounter(
+	c.InvokerTestingWaitDuration = c.createInvokerCounter(
 		"testing_wait_duration_sum",
 		"Time submission waits for testing in invoker",
 	)
 
-	c.InvokerSandboxOccupationDuration = createInvokerCounter(
-		"sandbox_occupation_duration_sun",
+	c.InvokerSandboxOccupationDuration = c.createInvokerCounter(
+		"sandbox_occupation_duration_sum",
 		"Total sandbox time for submission testing in invoker",
 	)
 
-	c.InvokerResourceWaitDuration = createInvokerCounter(
+	c.InvokerResourceWaitDuration = c.createInvokerCounter(
 		"resource_wait_duration_sum",
 		"Total time spent waiting for resources for submissions to load in invokers",
 	)
 
-	c.InvokerFileActionsDuration = createInvokerCounter(
+	c.InvokerFileActionsDuration = c.createInvokerCounter(
 		"file_actions_duration_sum",
 		"Total time spent waiting for file copy to sandbox in invoker",
 	)
 
-	c.InvokerExecutionWaitDuration = createInvokerCounter(
+	c.InvokerExecutionWaitDuration = c.createInvokerCounter(
 		"execution_wait_duration_sum",
 		"Total time spent waiting for execution of process on invoker when sandbox is set up",
 	)
 
-	c.InvokerExecutionDuration = createInvokerCounter(
+	c.InvokerExecutionDuration = c.createInvokerCounter(
 		"execution_duration_sum",
 		"Total time spent on executing processes in sandboxes",
 	)
 
-	c.InvokerSendResultDuration = createInvokerCounter(
+	c.InvokerSendResultDuration = c.createInvokerCounter(
 		"send_result_duration_sum",
 		"Total time spent on sending results from invoker to storage",
 	)
 	return c
 }
 
-func createInvokerCounter(
+func (c *Collector) createInvokerCounter(
 	name string,
 	help string,
 ) *prometheus.CounterVec {
@@ -78,7 +82,7 @@ func createInvokerCounter(
 		},
 		[]string{invokerLabel, jobTypeLabel},
 	)
-	prometheus.MustRegister(counter)
+	c.Registerer.MustRegister(counter)
 	return counter
 }
 
