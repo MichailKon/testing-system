@@ -67,15 +67,15 @@ func (r *InvokerRegistry) HandleInvokerJobResult(result *masterconn.InvokerJobRe
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	invoker, exists := r.invokerByJobID[result.JobID]
+	invoker, exists := r.invokerByJobID[result.Job.ID]
 
 	if !exists {
-		logger.Trace("old or unknown job %s is tested", result.JobID)
+		logger.Trace("old or unknown job %s is tested", result.Job.ID)
 		return false
 	}
 
-	delete(r.invokerByJobID, result.JobID)
-	return invoker.JobTested(result.JobID)
+	delete(r.invokerByJobID, result.Job.ID)
+	return invoker.JobTested(result.Job.ID)
 }
 
 func (r *InvokerRegistry) SendJobs() {

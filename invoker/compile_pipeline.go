@@ -13,34 +13,28 @@ import (
 )
 
 func (i *Invoker) fullCompilationPipeline(sandbox sandbox.ISandbox, job *Job) {
-	s := &JobPipelineState{
-		job:        job,
-		invoker:    i,
-		sandbox:    sandbox,
-		compile:    new(pipelineCompileData),
-		loggerData: fmt.Sprintf("compile job: %s submission: %d", job.ID, job.Submission.ID),
-	}
-
-	s.defers = append(s.defers, job.deferFunc)
-	defer s.deferFunc()
+	s := i.newPipeline(sandbox, job)
+	s.compile = new(pipelineCompileData)
+	s.loggerData = fmt.Sprintf("compile job: %s submission: %d", job.ID, job.submission.ID)
+	defer s.checkFinish()
 
 	logger.Trace("Starting compilation for %s", s.loggerData)
 
 	err := s.compilationProcessPipeline()
 	if err != nil {
 		logger.Error("Error in %s error: %v", s.loggerData, err)
-		i.failJob(job, "job %s error: %v", job.ID, err)
+		s.failJob("job %s error: %v", job.ID, err)
 		return
 	}
 
 	err = s.uploadCompilationResources()
 	if err != nil {
 		logger.Error("Error in %s error: %v", s.loggerData, err)
-		i.failJob(job, "job %s error: %v", job.ID, err)
+		s.failJob("job %s error: %v", job.ID, err)
 		return
 	}
 
-	i.successJob(job, s.compile.result)
+	s.successJob(s.compile.result)
 }
 
 func (s *JobPipelineState) compilationProcessPipeline() error {
@@ -49,7 +43,7 @@ func (s *JobPipelineState) compilationProcessPipeline() error {
 		return err
 	}
 
-	err = s.loadSource()
+	err = s.loadSolutionSourceFile()
 	if err != nil {
 		return err
 	}
@@ -71,25 +65,11 @@ func (s *JobPipelineState) compilationProcessPipeline() error {
 	return nil
 }
 
-func (s *JobPipelineState) loadSource() error {
-	source, err := s.invoker.Storage.Source.Get(uint64(s.job.Submission.ID))
-	if err != nil {
-		return fmt.Errorf("can not get submission source, error: %v", err)
-	}
-	s.compile.sourceName = "source_" + filepath.Base(*source)
-	err = s.copyFileToSandbox(*source, s.compile.sourceName, 0644)
-	if err != nil {
-		return fmt.Errorf("can not copy submission source to sandbox, error: %v", err)
-	}
-	logger.Trace("Loaded source to sandbox for %s", s.loggerData)
-	return nil
-}
-
 func (s *JobPipelineState) setupCompileScript() error {
 	var ok bool
-	s.compile.language, ok = s.invoker.Compiler.Languages[s.job.Submission.Language]
+	s.compile.language, ok = s.invoker.Compiler.Languages[s.job.submission.Language]
 	if !ok {
-		return fmt.Errorf("submission language %s does not exist", s.job.Submission.Language)
+		return fmt.Errorf("submission language %s does not exist", s.job.submission.Language)
 	}
 	script, err := s.compile.language.GenerateScript(s.compile.sourceName, solutionBinaryFile)
 	if err != nil {
@@ -108,7 +88,7 @@ func (s *JobPipelineState) setupCompileScript() error {
 
 func (s *JobPipelineState) executeCompilationCommand() error {
 	s.executeWaitGroup.Add(1)
-	s.invoker.RunQueue <- s.runCompilationCommand
+	s.runProcess(s.runCompilationCommand)
 	s.executeWaitGroup.Wait()
 
 	if s.compile.result.Err != nil {
@@ -188,10 +168,10 @@ func (s *JobPipelineState) uploadCompilationResources() error {
 func (s *JobPipelineState) uploadCompileResult() error {
 	compileOutputStoreRequest := &storageconn.Request{
 		Resource: resource.CompileOutput,
-		SubmitID: uint64(s.job.Submission.ID),
+		SubmitID: uint64(s.job.submission.ID),
 		File:     s.compile.messageReader,
 	}
-	resp := s.invoker.TS.StorageConn.Upload(compileOutputStoreRequest)
+	resp := s.uploadResource(compileOutputStoreRequest)
 	if resp.Error != nil {
 		return fmt.Errorf("can not upload compile output to storage, error: %v", resp.Error.Error())
 	}

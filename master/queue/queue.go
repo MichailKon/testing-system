@@ -43,25 +43,25 @@ func (q *Queue) Submit(problem *models.Problem, submission *models.Submission) e
 func (q *Queue) JobCompleted(jobResult *masterconn.InvokerJobResult) (submission *models.Submission, err error) {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
-	wasID := jobResult.JobID
-	if origID, ok := q.jobIDToOriginalJobID[jobResult.JobID]; ok {
-		delete(q.jobIDToOriginalJobID, jobResult.JobID)
-		jobResult.JobID = origID
+	wasID := jobResult.Job.ID
+	if origID, ok := q.jobIDToOriginalJobID[jobResult.Job.ID]; ok {
+		delete(q.jobIDToOriginalJobID, jobResult.Job.ID)
+		jobResult.Job.ID = origID
 		defer func() {
-			jobResult.JobID = wasID
+			jobResult.Job.ID = wasID
 		}()
 	}
 
-	generator, ok := q.originalJobIDToGenerator[jobResult.JobID]
+	generator, ok := q.originalJobIDToGenerator[jobResult.Job.ID]
 	if !ok {
-		if wasID != jobResult.JobID {
+		if wasID != jobResult.Job.ID {
 			logger.Panic("Job has id=%v and origID=%v; was not found in originalJobIDToGenerator",
-				wasID, jobResult.JobID)
+				wasID, jobResult.Job.ID)
 		}
-		return nil, fmt.Errorf("no job with id=%v (origID=%v)", jobResult.JobID, wasID)
+		return nil, fmt.Errorf("no job with id=%v (origID=%v)", jobResult.Job.ID, wasID)
 	}
-	delete(q.originalJobIDToJob, jobResult.JobID)
-	delete(q.originalJobIDToGenerator, jobResult.JobID)
+	delete(q.originalJobIDToJob, jobResult.Job.ID)
+	delete(q.originalJobIDToGenerator, jobResult.Job.ID)
 
 	if _, ok = q.activeGeneratorIDs[generator.ID()]; !ok {
 		q.activeGenerators.PushBack(generator)

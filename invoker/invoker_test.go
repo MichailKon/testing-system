@@ -71,12 +71,12 @@ func (ts *testState) testCompile(submitID uint) *JobPipelineState {
 			SubmitID: submitID,
 			Type:     invokerconn.CompileJob,
 		},
-		Problem: &models.Problem{
+		problem: &models.Problem{
 			Model: gorm.Model{
 				ID: 1,
 			},
 		},
-		Submission: &models.Submission{
+		submission: &models.Submission{
 			Model: gorm.Model{
 				ID: submitID,
 			},
@@ -90,13 +90,9 @@ func (ts *testState) testCompile(submitID uint) *JobPipelineState {
 		uint64(submitID),
 	))
 
-	s := &JobPipelineState{
-		invoker:    ts.Invoker,
-		sandbox:    ts.Sandbox,
-		job:        job,
-		compile:    new(pipelineCompileData),
-		loggerData: fmt.Sprintf("compile job: %s submission: %d", job.ID, job.Submission.ID),
-	}
+	s := ts.Invoker.newPipeline(ts.Sandbox, job)
+	s.compile = new(pipelineCompileData)
+	s.loggerData = fmt.Sprintf("compile job: %s submission: %d", job.ID, job.submission.ID)
 
 	require.NoError(ts.t, s.compilationProcessPipeline())
 
@@ -130,11 +126,11 @@ func testCompileSandbox(t *testing.T, sandboxType string) {
 	require.NoError(t, cmd.Run())
 	require.Equal(t, "1", strings.TrimSpace(stdout.String()))
 
-	s.deferFunc()
+	s.finish()
 
 	s = ts.testCompile(2)
 	require.Equal(t, verdict.CE, s.compile.result.Verdict)
-	s.deferFunc()
+	s.finish()
 }
 
 func (ts *testState) addProblem(problemID uint) {
@@ -169,13 +165,13 @@ func (ts *testState) testRun(submitID uint, problemID uint) *sandbox.RunResult {
 			Type:     invokerconn.TestJob,
 			Test:     1,
 		},
-		Problem: &models.Problem{
+		problem: &models.Problem{
 			Model: gorm.Model{
 				ID: problemID,
 			},
 			TestsNumber: 1,
 		},
-		Submission: &models.Submission{
+		submission: &models.Submission{
 			Model: gorm.Model{
 				ID: submitID,
 			},
@@ -183,8 +179,8 @@ func (ts *testState) testRun(submitID uint, problemID uint) *sandbox.RunResult {
 			Language:  "cpp",
 		},
 	}
-	job.Problem.TimeLimit.FromStr("1s")
-	job.Problem.MemoryLimit.FromStr("100m")
+	job.problem.TimeLimit.FromStr("1s")
+	job.problem.MemoryLimit.FromStr("100m")
 
 	sourceDir := fmt.Sprintf("%s/binary/%d", ts.FilesDir, submitID)
 	cmd := exec.Command("g++", "source.cpp", "-std=c++17", "-o", "binary")
@@ -193,21 +189,17 @@ func (ts *testState) testRun(submitID uint, problemID uint) *sandbox.RunResult {
 
 	require.NoError(ts.t, ts.Invoker.Storage.Binary.Insert(filepath.Join(sourceDir, "binary"), uint64(submitID)))
 
-	s := &JobPipelineState{
-		job:     job,
-		invoker: ts.Invoker,
-		sandbox: ts.Sandbox,
-		test:    new(pipelineTestData),
-		loggerData: fmt.Sprintf(
-			"test job: %s submission: %d problem %d test %d",
-			job.ID,
-			job.Submission.ID,
-			job.Problem.ID,
-			job.Test,
-		),
-	}
+	s := ts.Invoker.newPipeline(ts.Sandbox, job)
+	s.test = new(pipelineTestData)
+	s.loggerData = fmt.Sprintf(
+		"test job: %s submission: %d problem %d test %d",
+		job.ID,
+		job.submission.ID,
+		job.problem.ID,
+		job.Test,
+	)
 
-	defer s.deferFunc()
+	defer s.finish()
 
 	require.NoError(ts.t, s.testingProcessPipeline())
 

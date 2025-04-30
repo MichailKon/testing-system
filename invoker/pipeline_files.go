@@ -7,7 +7,9 @@ import (
 	"path/filepath"
 	"testing_system/common/connectors/storageconn"
 	"testing_system/common/constants/resource"
+	"testing_system/invoker/storage"
 	"testing_system/lib/logger"
+	"time"
 )
 
 const (
@@ -24,7 +26,7 @@ const (
 )
 
 func (s *JobPipelineState) loadSolutionBinary() error {
-	binary, err := s.invoker.Storage.Binary.Get(uint64(s.job.Submission.ID))
+	binary, err := s.loadResource(s.invoker.Storage.Binary, uint64(s.job.submission.ID))
 	if err != nil {
 		return fmt.Errorf("can not get solution binary, error: %v", err)
 	}
@@ -37,7 +39,7 @@ func (s *JobPipelineState) loadSolutionBinary() error {
 }
 
 func (s *JobPipelineState) loadTestInput() error {
-	testInput, err := s.invoker.Storage.TestInput.Get(uint64(s.job.Problem.ID), s.job.Test)
+	testInput, err := s.loadResource(s.invoker.Storage.TestInput, uint64(s.job.problem.ID), s.job.Test)
 	if err != nil {
 		return fmt.Errorf("can not get test input, error: %v", err)
 	}
@@ -50,7 +52,7 @@ func (s *JobPipelineState) loadTestInput() error {
 }
 
 func (s *JobPipelineState) loadCheckerBinaryFile() error {
-	checker, err := s.invoker.Storage.Checker.Get(uint64(s.job.Problem.ID))
+	checker, err := s.loadResource(s.invoker.Storage.Checker, uint64(s.job.problem.ID))
 	if err != nil {
 		return fmt.Errorf("can not get checker binary, error: %v", err)
 	}
@@ -63,7 +65,7 @@ func (s *JobPipelineState) loadCheckerBinaryFile() error {
 }
 
 func (s *JobPipelineState) loadTestAnswerFile() error {
-	testAnswer, err := s.invoker.Storage.TestAnswer.Get(uint64(s.job.Problem.ID), s.job.Test)
+	testAnswer, err := s.loadResource(s.invoker.Storage.TestAnswer, uint64(s.job.problem.ID), s.job.Test)
 	if err != nil {
 		return fmt.Errorf("can not get test answer, error: %s", err.Error())
 	}
@@ -75,6 +77,23 @@ func (s *JobPipelineState) loadTestAnswerFile() error {
 	return nil
 }
 
+func (s *JobPipelineState) loadSolutionSourceFile() error {
+	source, err := s.loadResource(s.invoker.Storage.Source, uint64(s.job.submission.ID))
+	if err != nil {
+		return fmt.Errorf("can not get submission source, error: %v", err)
+	}
+	if s.compile == nil {
+		return fmt.Errorf("can not save solution source, pipeline compile field not initialized")
+	}
+	s.compile.sourceName = "source_" + filepath.Base(*source)
+	err = s.copyFileToSandbox(*source, s.compile.sourceName, 0644)
+	if err != nil {
+		return fmt.Errorf("can not copy submission source to sandbox, error: %v", err)
+	}
+	logger.Trace("Loaded source to sandbox for %s", s.loggerData)
+	return nil
+}
+
 func (s *JobPipelineState) uploadBinary() error {
 	reader, err := s.openSandboxFile(solutionBinaryFile, false)
 	if err != nil {
@@ -82,10 +101,10 @@ func (s *JobPipelineState) uploadBinary() error {
 	}
 	binaryStoreRequest := &storageconn.Request{
 		Resource: resource.CompiledBinary,
-		SubmitID: uint64(s.job.Submission.ID),
+		SubmitID: uint64(s.job.submission.ID),
 		File:     reader,
 	}
-	resp := s.invoker.TS.StorageConn.Upload(binaryStoreRequest)
+	resp := s.uploadResource(binaryStoreRequest)
 	if resp.Error != nil {
 		return fmt.Errorf("can not send solution binary file to storage, error: %v", resp.Error)
 	}
@@ -101,11 +120,11 @@ func (s *JobPipelineState) uploadOutput(fileName string, resourceType resource.T
 
 	outputStoreRequest := &storageconn.Request{
 		Resource: resourceType,
-		SubmitID: uint64(s.job.Submission.ID),
+		SubmitID: uint64(s.job.submission.ID),
 		TestID:   s.job.Test,
 		File:     reader,
 	}
-	resp := s.invoker.TS.StorageConn.Upload(outputStoreRequest)
+	resp := s.uploadResource(outputStoreRequest)
 	if resp.Error != nil {
 		return fmt.Errorf("can not upload %v file to storage, error: %v", resourceType, resp.Error)
 	}
@@ -114,6 +133,7 @@ func (s *JobPipelineState) uploadOutput(fileName string, resourceType resource.T
 }
 
 func (s *JobPipelineState) copyFileToSandbox(src string, dst string, perm os.FileMode) error {
+	start := time.Now()
 	srcReader, err := os.Open(src)
 	if err != nil {
 		return err
@@ -125,6 +145,8 @@ func (s *JobPipelineState) copyFileToSandbox(src string, dst string, perm os.Fil
 	}
 	defer dstWriter.Close()
 	_, err = io.Copy(dstWriter, srcReader)
+
+	s.metrics.FileActionsDuration += time.Since(start)
 	return nil
 }
 
@@ -146,4 +168,18 @@ func (s *JobPipelineState) limitedReader(r io.Reader) io.Reader {
 	} else {
 		return io.LimitReader(r, int64(*s.invoker.TS.Config.Invoker.SaveOutputHead))
 	}
+}
+
+func (s *JobPipelineState) loadResource(getter *storage.CacheGetter, args ...uint64) (*string, error) {
+	start := time.Now()
+	res, err := getter.Get(args...)
+	s.metrics.ResourceWaitDuration += time.Since(start)
+	return res, err
+}
+
+func (s *JobPipelineState) uploadResource(request *storageconn.Request) *storageconn.Response {
+	start := time.Now()
+	resp := s.invoker.TS.StorageConn.Upload(request)
+	s.metrics.SendResultDuration += time.Since(start)
+	return resp
 }
