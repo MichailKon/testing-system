@@ -62,7 +62,7 @@ func (t TestGroup) Value() (driver.Value, error) {
 func (t *TestGroup) Scan(value interface{}) error {
 	bytes, ok := value.([]byte)
 	if !ok {
-		return errors.New("type assertion to []byte failed")
+		return errors.New("type assertion to []byte failed while scanning TestGroup")
 	}
 	return json.Unmarshal(bytes, t)
 }
