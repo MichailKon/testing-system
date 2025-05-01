@@ -22,7 +22,7 @@ const (
 	ProblemTypeIOI
 )
 const (
-	// TestGroupScoringTypeComplete means that group costs TestGroup.GroupScore (all the tests should be OK)
+	// TestGroupScoringTypeComplete means that group costs TestGroup.Score (all the tests should be OK)
 	TestGroupScoringTypeComplete TestGroupScoringType = iota + 1
 	// TestGroupScoringTypeEachTest means that group score = TestGroup.TestScore * (number of tests with OK)
 	TestGroupScoringTypeEachTest
@@ -44,15 +44,15 @@ const (
 
 type TestGroup struct {
 	Name      string `json:"name" yaml:"name"`
-	FirstTest uint64 `json:"FirstTest" yaml:"FirstTest"`
-	LastTest  uint64 `json:"LastTest" yaml:"LastTest"`
+	FirstTest int    `json:"first_test" yaml:"first_test"`
+	LastTest  int    `json:"last_test" yaml:"last_test"`
 	// TestScore meaningful only in case of TestGroupScoringTypeEachTest
-	TestScore *float64 `json:"TestScore" yaml:"TestScore"`
-	// GroupScore meaningful only in case of TestGroupScoringTypeComplete
-	GroupScore         *float64              `json:"GroupScore" yaml:"GroupScore"`
-	ScoringType        TestGroupScoringType  `json:"ScoringType" yaml:"ScoringType"`
-	FeedbackType       TestGroupFeedbackType `json:"FeedbackType" yaml:"FeedbackType"`
-	RequiredGroupNames []string              `json:"RequiredGroupNames" yaml:"RequiredGroupNames"`
+	TestScore *float64 `json:"test_score" yaml:"test_score"`
+	// Score meaningful only in case of TestGroupScoringTypeComplete
+	Score              *float64              `json:"score" yaml:"score"`
+	ScoringType        TestGroupScoringType  `json:"scoring_type" yaml:"scoring_type"`
+	FeedbackType       TestGroupFeedbackType `json:"feedback_type" yaml:"feedback_type"`
+	RequiredGroupNames []string              `json:"required_groups" yaml:"required_groups"`
 }
 
 func (t TestGroup) Value() (driver.Value, error) {
@@ -62,7 +62,7 @@ func (t TestGroup) Value() (driver.Value, error) {
 func (t *TestGroup) Scan(value interface{}) error {
 	bytes, ok := value.([]byte)
 	if !ok {
-		return errors.New("type assertion to []byte failed while scanning TestGroup")
+		return errors.New("type assertion to []byte failed")
 	}
 	return json.Unmarshal(bytes, t)
 }
@@ -80,39 +80,17 @@ func (t TestGroup) GormDBDataType(db *gorm.DB, field *schema.Field) string {
 type Problem struct {
 	gorm.Model
 
-<<<<<<< HEAD
-	ProblemType ProblemType `yaml:"ProblemType"`
-
-	TimeLimit   customfields.Time   `yaml:"TimeLimit"`
-	MemoryLimit customfields.Memory `yaml:"MemoryLimit"`
-
-	TestsNumber uint64 `yaml:"TestsNumber"`
-	// TestGroups ignored for ICPC problems
-	TestGroups []TestGroup
-=======
 	ProblemType ProblemType
->>>>>>> f1bf2b0 (fixes and tests)
-
-	// WallTimeLimit specifies maximum execution and wait time.
-	// By default, it is max(5s, TimeLimit * 2)
-	WallTimeLimit *customfields.Time `yaml:"WallTimeLimit,omitempty"`
-
-<<<<<<< HEAD
-	// MaxOpenFiles specifies the maximum number of files, opened by testing system.
-	// By default, it is 64
-	MaxOpenFiles *uint64 `yaml:"MaxOpenFiles,omitempty"`
-=======
-	TestsNumber uint64
 	// TestGroups ignored for ICPC problems
 	TestGroups []TestGroup
->>>>>>> f1bf2b0 (fixes and tests)
 
-	// MaxThreads specifies the maximum number of threads and/or processes;
-	// By default, it is a single thread
-	// If MaxThreads equals to -1, any number of threads allowed
-	MaxThreads *int64 `yaml:"MaxThreads,omitempty"`
+	TimeLimit     customfields.Time
+	MemoryLimit   customfields.Memory
+	WallTimeLimit *customfields.Time
 
-	// MaxOutputSize specifies maximum output in EACH file.
-	// By default, it is 1g
-	MaxOutputSize *customfields.Memory `yaml:"MaxOutputSize,omitempty"`
+	TestsNumber uint64
+
+	MaxOpenFiles  *uint64
+	MaxThreads    *uint64
+	MaxOutputSize *customfields.Memory
 }
