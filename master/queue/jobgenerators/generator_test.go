@@ -11,23 +11,16 @@ import (
 	"testing_system/common/db/models"
 )
 
-func fixtureICPCProblem() *models.Problem {
-	return &models.Problem{
-		ProblemType: models.ProblemTypeICPC,
-		TestsNumber: 10,
-	}
-}
-
-func fixtureSubmission() *models.Submission {
+func fixtureSubmission(ID uint) *models.Submission {
 	submission := &models.Submission{}
-	submission.ID = 1
+	submission.ID = ID
 	return submission
 }
 
 func nextJob(t *testing.T, g Generator, SubmitID uint, jobType invokerconn.JobType, test uint64) *invokerconn.Job {
 	job := g.NextJob()
 	require.NotNil(t, job)
-	require.Equal(t, job.Type, jobType)
+	require.Equal(t, jobType, job.Type)
 	require.Equal(t, SubmitID, job.SubmitID)
 	require.Equal(t, test, job.Test)
 	return job
@@ -39,8 +32,16 @@ func noJobs(t *testing.T, g Generator) {
 }
 
 func TestICPCGenerator(t *testing.T) {
+	const fixtureICPCProblemTestsNumber = 10
+	fixtureICPCProblem := func() *models.Problem {
+		return &models.Problem{
+			ProblemType: models.ProblemTypeICPC,
+			TestsNumber: fixtureICPCProblemTestsNumber,
+		}
+	}
+
 	t.Run("Fail compilation", func(t *testing.T) {
-		problem, submission := fixtureICPCProblem(), fixtureSubmission()
+		problem, submission := fixtureICPCProblem(), fixtureSubmission(1)
 		g, err := NewGenerator(problem, submission)
 		require.Nil(t, err)
 		job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
@@ -61,7 +62,7 @@ func TestICPCGenerator(t *testing.T) {
 
 	t.Run("Straight tasks finishing", func(t *testing.T) {
 		problem := fixtureICPCProblem()
-		submission := fixtureSubmission()
+		submission := fixtureSubmission(1)
 		generator, err := NewGenerator(problem, submission)
 		require.Nil(t, err)
 		job := nextJob(t, generator, 1, invokerconn.CompileJob, 0)
@@ -72,7 +73,7 @@ func TestICPCGenerator(t *testing.T) {
 		})
 		require.Nil(t, sub)
 		require.Nil(t, err)
-		for i := range 9 {
+		for i := range fixtureICPCProblemTestsNumber - 1 {
 			job = nextJob(t, generator, 1, invokerconn.TestJob, uint64(i)+1)
 			sub, err = generator.JobCompleted(&masterconn.InvokerJobResult{
 				JobID:   job.ID,
@@ -81,7 +82,7 @@ func TestICPCGenerator(t *testing.T) {
 			require.Nil(t, sub)
 			require.Nil(t, err)
 		}
-		job = nextJob(t, generator, 1, invokerconn.TestJob, 10)
+		job = nextJob(t, generator, 1, invokerconn.TestJob, fixtureICPCProblemTestsNumber)
 		sub, err = generator.JobCompleted(&masterconn.InvokerJobResult{
 			JobID:   job.ID,
 			Verdict: verdict.OK,
@@ -100,7 +101,7 @@ func TestICPCGenerator(t *testing.T) {
 	t.Run("Tasks finishing", func(t *testing.T) {
 		prepare := func() (Generator, []string) {
 			problem := fixtureICPCProblem()
-			submission := fixtureSubmission()
+			submission := fixtureSubmission(1)
 			g, err := NewGenerator(problem, submission)
 			require.Nil(t, err)
 			job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
@@ -118,7 +119,7 @@ func TestICPCGenerator(t *testing.T) {
 			return g, firstTwoJobIDs
 		}
 		finishOtherTests := func(g Generator) {
-			for i := 2; i < 9; i++ {
+			for i := 2; i < fixtureICPCProblemTestsNumber-1; i++ {
 				job := nextJob(t, g, 1, invokerconn.TestJob, uint64(i)+1)
 				sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
 					JobID:   job.ID,
@@ -229,7 +230,7 @@ func TestICPCGenerator(t *testing.T) {
 	})
 
 	t.Run("Finish same job twice", func(t *testing.T) {
-		problem, submission := fixtureICPCProblem(), fixtureSubmission()
+		problem, submission := fixtureICPCProblem(), fixtureSubmission(1)
 		g, err := NewGenerator(problem, submission)
 		require.Nil(t, err)
 		job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
@@ -274,7 +275,7 @@ func TestIOIGenerator(t *testing.T) {
 				},
 				TestsNumber: 1,
 			},
-			// type Complete, but Score is nil
+			// type Complete, but GroupScore is nil
 			{
 				ProblemType: models.ProblemTypeIOI,
 				TestGroups: []models.TestGroup{
@@ -282,7 +283,7 @@ func TestIOIGenerator(t *testing.T) {
 						Name:               "name",
 						FirstTest:          1,
 						LastTest:           1,
-						Score:              nil,
+						GroupScore:         nil,
 						ScoringType:        models.TestGroupScoringTypeComplete,
 						RequiredGroupNames: make([]string, 0),
 					},
@@ -386,7 +387,7 @@ func TestIOIGenerator(t *testing.T) {
 				FirstTest:          1,
 				LastTest:           10,
 				TestScore:          nil,
-				Score:              pointer.Float64(100),
+				GroupScore:         pointer.Float64(100),
 				ScoringType:        models.TestGroupScoringTypeComplete,
 				RequiredGroupNames: make([]string, 0),
 			},
@@ -394,7 +395,7 @@ func TestIOIGenerator(t *testing.T) {
 	}
 
 	t.Run("Fail compilation", func(t *testing.T) {
-		submission := fixtureSubmission()
+		submission := fixtureSubmission(1)
 		wasProblem := problemWithOneGroup
 		g, err := NewGenerator(&problemWithOneGroup, submission)
 		require.Nil(t, err)
@@ -424,7 +425,7 @@ func TestIOIGenerator(t *testing.T) {
 
 	t.Run("Straight task finishing", func(t *testing.T) {
 		wasProblem := problemWithOneGroup
-		submission := fixtureSubmission()
+		submission := fixtureSubmission(1)
 		generator, err := NewGenerator(&problemWithOneGroup, submission)
 		require.Nil(t, err)
 		job := nextJob(t, generator, 1, invokerconn.CompileJob, 0)
@@ -480,7 +481,7 @@ func TestIOIGenerator(t *testing.T) {
 						FirstTest:          1,
 						LastTest:           1,
 						TestScore:          nil,
-						Score:              pointer.Float64(50),
+						GroupScore:         pointer.Float64(50),
 						ScoringType:        models.TestGroupScoringTypeComplete,
 						RequiredGroupNames: make([]string, 0),
 					},
@@ -489,7 +490,7 @@ func TestIOIGenerator(t *testing.T) {
 						FirstTest:          2,
 						LastTest:           2,
 						TestScore:          nil,
-						Score:              pointer.Float64(50),
+						GroupScore:         pointer.Float64(50),
 						ScoringType:        models.TestGroupScoringTypeComplete,
 						RequiredGroupNames: []string{"group1"},
 					},
@@ -674,7 +675,7 @@ func TestIOIGenerator(t *testing.T) {
 						FirstTest:          1,
 						LastTest:           2,
 						TestScore:          nil,
-						Score:              pointer.Float64(100),
+						GroupScore:         pointer.Float64(100),
 						ScoringType:        models.TestGroupScoringTypeComplete,
 						RequiredGroupNames: make([]string, 0),
 					},
@@ -728,7 +729,7 @@ func TestIOIGenerator(t *testing.T) {
 					},
 				},
 			}
-			g, err := NewIOIGenerator(&problem, fixtureSubmission())
+			g, err := NewIOIGenerator(&problem, fixtureSubmission(1))
 			require.NoError(t, err)
 			job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
 			require.NotNil(t, job)
@@ -789,7 +790,7 @@ func TestIOIGenerator(t *testing.T) {
 						Name:               "group1",
 						FirstTest:          1,
 						LastTest:           3,
-						Score:              pointer.Float64(20),
+						GroupScore:         pointer.Float64(20),
 						ScoringType:        models.TestGroupScoringTypeMin,
 						RequiredGroupNames: make([]string, 0),
 					},
@@ -799,7 +800,7 @@ func TestIOIGenerator(t *testing.T) {
 
 		t.Run("WA in the middle of the group", func(t *testing.T) {
 			problem := prepare()
-			g, err := NewIOIGenerator(&problem, fixtureSubmission())
+			g, err := NewIOIGenerator(&problem, fixtureSubmission(1))
 			require.NoError(t, err)
 			job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
 			require.NotNil(t, job)
@@ -851,7 +852,7 @@ func TestIOIGenerator(t *testing.T) {
 
 		t.Run("PT in the middle of the group", func(t *testing.T) {
 			problem := prepare()
-			g, err := NewIOIGenerator(&problem, fixtureSubmission())
+			g, err := NewIOIGenerator(&problem, fixtureSubmission(1))
 			require.NoError(t, err)
 			job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
 			require.NotNil(t, job)
@@ -904,7 +905,7 @@ func TestIOIGenerator(t *testing.T) {
 
 		t.Run("no fails", func(t *testing.T) {
 			problem := prepare()
-			g, err := NewIOIGenerator(&problem, fixtureSubmission())
+			g, err := NewIOIGenerator(&problem, fixtureSubmission(1))
 			require.NoError(t, err)
 			job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
 			require.NotNil(t, job)

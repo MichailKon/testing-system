@@ -22,7 +22,7 @@ const (
 	ProblemTypeIOI
 )
 const (
-	// TestGroupScoringTypeComplete means that group costs TestGroup.Score (all the tests should be OK)
+	// TestGroupScoringTypeComplete means that group costs TestGroup.GroupScore (all the tests should be OK)
 	TestGroupScoringTypeComplete TestGroupScoringType = iota + 1
 	// TestGroupScoringTypeEachTest means that group score = TestGroup.TestScore * (number of tests with OK)
 	TestGroupScoringTypeEachTest
@@ -44,12 +44,12 @@ const (
 
 type TestGroup struct {
 	Name      string `json:"name" yaml:"name"`
-	FirstTest int    `json:"FirstTest" yaml:"FirstTest"`
-	LastTest  int    `json:"LastTest" yaml:"LastTest"`
+	FirstTest uint64 `json:"FirstTest" yaml:"FirstTest"`
+	LastTest  uint64 `json:"LastTest" yaml:"LastTest"`
 	// TestScore meaningful only in case of TestGroupScoringTypeEachTest
 	TestScore *float64 `json:"TestScore" yaml:"TestScore"`
-	// Score meaningful only in case of TestGroupScoringTypeComplete
-	Score              *float64              `json:"Score" yaml:"Score"`
+	// GroupScore meaningful only in case of TestGroupScoringTypeComplete
+	GroupScore         *float64              `json:"GroupScore" yaml:"GroupScore"`
 	ScoringType        TestGroupScoringType  `json:"ScoringType" yaml:"ScoringType"`
 	FeedbackType       TestGroupFeedbackType `json:"FeedbackType" yaml:"FeedbackType"`
 	RequiredGroupNames []string              `json:"RequiredGroupNames" yaml:"RequiredGroupNames"`
