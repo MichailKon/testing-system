@@ -79,8 +79,8 @@ type Submission struct {
 	ProblemID uint64 `json:"ProblemID" yaml:"ProblemID"`
 	Language  string `json:"Language" yaml:"Language"`
 
-	Score        float64         `json:"GroupScore" yaml:"GroupScore"`
+	Score        float64         `json:"Score" yaml:"Score"`
 	Verdict      verdict.Verdict `json:"Verdict" yaml:"Verdict"`
-	TestResults  TestResults     `gorm:"type:jsonb" json:"TestResults" yaml:"TestResults"`
-	GroupResults GroupResults
+	TestResults  TestResults     `json:"TestResults" yaml:"TestResults"`
+	GroupResults GroupResults    `json:"GroupResults" yaml:"GroupResults"`
 }

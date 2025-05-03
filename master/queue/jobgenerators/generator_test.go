@@ -711,6 +711,96 @@ func TestIOIGenerator(t *testing.T) {
 				},
 			})
 		})
+
+		t.Run("OK, run, FAIL, get", func(t *testing.T) {
+			baseStat := &masterconn.JobResultStatistics{
+				Time:     100,
+				Memory:   100,
+				WallTime: 100,
+				ExitCode: 0,
+			}
+			problem := models.Problem{
+				ProblemType: models.ProblemTypeIOI,
+				TestsNumber: 4,
+				TestGroups: []models.TestGroup{
+					{
+						Name:               "group1",
+						FirstTest:          1,
+						LastTest:           4,
+						TestScore:          nil,
+						GroupScore:         pointer.Float64(100),
+						ScoringType:        models.TestGroupScoringTypeComplete,
+						RequiredGroupNames: make([]string, 0),
+					},
+				},
+			}
+			gen, err := NewGenerator(&problem, fixtureSubmission(1))
+			require.NoError(t, err)
+			job := nextJob(t, gen, 1, invokerconn.CompileJob, 0)
+			sub, err := gen.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:   job.ID,
+				Verdict: verdict.CD,
+			})
+			require.Nil(t, sub)
+			require.NoError(t, err)
+			job1 := nextJob(t, gen, 1, invokerconn.TestJob, 1)
+			job2 := nextJob(t, gen, 1, invokerconn.TestJob, 2)
+			job3 := nextJob(t, gen, 1, invokerconn.TestJob, 3)
+			// now finish 1 and 3
+			sub, err = gen.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:   job1.ID,
+				Verdict: verdict.OK,
+			})
+			require.NoError(t, err)
+			require.Nil(t, sub)
+			sub, err = gen.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:      job3.ID,
+				Verdict:    verdict.WA,
+				Statistics: baseStat,
+			})
+			// this group is already failed, so the generator should not return any job
+			require.Nil(t, gen.NextJob())
+			sub, err = gen.JobCompleted(&masterconn.InvokerJobResult{
+				JobID:      job2.ID,
+				Verdict:    verdict.TL,
+				Statistics: baseStat,
+			})
+			require.NoError(t, err)
+			require.Nil(t, gen.NextJob())
+			require.NotNil(t, sub)
+
+			require.Equal(t, verdict.PT, sub.Verdict)
+			require.Equal(t, 0., sub.Score)
+			require.Equal(t, sub.GroupResults, models.GroupResults{
+				{
+					GroupName: "group1",
+					Points:    0.,
+					Passed:    false,
+				},
+			})
+			require.Equal(t, models.TestResult{
+				TestNumber: 1,
+				Points:     nil,
+				Verdict:    verdict.OK,
+			}, sub.TestResults[0])
+			require.Equal(t, models.TestResult{
+				TestNumber: 2,
+				Points:     nil,
+				Verdict:    verdict.TL,
+				Time:       100,
+				Memory:     100,
+			}, sub.TestResults[1])
+			require.Equal(t, models.TestResult{
+				TestNumber: 3,
+				Points:     nil,
+				Verdict:    verdict.SK,
+			}, sub.TestResults[2])
+			require.Equal(t, models.TestResult{
+				TestNumber: 4,
+				Points:     nil,
+				Verdict:    verdict.SK,
+			}, sub.TestResults[3])
+		})
 	})
 
 	t.Run("Fails in TestGroupScoringTypeEachTest", func(t *testing.T) {

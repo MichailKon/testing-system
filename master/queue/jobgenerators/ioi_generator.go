@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/xorcare/pointer"
-	"math"
 	"slices"
 	"sync"
 	"testing_system/common/connectors/invokerconn"
@@ -26,19 +25,13 @@ type IOIGenerator struct {
 	testNumberToGroupName   map[uint64]string
 	internalTestResults     []*internalTestResult
 
-	// firstNotCompletedTest = the longest prefix of the tests, for which we know verdict
+	// firstNotCompletedTest = the longest prefix of the tests, for which we know verdict; 1-based indexing
 	firstNotCompletedTest uint64
-	// firstNotCompletedGroup = the longest prefix of the groups, for which we know verdict
+	// firstNotCompletedGroup = the longest prefix of the groups, for which we know verdict; 1-based indexing
 	firstNotCompletedGroup uint64
-	firstUnseenTest        uint64
+	// firstNotGivenTest = first test with internalTestState = testNotGiven; 1-based indexing
+	firstNotGivenTest uint64
 }
-
-type internalGroupState int
-
-const (
-	groupRunning internalGroupState = iota
-	groupFailed                     // if the group isn't failed and completed, it will still have groupRunning state
-)
 
 type internalTestState int
 
@@ -49,8 +42,8 @@ const (
 )
 
 type internalGroupInfo struct {
-	state           internalGroupState
-	shouldSkipTests bool
+	shouldGiveNewJobs           bool
+	shouldMarkFinalTestsSkipped bool
 }
 
 type internalTestResult struct {
@@ -125,8 +118,8 @@ func (i *IOIGenerator) prepareGenerator() error {
 		}
 		i.groupNameToGroupInfo[group.Name] = group
 		i.groupNameToInternalInfo[group.Name] = &internalGroupInfo{
-			state:           groupRunning,
-			shouldSkipTests: false,
+			shouldGiveNewJobs:           true,
+			shouldMarkFinalTestsSkipped: false,
 		}
 	}
 	return i.checkIfGroupsDependenciesOK(problem)
@@ -139,7 +132,7 @@ func (i *IOIGenerator) ID() string {
 func (i *IOIGenerator) NextJob() *invokerconn.Job {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
-	if i.state == compilationFinished && i.firstUnseenTest > i.problem.TestsNumber {
+	if i.state == compilationFinished && i.firstNotGivenTest > i.problem.TestsNumber {
 		return nil
 	}
 	if i.state == compilationStarted {
@@ -160,36 +153,24 @@ func (i *IOIGenerator) NextJob() *invokerconn.Job {
 		return job
 	}
 	job.Type = invokerconn.TestJob
-	for i.firstUnseenTest < i.problem.TestsNumber {
-		groupName := i.testNumberToGroupName[i.firstUnseenTest]
+	for i.firstNotGivenTest <= i.problem.TestsNumber {
+		groupName := i.testNumberToGroupName[i.firstNotGivenTest-1]
 		groupInfo := i.groupNameToInternalInfo[groupName]
-		if groupInfo.shouldSkipTests {
-			i.firstUnseenTest++
+		if !groupInfo.shouldGiveNewJobs {
+			i.internalTestResults[i.firstNotGivenTest-1].state = testFinished
+			i.firstNotGivenTest++
 			continue
 		}
-		i.internalTestResults[i.firstUnseenTest].state = testRunning
-		i.firstUnseenTest++
-		job.Test = i.firstUnseenTest
+		i.internalTestResults[i.firstNotGivenTest-1].state = testRunning
+		job.Test = i.firstNotGivenTest
 		i.givenJobs[job.ID] = job
+		i.firstNotGivenTest++
 		return job
 	}
 	return nil
 }
 
-func isTestFailed(testGroupInfo models.TestGroup, testVerdict verdict.Verdict) bool {
-	switch testGroupInfo.ScoringType {
-	case models.TestGroupScoringTypeComplete:
-		return testVerdict != verdict.OK
-	case models.TestGroupScoringTypeEachTest:
-		return testVerdict != verdict.OK
-	case models.TestGroupScoringTypeMin:
-		return testVerdict != verdict.OK
-	default:
-		panic(fmt.Sprintf("unknown testGroupInfo.ScoringType %v", testGroupInfo.ScoringType))
-	}
-}
-
-func shouldSkipNewTests(testGroupInfo models.TestGroup, testVerdict verdict.Verdict) bool {
+func doesTestPreventTestingGroup(testGroupInfo models.TestGroup, testVerdict verdict.Verdict) bool {
 	switch testGroupInfo.ScoringType {
 	case models.TestGroupScoringTypeComplete:
 		return testVerdict != verdict.OK
@@ -198,75 +179,107 @@ func shouldSkipNewTests(testGroupInfo models.TestGroup, testVerdict verdict.Verd
 	case models.TestGroupScoringTypeMin:
 		return testVerdict != verdict.OK && testVerdict != verdict.PT
 	default:
-		panic(fmt.Sprintf("unknown testGroupInfo.ScoringType %v", testGroupInfo.ScoringType))
+		logger.Panic("unknown testGroupInfo.ScoringType %v", testGroupInfo.ScoringType)
 	}
+	return false
+}
+
+func (i *IOIGenerator) calcGroupVerdict(
+	groupInfo models.TestGroup) verdict.Verdict {
+	firstTest, lastTest := groupInfo.FirstTest, groupInfo.LastTest
+	if slices.IndexFunc(i.submission.TestResults[firstTest-1:lastTest], func(result models.TestResult) bool {
+		return result.Verdict != verdict.OK
+	}) != -1 {
+		return verdict.PT
+	} else {
+		return verdict.OK
+	}
+}
+
+func (i *IOIGenerator) completeGroupTesting(groupInfo models.TestGroup) {
+	if i.firstNotCompletedTest != groupInfo.LastTest {
+		logger.Panic("completeGroupTesting called, but wasn't finished right now")
+	}
+	score := 0.0
+	groupVerdict := i.calcGroupVerdict(groupInfo)
+	switch groupInfo.ScoringType {
+	case models.TestGroupScoringTypeComplete:
+		if groupVerdict == verdict.OK {
+			score = *groupInfo.GroupScore
+		}
+	case models.TestGroupScoringTypeEachTest:
+		for testNumber := groupInfo.FirstTest; testNumber <= groupInfo.LastTest; testNumber++ {
+			testScore := i.submission.TestResults[testNumber-1].Points
+			if testScore == nil {
+				logger.Panic("test %v has <nil> points in group %v", testNumber, groupInfo.Name)
+			} else {
+				score += *testScore
+			}
+		}
+	case models.TestGroupScoringTypeMin:
+		score = *groupInfo.GroupScore
+		for testNumber := groupInfo.FirstTest; testNumber <= groupInfo.LastTest; testNumber++ {
+			testScore := i.submission.TestResults[testNumber-1].Points
+			if testScore == nil {
+				if i.submission.TestResults[testNumber-1].Verdict != verdict.SK {
+					logger.Panic("test %v has <nil> points in group %v", testNumber, groupInfo.Name)
+				} else {
+					score = 0
+				}
+			} else {
+				score = min(score, *testScore)
+			}
+		}
+	}
+	i.submission.GroupResults = append(i.submission.GroupResults, models.GroupResult{
+		GroupName: groupInfo.Name,
+		Points:    score,
+		Passed:    groupVerdict == verdict.OK,
+	})
+	i.firstNotCompletedGroup++
 }
 
 // increaseCompletedTestsAndGroups must be done with acquired mutex
 func (i *IOIGenerator) increaseCompletedTestsAndGroups() {
 TestsLoop:
-	for i.firstNotCompletedTest != i.problem.TestsNumber {
-		testGroupName := i.testNumberToGroupName[i.firstNotCompletedTest]
+	for i.firstNotCompletedTest <= i.problem.TestsNumber {
+		testGroupName := i.testNumberToGroupName[i.firstNotCompletedTest-1]
 		testGroupInfo := i.groupNameToGroupInfo[testGroupName]
 		testInternalGroupInfo := i.groupNameToInternalInfo[testGroupName]
-		switch i.internalTestResults[i.firstNotCompletedTest].state {
+		switch i.internalTestResults[i.firstNotCompletedTest-1].state {
 		case testNotGiven:
-			if !testInternalGroupInfo.shouldSkipTests {
+			if !testInternalGroupInfo.shouldMarkFinalTestsSkipped {
 				break TestsLoop
 			}
 		case testRunning:
 			break TestsLoop
 		case testFinished:
 		}
-		i.submission.TestResults = append(i.submission.TestResults,
-			*i.internalTestResults[i.firstNotCompletedTest].result)
-		if !testInternalGroupInfo.shouldSkipTests {
-			if shouldSkipNewTests(testGroupInfo, i.submission.TestResults[i.firstNotCompletedTest].Verdict) {
-				testInternalGroupInfo.shouldSkipTests = true
-				// update shouldSkipTests
+
+		if testInternalGroupInfo.shouldMarkFinalTestsSkipped {
+			i.submission.TestResults = append(i.submission.TestResults,
+				models.TestResult{
+					TestNumber: i.internalTestResults[i.firstNotCompletedTest-1].result.TestNumber,
+					Verdict:    verdict.SK,
+				})
+		} else {
+			i.submission.TestResults = append(i.submission.TestResults,
+				*i.internalTestResults[i.firstNotCompletedTest-1].result)
+			testVerdict := i.internalTestResults[i.firstNotCompletedTest-1].result.Verdict
+			if doesTestPreventTestingGroup(testGroupInfo, testVerdict) {
+				testInternalGroupInfo.shouldMarkFinalTestsSkipped = true
 				for _, group := range i.problem.TestGroups {
 					for _, requiredGroupName := range group.RequiredGroupNames {
-						if i.groupNameToInternalInfo[requiredGroupName].shouldSkipTests {
-							i.groupNameToInternalInfo[group.Name].shouldSkipTests = true
+						if i.groupNameToInternalInfo[requiredGroupName].shouldMarkFinalTestsSkipped {
+							i.groupNameToInternalInfo[group.Name].shouldMarkFinalTestsSkipped = true
 						}
 					}
 				}
 			}
-		} else {
-			i.submission.TestResults[i.firstNotCompletedTest].Verdict = verdict.SK
 		}
-		if i.firstNotCompletedTest+1 == testGroupInfo.LastTest {
-			score := 0.0
-			switch testGroupInfo.ScoringType {
-			case models.TestGroupScoringTypeComplete:
-				if testInternalGroupInfo.state != groupFailed {
-					score = *testGroupInfo.GroupScore
-				}
-			case models.TestGroupScoringTypeEachTest:
-				for testNumber := testGroupInfo.FirstTest - 1; testNumber < testGroupInfo.LastTest; testNumber++ {
-					if testScore := i.submission.TestResults[testNumber].Points; testScore != nil {
-						score += *testScore
-					}
-				}
-			case models.TestGroupScoringTypeMin:
-				score = math.Inf(+1)
-				for testNumber := testGroupInfo.FirstTest - 1; testNumber < testGroupInfo.LastTest; testNumber++ {
-					if testScore := i.submission.TestResults[testNumber].Points; testScore != nil {
-						score = min(score, *testScore)
-					} else {
-						score = 0.0
-					}
-				}
-				if score == math.Inf(+1) {
-					score = 0
-				}
-			}
-			i.submission.GroupResults = append(i.submission.GroupResults, models.GroupResult{
-				GroupName: testGroupName,
-				Points:    score,
-				Passed:    testInternalGroupInfo.state != groupFailed,
-			})
-			i.firstNotCompletedGroup++
+
+		if i.firstNotCompletedTest == testGroupInfo.LastTest {
+			i.completeGroupTesting(testGroupInfo)
 		}
 		i.firstNotCompletedTest++
 	}
@@ -283,18 +296,20 @@ func (i *IOIGenerator) compileJobCompleted(job *invokerconn.Job, result *masterc
 		return nil, nil
 	case verdict.CE:
 		i.submission.Verdict = verdict.CE
-		for _, group := range i.problem.TestGroups {
-			i.submission.GroupResults = append(i.submission.GroupResults, models.GroupResult{
-				GroupName: group.Name,
-				Points:    0,
-				Passed:    false,
-			})
-		}
 		for t := range i.problem.TestsNumber {
-			i.submission.TestResults = append(i.submission.TestResults, models.TestResult{
-				TestNumber: t + 1,
-				Verdict:    verdict.SK,
-			})
+			i.internalTestResults[t] = &internalTestResult{
+				result: &models.TestResult{
+					TestNumber: t + 1,
+					Points:     nil,
+					Verdict:    verdict.SK,
+				},
+				state: testFinished,
+			}
+		}
+		i.increaseCompletedTestsAndGroups()
+		if i.firstNotCompletedTest <= i.problem.TestsNumber ||
+			int(i.firstNotCompletedGroup) <= len(i.problem.TestGroups) {
+			logger.Panic("not all tests got verdict after CE")
 		}
 		return i.submission, nil
 	default:
@@ -327,9 +342,62 @@ func populateTestJobResult(groupInfo models.TestGroup, result *masterconn.Invoke
 			}
 		}
 	default:
-		panic(fmt.Sprintf("unknown group scoring type: %v", groupInfo.ScoringType))
+		logger.Panic("unknown group scoring type: %v", groupInfo.ScoringType)
 	}
 	return nil
+}
+
+func (i *IOIGenerator) stopGivingNewTestsIfNeeded(
+	testInternalGroupInfo *internalGroupInfo, testGroupInfo models.TestGroup, testVerdict verdict.Verdict) {
+	if !doesTestPreventTestingGroup(testGroupInfo, testVerdict) {
+		return
+	}
+
+	testInternalGroupInfo.shouldGiveNewJobs = false
+	for _, group := range i.problem.TestGroups {
+		for _, requiredGroupName := range group.RequiredGroupNames {
+			if !i.groupNameToInternalInfo[requiredGroupName].shouldGiveNewJobs {
+				i.groupNameToInternalInfo[group.Name].shouldGiveNewJobs = false
+				break
+			}
+		}
+	}
+}
+
+func (i *IOIGenerator) setFinalScoreAndVerdict() {
+	if len(i.givenJobs) != 0 {
+		logger.Panic("setFinalScoreAndVerdict called, but there are some jobs still")
+	}
+	if i.firstNotCompletedTest != i.problem.TestsNumber+1 {
+		logger.Panic("setFinalScoreAndVerdict called, but not all the tests were completed")
+	}
+	if len(i.submission.GroupResults) != len(i.problem.TestGroups) {
+		logger.Panic("for some reason \"len(i.submission.GroupResults) != len(i.problem.TestGroups)\"")
+	}
+	if len(i.submission.TestResults) != int(i.problem.TestsNumber) {
+		logger.Panic("for some reason \"len(i.submission.TestResults) != int(i.problem.TestsNumber)\"")
+	}
+	for _, groupResult := range i.submission.GroupResults {
+		i.submission.Score += groupResult.Points
+	}
+
+	hasSkipped := false
+	hasVerdict := false
+	for _, testResult := range i.submission.TestResults {
+		if testResult.Verdict != verdict.OK && testResult.Verdict != verdict.SK {
+			i.submission.Verdict = verdict.PT
+			hasVerdict = true
+		} else if testResult.Verdict == verdict.SK {
+			hasSkipped = true
+		}
+	}
+	if !hasVerdict {
+		if hasSkipped {
+			logger.Panic("problem does not have verdict, but have skipped tests")
+		}
+		i.submission.Verdict = verdict.OK
+	}
+	return
 }
 
 // testJobCompleted must be done with acquired mutex
@@ -337,8 +405,7 @@ func (i *IOIGenerator) testJobCompleted(job *invokerconn.Job, result *masterconn
 	if job.Type != invokerconn.TestJob {
 		return nil, fmt.Errorf("job type %v is not test job", job.ID)
 	}
-	test := job.Test - 1
-	testGroupName := i.testNumberToGroupName[test]
+	testGroupName := i.testNumberToGroupName[job.Test-1]
 	testGroupInfo := i.groupNameToGroupInfo[testGroupName]
 	testInternalGroupInfo := i.groupNameToInternalInfo[testGroupName]
 	// move info from result to internal state
@@ -352,54 +419,19 @@ func (i *IOIGenerator) testJobCompleted(job *invokerconn.Job, result *masterconn
 		}
 		result.Error += err.Error()
 	}
-	i.internalTestResults[test].result.Points = result.Points
-	i.internalTestResults[test].result.Verdict = result.Verdict
-	i.internalTestResults[test].result.Error = result.Error
+	i.internalTestResults[job.Test-1].result.Points = result.Points
+	i.internalTestResults[job.Test-1].result.Verdict = result.Verdict
+	i.internalTestResults[job.Test-1].result.Error = result.Error
 	if result.Statistics != nil {
-		i.internalTestResults[test].result.Time = result.Statistics.Time
-		i.internalTestResults[test].result.Memory = result.Statistics.Memory
+		i.internalTestResults[job.Test-1].result.Time = result.Statistics.Time
+		i.internalTestResults[job.Test-1].result.Memory = result.Statistics.Memory
 	}
-	i.internalTestResults[test].state = testFinished
+	i.internalTestResults[job.Test-1].state = testFinished
 
-	if isTestFailed(testGroupInfo, result.Verdict) {
-		testInternalGroupInfo.state = groupFailed
-		for _, group := range i.problem.TestGroups {
-			for _, requiredGroupName := range group.RequiredGroupNames {
-				if i.groupNameToInternalInfo[requiredGroupName].state == groupFailed {
-					i.groupNameToInternalInfo[group.Name].state = groupFailed
-					break
-				}
-			}
-		}
-	}
 	i.increaseCompletedTestsAndGroups()
-	if i.firstNotCompletedTest == i.problem.TestsNumber && len(i.givenJobs) == 0 {
-		if len(i.submission.GroupResults) != len(i.problem.TestGroups) {
-			panic("for some reason \"len(i.submission.GroupResults) != len(i.problem.TestGroups)\"")
-		}
-		if len(i.submission.TestResults) != int(i.problem.TestsNumber) {
-			panic("for some reason \"len(i.submission.TestResults) != int(i.problem.TestsNumber)\"")
-		}
-		for _, groupResult := range i.submission.GroupResults {
-			i.submission.Score += groupResult.Points
-		}
-
-		haveSkipped := false
-		haveVerdict := false
-		for _, testResult := range i.submission.TestResults {
-			if testResult.Verdict != verdict.OK && testResult.Verdict != verdict.SK {
-				i.submission.Verdict = verdict.PT
-				haveVerdict = true
-			} else if testResult.Verdict == verdict.SK {
-				haveSkipped = true
-			}
-		}
-		if !haveVerdict {
-			if haveSkipped {
-				panic("problem does not have verdict, but have skipped tests")
-			}
-			i.submission.Verdict = verdict.OK
-		}
+	i.stopGivingNewTestsIfNeeded(testInternalGroupInfo, testGroupInfo, result.Verdict)
+	if i.firstNotCompletedTest > i.problem.TestsNumber && len(i.givenJobs) == 0 {
+		i.setFinalScoreAndVerdict()
 		return i.submission, nil
 	}
 	return nil, nil
@@ -438,9 +470,9 @@ func NewIOIGenerator(problem *models.Problem, submission *models.Submission) (Ge
 		groupNameToInternalInfo: make(map[string]*internalGroupInfo),
 		testNumberToGroupName:   make(map[uint64]string),
 		internalTestResults:     make([]*internalTestResult, 0),
-		firstNotCompletedTest:   0,
-		firstNotCompletedGroup:  0,
-		firstUnseenTest:         0,
+		firstNotCompletedTest:   1,
+		firstNotCompletedGroup:  1,
+		firstNotGivenTest:       1,
 	}
 	if err = generator.prepareGenerator(); err != nil {
 		return nil, err

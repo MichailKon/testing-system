@@ -11,16 +11,14 @@ import (
 
 type ProblemType int
 
-// TestGroupScoringType sets how should scheduler set points for a group
-type TestGroupScoringType int
-
-// TestGroupFeedbackType sets which info about tests in a group would be shown
-type TestGroupFeedbackType int
-
 const (
 	ProblemTypeICPC ProblemType = iota + 1
 	ProblemTypeIOI
 )
+
+// TestGroupScoringType sets how should scheduler set points for a group
+type TestGroupScoringType int
+
 const (
 	// TestGroupScoringTypeComplete means that group costs TestGroup.GroupScore (all the tests should be OK)
 	TestGroupScoringTypeComplete TestGroupScoringType = iota + 1
@@ -29,6 +27,10 @@ const (
 	// TestGroupScoringTypeMin means that group score = min(checker's scores among all the tests)
 	TestGroupScoringTypeMin
 )
+
+// TestGroupFeedbackType sets which info about tests in a group would be shown
+type TestGroupFeedbackType int
+
 const (
 	// TestGroupFeedbackTypeNone won't show anything
 	TestGroupFeedbackTypeNone TestGroupFeedbackType = iota + 1

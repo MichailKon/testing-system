@@ -122,7 +122,7 @@ func (i *ICPCGenerator) JobCompleted(result *masterconn.InvokerJobResult) (*mode
 	defer i.mutex.Unlock()
 	job, ok := i.givenJobs[result.JobID]
 	if !ok {
-		return nil, fmt.Errorf("job %s not exist", result.JobID)
+		return nil, fmt.Errorf("job %s does not exist", result.JobID)
 	}
 	delete(i.givenJobs, result.JobID)
 
