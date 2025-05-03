@@ -106,6 +106,9 @@ func (i *IOIGenerator) prepareGenerator() error {
 		default:
 			return fmt.Errorf("unknown TestGroupScoringType %v", group.ScoringType)
 		}
+		if group.FirstTest > group.LastTest {
+			return fmt.Errorf("group %v has FirstTest > LastTest", group.Name)
+		}
 		for testNumber := group.FirstTest; testNumber <= group.LastTest; testNumber++ {
 			i.testNumberToGroupName[testNumber-1] = group.Name
 			i.internalTestResults = append(i.internalTestResults, &internalTestResult{

@@ -290,6 +290,21 @@ func TestIOIGenerator(t *testing.T) {
 				},
 				TestsNumber: 1,
 			},
+			// type Min, but GroupScore is nil
+			{
+				ProblemType: models.ProblemTypeIOI,
+				TestGroups: []models.TestGroup{
+					{
+						Name:               "name",
+						FirstTest:          1,
+						LastTest:           1,
+						GroupScore:         nil,
+						ScoringType:        models.TestGroupScoringTypeMin,
+						RequiredGroupNames: make([]string, 0),
+					},
+				},
+				TestsNumber: 1,
+			},
 			// cyclic groups
 			{
 				ProblemType: models.ProblemTypeIOI,
@@ -298,6 +313,7 @@ func TestIOIGenerator(t *testing.T) {
 						Name:               "name1",
 						FirstTest:          1,
 						LastTest:           1,
+						GroupScore:         pointer.Float64(1.0),
 						ScoringType:        models.TestGroupScoringTypeMin,
 						RequiredGroupNames: []string{"name2"},
 					},
@@ -305,12 +321,13 @@ func TestIOIGenerator(t *testing.T) {
 						Name:               "name2",
 						FirstTest:          2,
 						LastTest:           2,
+						GroupScore:         pointer.Float64(1.0),
 						ScoringType:        models.TestGroupScoringTypeMin,
 						RequiredGroupNames: []string{"name1"},
 					},
 				},
 			},
-			// test not covered
+			// test is not covered
 			{
 				ProblemType: models.ProblemTypeIOI,
 				TestGroups: []models.TestGroup{
@@ -318,7 +335,7 @@ func TestIOIGenerator(t *testing.T) {
 						Name:               "name",
 						FirstTest:          1,
 						LastTest:           1,
-						TestScore:          nil,
+						TestScore:          pointer.Float64(1.0),
 						ScoringType:        models.TestGroupScoringTypeEachTest,
 						RequiredGroupNames: make([]string, 0),
 					},
@@ -333,7 +350,7 @@ func TestIOIGenerator(t *testing.T) {
 						Name:               "name",
 						FirstTest:          1,
 						LastTest:           2,
-						TestScore:          nil,
+						TestScore:          pointer.Float64(1.0),
 						ScoringType:        models.TestGroupScoringTypeEachTest,
 						RequiredGroupNames: make([]string, 0),
 					},
@@ -341,7 +358,7 @@ func TestIOIGenerator(t *testing.T) {
 						Name:               "name1",
 						FirstTest:          2,
 						LastTest:           3,
-						TestScore:          nil,
+						TestScore:          pointer.Float64(1.0),
 						ScoringType:        models.TestGroupScoringTypeEachTest,
 						RequiredGroupNames: make([]string, 0),
 					},
@@ -356,7 +373,7 @@ func TestIOIGenerator(t *testing.T) {
 						Name:               "name",
 						FirstTest:          1,
 						LastTest:           2,
-						TestScore:          nil,
+						TestScore:          pointer.Float64(1.0),
 						ScoringType:        models.TestGroupScoringTypeEachTest,
 						RequiredGroupNames: make([]string, 0),
 					},
@@ -364,12 +381,42 @@ func TestIOIGenerator(t *testing.T) {
 						Name:               "name",
 						FirstTest:          3,
 						LastTest:           3,
-						TestScore:          nil,
+						TestScore:          pointer.Float64(1.0),
 						ScoringType:        models.TestGroupScoringTypeEachTest,
 						RequiredGroupNames: make([]string, 0),
 					},
 				},
 				TestsNumber: 3,
+			},
+			// first test > last test
+			{
+				ProblemType: models.ProblemTypeIOI,
+				TestGroups: []models.TestGroup{
+					{
+						Name:               "name1",
+						FirstTest:          1,
+						LastTest:           2,
+						TestScore:          pointer.Float64(1.0),
+						ScoringType:        models.TestGroupScoringTypeEachTest,
+						RequiredGroupNames: make([]string, 0),
+					},
+					{
+						Name:               "name2",
+						FirstTest:          2,
+						LastTest:           1,
+						TestScore:          pointer.Float64(1.0),
+						ScoringType:        models.TestGroupScoringTypeEachTest,
+						RequiredGroupNames: make([]string, 0),
+					},
+					{
+						Name:               "name3",
+						FirstTest:          3,
+						LastTest:           3,
+						TestScore:          pointer.Float64(1.0),
+						ScoringType:        models.TestGroupScoringTypeEachTest,
+						RequiredGroupNames: make([]string, 0),
+					},
+				},
 			},
 		}
 		for _, problem := range badProblems {
