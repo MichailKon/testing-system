@@ -67,7 +67,7 @@ func (i *ICPCGenerator) NextJob() *invokerconn.Job {
 	return job
 }
 
-func (i *ICPCGenerator) hasFail() {
+func (i *ICPCGenerator) setFail() {
 	for i.firstTestToGive <= i.problem.TestsNumber {
 		i.internalTestResults[i.firstTestToGive] = models.TestResult{
 			TestNumber: i.firstTestToGive,
@@ -112,7 +112,7 @@ func (i *ICPCGenerator) incTestedPrefix() (*models.Submission, error) {
 // compileJobCompleted must be done with acquired mutex
 func (i *ICPCGenerator) compileJobCompleted(job *invokerconn.Job, result *masterconn.InvokerJobResult) (*models.Submission, error) {
 	if job.Type != invokerconn.CompileJob {
-		logger.Panic("Treating %v as compile job", job.Type)
+		logger.Panic("Treating job %d of type %v as compile job", job.ID, job.Type)
 	}
 	i.state = compilationFinished
 	switch result.Verdict {
@@ -120,7 +120,7 @@ func (i *ICPCGenerator) compileJobCompleted(job *invokerconn.Job, result *master
 		// skip
 	case verdict.CE:
 		i.submission.Verdict = result.Verdict
-		i.hasFail()
+		i.setFail()
 	default:
 		i.internalTestResults[1] = models.TestResult{
 			TestNumber: 1,
@@ -128,22 +128,25 @@ func (i *ICPCGenerator) compileJobCompleted(job *invokerconn.Job, result *master
 			Error:      fmt.Sprintf("unknown verdict for compilation completed: %v", result.Verdict),
 		}
 		i.firstTestToGive++
-		i.hasFail()
+		i.setFail()
 	}
 	return i.incTestedPrefix()
 }
 
 // testJobCompleted must be done with acquired mutex
 func (i *ICPCGenerator) testJobCompleted(job *invokerconn.Job, result *masterconn.InvokerJobResult) (*models.Submission, error) {
+	if job.Type != invokerconn.TestJob {
+		logger.Panic("Treating job %d of type %v as test job", job.ID, job.Type)
+	}
 	switch result.Verdict {
 	case verdict.OK:
 		// skip
 	case verdict.PT, verdict.WA, verdict.RT, verdict.ML, verdict.TL, verdict.WL, verdict.SE, verdict.CF:
-		i.hasFail()
+		i.setFail()
 	default:
 		result.Verdict = verdict.CF
 		result.Error = fmt.Sprintf("unknown verdict for test job: %v", result.Verdict)
-		i.hasFail()
+		i.setFail()
 	}
 	i.internalTestResults[job.Test] = buildTestResult(job, result)
 	return i.incTestedPrefix()

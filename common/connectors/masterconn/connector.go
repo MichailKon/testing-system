@@ -40,7 +40,7 @@ func (c *Connector) SendNewSubmission(
 	language string,
 	fileName string,
 	fileReader io.Reader,
-) (uint, error) {
+) (SubmissionID uint, err error) {
 	r := c.connection.R()
 	r.SetContext(ctx)
 	r.SetFormData(map[string]string{

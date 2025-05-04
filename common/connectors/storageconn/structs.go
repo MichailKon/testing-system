@@ -32,7 +32,7 @@ type Request struct {
 	// For any download, if DownloadBytes == false, the DownloadFolder should be specified
 	DownloadFolder string `json:"-"`
 
-	// Specify a custom filename for the downloaded file. Can be empty
+	// Specify a custom filename for the downloaded file. Can be nil for auto filename detection
 	DownloadFilename *string `json:"-"`
 
 	// For downloads, DownloadHead can be specified so that only first DownloadHead bytes will be loaded
