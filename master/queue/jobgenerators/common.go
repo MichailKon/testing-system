@@ -16,7 +16,7 @@ const (
 	compilationFinished
 )
 
-func buildTestResult(job *invokerconn.Job, result *masterconn.InvokerJobResult) *models.TestResult {
+func buildTestResult(job *invokerconn.Job, result *masterconn.InvokerJobResult) models.TestResult {
 	testResult := models.TestResult{
 		TestNumber: job.Test,
 		Verdict:    result.Verdict,
@@ -31,29 +31,32 @@ func buildTestResult(job *invokerconn.Job, result *masterconn.InvokerJobResult) 
 		testResult.ExitCode = &result.Statistics.ExitCode
 	}
 
-	return &testResult
+	return testResult
 }
-
-const (
-	timeRoundFactor   = 1000
-	memoryRoundFactor = 1024
-)
-
 func roundTime(time customfields.Time) *customfields.Time {
-	return roundValue(time, timeRoundFactor)
+	roundFactor := customfields.Time(1000)
+	if time < roundFactor {
+		return &time
+	}
+	time = (time + roundFactor - 1) / roundFactor * roundFactor
+	roundFactor *= roundFactor
+	if time < roundFactor {
+		return &time
+	}
+	time = (time + roundFactor - 1) / roundFactor * roundFactor
+	return &time
 }
 
 func roundMemory(memory customfields.Memory) *customfields.Memory {
-	return roundValue(memory, memoryRoundFactor)
-}
-
-func roundValue[T ~uint64](value T, roundFactor T) *T {
-	for _ = range 2 {
-		if value < roundFactor {
-			return &value
-		}
-		value = (value + roundFactor - 1) / roundFactor * roundFactor
-		roundFactor *= roundFactor
+	memoryFactor := customfields.Memory(1024)
+	if memory < memoryFactor {
+		return &memory
 	}
-	return &value
+	memory = (memory + memoryFactor - 1) / memoryFactor * memoryFactor
+	memoryFactor *= memoryFactor
+	if memory < memoryFactor {
+		return &memory
+	}
+	memory = (memory + memoryFactor - 1) / memoryFactor * memoryFactor
+	return &memory
 }

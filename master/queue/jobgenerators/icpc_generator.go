@@ -12,14 +12,6 @@ import (
 	"testing_system/master/queue/queuestatus"
 )
 
-type state int
-
-const (
-	compilationNotStarted state = iota
-	compilationStarted
-	compilationFinished
-)
-
 type ICPCGenerator struct {
 	id    string
 	mutex sync.Mutex
@@ -130,6 +122,8 @@ func (i *ICPCGenerator) compileJobCompleted(job *invokerconn.Job, result *master
 	case verdict.CD:
 		// skip
 	case verdict.CE, verdict.CF:
+		// skip
+	case verdict.CE:
 		i.submission.Verdict = result.Verdict
 		i.setFail()
 	default:
@@ -176,6 +170,7 @@ func (i *ICPCGenerator) JobCompleted(result *masterconn.InvokerJobResult) (*mode
 		i.testJobCompleted(job, result)
 	default:
 		logger.Panic("unknown job type for ICPC problem: %v", job.Type)
+		// never pass here
 	}
 	return i.updateSubmissionResult()
 }
@@ -186,7 +181,7 @@ func newICPCGenerator(problem *models.Problem, submission *models.Submission, st
 		logger.Panic("Can't generate generator id: %w", err)
 	}
 
-	if problem.ProblemType != models.ProblemType_ICPC {
+	if problem.ProblemType != models.ProblemTypeICPC {
 		return nil, fmt.Errorf("problem %v is not ICPC", problem.ID)
 	}
 	submission.Verdict = verdict.RU

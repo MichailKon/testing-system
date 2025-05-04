@@ -69,9 +69,9 @@ func (t TestResults) GormDBDataType(db *gorm.DB, field *schema.Field) string {
 }
 
 type GroupResult struct {
-	GroupName string  `json:"GroupName" yaml:"GroupName"`
-	Points    float64 `json:"Points" yaml:"Points"`
-	Passed    bool    `json:"Passed" yaml:"Passed"`
+	GroupName string  `json:"group_name" yaml:"group_name"`
+	Points    float64 `json:"points" yaml:"points"`
+	Passed    bool    `json:"passed" yaml:"passed"`
 	// TODO maybe more fields
 }
 

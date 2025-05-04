@@ -2,7 +2,6 @@ package masterconn
 
 import (
 	"context"
-	"github.com/go-resty/resty/v2"
 	"io"
 	"net/http"
 	"strconv"
@@ -10,6 +9,8 @@ import (
 	"testing_system/common/connectors"
 	"testing_system/common/connectors/invokerconn"
 	"testing_system/lib/connector"
+
+	"github.com/go-resty/resty/v2"
 )
 
 type Connector struct {
@@ -33,7 +34,6 @@ func (c *Connector) SendInvokerStatus(response *invokerconn.Status) error {
 
 	return connector.ReceiveEmpty(r, "/master/invoker/status", resty.MethodPost)
 }
-
 func (c *Connector) SendNewSubmission(
 	ctx context.Context,
 	problemID uint,
