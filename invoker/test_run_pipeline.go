@@ -14,7 +14,7 @@ const (
 )
 
 func (i *Invoker) fullTestingPipeline(sandbox sandbox.ISandbox, job *Job) {
-	s := i.newPipeline(sandbox, job)
+	s := i.newPipelineState(sandbox, job)
 	s.test = new(pipelineTestData)
 	s.loggerData = fmt.Sprintf(
 		"test job: %s submission: %d problem %d test %d",

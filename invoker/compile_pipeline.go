@@ -13,7 +13,7 @@ import (
 )
 
 func (i *Invoker) fullCompilationPipeline(sandbox sandbox.ISandbox, job *Job) {
-	s := i.newPipeline(sandbox, job)
+	s := i.newPipelineState(sandbox, job)
 	s.compile = new(pipelineCompileData)
 	s.loggerData = fmt.Sprintf("compile job: %s submission: %d", job.ID, job.submission.ID)
 	defer s.checkFinish()

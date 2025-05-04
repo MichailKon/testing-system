@@ -90,7 +90,7 @@ func (ts *testState) testCompile(submitID uint) *JobPipelineState {
 		uint64(submitID),
 	))
 
-	s := ts.Invoker.newPipeline(ts.Sandbox, job)
+	s := ts.Invoker.newPipelineState(ts.Sandbox, job)
 	s.compile = new(pipelineCompileData)
 	s.loggerData = fmt.Sprintf("compile job: %s submission: %d", job.ID, job.submission.ID)
 
@@ -189,7 +189,7 @@ func (ts *testState) testRun(submitID uint, problemID uint) *sandbox.RunResult {
 
 	require.NoError(ts.t, ts.Invoker.Storage.Binary.Insert(filepath.Join(sourceDir, "binary"), uint64(submitID)))
 
-	s := ts.Invoker.newPipeline(ts.Sandbox, job)
+	s := ts.Invoker.newPipelineState(ts.Sandbox, job)
 	s.test = new(pipelineTestData)
 	s.loggerData = fmt.Sprintf(
 		"test job: %s submission: %d problem %d test %d",

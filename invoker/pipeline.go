@@ -51,7 +51,7 @@ type pipelineTestData struct {
 	hasResources        bool
 }
 
-func (i *Invoker) newPipeline(sandbox sandbox.ISandbox, job *Job) *JobPipelineState {
+func (i *Invoker) newPipelineState(sandbox sandbox.ISandbox, job *Job) *JobPipelineState {
 	s := &JobPipelineState{
 		sandbox: sandbox,
 		invoker: i,
