@@ -112,7 +112,7 @@ func (i *ICPCGenerator) incTestedPrefix() (*models.Submission, error) {
 // compileJobCompleted must be done with acquired mutex
 func (i *ICPCGenerator) compileJobCompleted(job *invokerconn.Job, result *masterconn.InvokerJobResult) (*models.Submission, error) {
 	if job.Type != invokerconn.CompileJob {
-		logger.Panic("Treating job %d of type %v as compile job", job.ID, job.Type)
+		logger.Panic("Treating job %s of type %v as compile job", job.ID, job.Type)
 	}
 	i.state = compilationFinished
 	switch result.Verdict {
@@ -136,7 +136,7 @@ func (i *ICPCGenerator) compileJobCompleted(job *invokerconn.Job, result *master
 // testJobCompleted must be done with acquired mutex
 func (i *ICPCGenerator) testJobCompleted(job *invokerconn.Job, result *masterconn.InvokerJobResult) (*models.Submission, error) {
 	if job.Type != invokerconn.TestJob {
-		logger.Panic("Treating job %d of type %v as test job", job.ID, job.Type)
+		logger.Panic("Treating job %s of type %v as test job", job.ID, job.Type)
 	}
 	switch result.Verdict {
 	case verdict.OK:
