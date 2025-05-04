@@ -19,7 +19,7 @@ type ICPCGenerator struct {
 	submission *models.Submission
 	problem    *models.Problem
 
-	state              state
+	state       generatorState
 	firstTestToGive    uint64
 	testedPrefixLength uint64
 
@@ -156,12 +156,12 @@ func (i *ICPCGenerator) testJobCompleted(job *invokerconn.Job, result *mastercon
 func (i *ICPCGenerator) JobCompleted(result *masterconn.InvokerJobResult) (*models.Submission, error) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
-	job, ok := i.givenJobs[result.JobID]
+	job, ok := i.givenJobs[result.Job.ID]
 	if !ok {
 		logger.Panic("Wrong job %s is passed to ICPC generator", job.ID)
 		return nil, nil
 	}
-	delete(i.givenJobs, result.JobID)
+	delete(i.givenJobs, result.Job.ID)
 
 	switch job.Type {
 	case invokerconn.CompileJob:
