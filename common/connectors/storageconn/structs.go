@@ -26,11 +26,17 @@ type Request struct {
 	// If resource is a test, TestID should be specified
 	TestID uint64 `json:"testID"`
 
-	// For any download, BaseFolder should be specified. The files with original filenames will be placed there
-	BaseFolder string `json:"-"`
+	// For any download, either a new file will be created or the file will be downloaded as []byte
+	DownloadBytes bool `json:"-"`
 
-	// Specify a custom filename for the downloaded file
+	// For any download, if DownloadBytes == false, the DownloadFolder should be specified
+	DownloadFolder string `json:"-"`
+
+	// Specify a custom filename for the downloaded file. Can be empty
 	DownloadFilename *string `json:"-"`
+
+	// For downloads, DownloadHead can be specified so that only first DownloadHead bytes will be loaded
+	DownloadHead *int64 `json:"downloadHead"`
 
 	// For uploads, File should be specified
 	File io.Reader `json:"-"`
@@ -49,8 +55,11 @@ type Response struct {
 
 type FileResponse struct {
 	Response
+	IsBytesArray bool   `json:"isFile"`
+	RawData      []byte `json:"rawData"`
+
 	Filename   string `json:"filename"`
-	BaseFolder string `json:"basefolder"`
+	BaseFolder string `json:"baseFolder"`
 	Size       uint64 `json:"size"`
 }
 
@@ -64,13 +73,13 @@ func NewFileResponse(request Request) *FileResponse {
 }
 
 func (r *FileResponse) GetFilePath() (string, bool) {
-	if r.BaseFolder == "" || r.Filename == "" {
+	if r.BaseFolder == "" || r.Filename == "" || !r.IsBytesArray {
 		return "", false
 	}
 	return filepath.Join(r.BaseFolder, r.Filename), true
 }
 
-// Removes BaseFolder with all files
+// CleanUp Removes BaseFolder with all files
 func (r *FileResponse) CleanUp() {
 	if r.Error != nil {
 		logger.Error("CleanUp was called for failed FileResponse: %v", r.Error)
@@ -78,6 +87,10 @@ func (r *FileResponse) CleanUp() {
 	}
 	if r.BaseFolder == "" {
 		logger.Error("CleanUp was called for empty BaseFolder name")
+		return
+	}
+	if r.IsBytesArray {
+		logger.Error("CleanUp was called for file downloaded as []bytes")
 		return
 	}
 

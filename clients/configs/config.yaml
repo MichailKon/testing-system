@@ -1,0 +1,17 @@
+Address: "localhost:8012"
+
+MasterConnection:
+  Address: "http://localhost:8011"
+
+StorageConnection:
+  Address: "http://localhost:8011"
+
+DB:
+  Dsn: "postgresql://postgres:qwerty@localhost:5432/ts"
+
+ResourcesPath: "/Users/grphil/Documents/go/testing-system/clients/resources"
+
+Admin: true
+TestingSystemAPI:
+  DefaultLoadFilesHead: 100
+

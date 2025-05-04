@@ -80,7 +80,7 @@ func (m *Master) saveSubmissionInStorage(c *gin.Context, submission *models.Subm
 	return true
 }
 
-func (m *Master) saveSubmissionInDB(c *gin.Context, problemID uint64, language string) *models.Submission {
+func (m *Master) saveSubmissionInDB(c *gin.Context, problemID uint, language string) *models.Submission {
 	submission := &models.Submission{
 		ProblemID: problemID,
 		Language:  language,

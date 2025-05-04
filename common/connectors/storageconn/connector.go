@@ -1,6 +1,7 @@
 package storageconn
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/go-resty/resty/v2"
@@ -28,9 +29,11 @@ func NewConnector(connection *config.Connection) *Connector {
 func (s *Connector) Download(request *Request) *FileResponse {
 	response := NewFileResponse(*request)
 
-	if err := os.MkdirAll(request.BaseFolder, 0775); err != nil {
-		response.Error = fmt.Errorf("failed to create base folder: %v", err)
-		return response
+	if !request.DownloadBytes {
+		if err := os.MkdirAll(request.DownloadFolder, 0775); err != nil {
+			response.Error = fmt.Errorf("failed to create base folder: %v", err)
+			return response
+		}
 	}
 
 	r := s.connection.R()
@@ -93,22 +96,34 @@ func (s *Connector) Download(request *Request) *FileResponse {
 		return response
 	}
 
-	filePath := filepath.Join(request.BaseFolder, filename)
-	file, err := os.Create(filePath)
-	if err != nil {
-		response.Error = fmt.Errorf("failed to create file: %v", err)
-		return response
-	}
-	defer file.Close()
+	var written int64
+	if request.DownloadBytes {
+		buf := &bytes.Buffer{}
+		written, err = io.Copy(buf, resp.RawBody())
+		if err != nil {
+			response.Error = fmt.Errorf("failed to load file as []byte, error: %v", err)
+			return response
+		}
+		response.IsBytesArray = true
+		response.RawData = buf.Bytes()
+	} else {
+		filePath := filepath.Join(request.DownloadFolder, filename)
+		file, err := os.Create(filePath)
+		if err != nil {
+			response.Error = fmt.Errorf("failed to create file: %v", err)
+			return response
+		}
+		defer file.Close()
 
-	written, err := io.Copy(file, resp.RawBody())
-	if err != nil {
-		response.Error = fmt.Errorf("failed to write to file: %v", err)
-		return response
+		written, err = io.Copy(file, resp.RawBody())
+		if err != nil {
+			response.Error = fmt.Errorf("failed to write to file: %v", err)
+			return response
+		}
+		response.BaseFolder = request.DownloadFolder
 	}
 
 	response.Filename = filename
-	response.BaseFolder = request.BaseFolder
 	response.Size = uint64(written)
 	return response
 }

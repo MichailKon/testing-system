@@ -95,6 +95,14 @@ func (m *Memory) FromStr(s string) error {
 	return nil
 }
 
+func NewMemory(s string) (*Memory, error) {
+	var m Memory
+	if err := m.FromStr(s); err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
 func (m Memory) String() string {
 	v := m.Val()
 	suf := "b"

@@ -5,15 +5,12 @@ package master
 import (
 	"net/http"
 	"strconv"
+	"testing_system/common/connectors/masterconn"
 	"testing_system/lib/connector"
 	"testing_system/lib/logger"
 
 	"github.com/gin-gonic/gin"
 )
-
-type SubmissionResponse struct {
-	SubmissionID uint `json:"SubmissionID"`
-}
 
 // @Summary Submit
 // @Description Submit a solution
@@ -23,7 +20,7 @@ type SubmissionResponse struct {
 // @Param ProblemID formData uint true "Problem ID" example:"228"
 // @Param Language formData string true "Programming language" example:"g++"
 // @Param Solution formData file true "Source code"
-// @Success 200 {object} SubmissionResponse
+// @Success 200 {object} masterconn.SubmissionResponse
 // @Failure 400 {object} string
 // @Failure 404 {object} string
 // @Failure 500 {object} string
@@ -49,7 +46,7 @@ func (m *Master) handleNewSubmission(c *gin.Context) {
 		return
 	}
 
-	submission := m.saveSubmissionInDB(c, problemID, language)
+	submission := m.saveSubmissionInDB(c, uint(problemID), language)
 	if submission == nil {
 		return
 	}
@@ -72,5 +69,5 @@ func (m *Master) handleNewSubmission(c *gin.Context) {
 
 	m.invokerRegistry.SendJobs()
 
-	c.JSON(http.StatusOK, SubmissionResponse{submission.ID})
+	c.JSON(http.StatusOK, masterconn.SubmissionResponse{submission.ID})
 }

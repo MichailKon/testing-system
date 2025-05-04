@@ -31,6 +31,10 @@ type JobResultStatistics struct {
 	// TODO: Add more statistics
 }
 
+type SubmissionResponse struct {
+	SubmissionID uint `json:"SubmissionID"`
+}
+
 type InvokerJobMetrics struct {
 	TestingWaitDuration    time.Duration `json:"InvokerWaitDuration"`
 	TotalSandboxOccupation time.Duration `json:"TotalSandboxOccupation"`

@@ -66,19 +66,19 @@ func (s *InvokerStorage) getFiles(key cacheKey) (*string, error, uint64) {
 		}
 		return nil, response.Error, 0
 	} else {
-		return pointer.String(filepath.Join(request.BaseFolder, response.Filename)), nil, response.Size
+		return pointer.String(filepath.Join(request.DownloadFolder, response.Filename)), nil, response.Size
 	}
 }
 
 func setRequestBaseFolder(request *storageconn.Request, parent string) {
-	request.BaseFolder = filepath.Join(parent, request.Resource.String())
+	request.DownloadFolder = filepath.Join(parent, request.Resource.String())
 	switch request.Resource {
 	case resource.SourceCode, resource.CompiledBinary, resource.CompileOutput:
-		request.BaseFolder = filepath.Join(request.BaseFolder, strconv.FormatUint(request.SubmitID, 10))
+		request.DownloadFolder = filepath.Join(request.DownloadFolder, strconv.FormatUint(request.SubmitID, 10))
 	case resource.Checker, resource.Interactor:
-		request.BaseFolder = filepath.Join(request.BaseFolder, strconv.FormatUint(request.ProblemID, 10))
+		request.DownloadFolder = filepath.Join(request.DownloadFolder, strconv.FormatUint(request.ProblemID, 10))
 	case resource.TestInput, resource.TestAnswer:
-		request.BaseFolder = filepath.Join(request.BaseFolder, fmt.Sprintf("%d-%d", request.ProblemID, request.TestID))
+		request.DownloadFolder = filepath.Join(request.DownloadFolder, fmt.Sprintf("%d-%d", request.ProblemID, request.TestID))
 	default:
 		logger.Panic("Can not fill base folder for storageconn request of type %v", request.Resource)
 	}

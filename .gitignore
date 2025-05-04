@@ -2,4 +2,7 @@
 testing_system
 cp.sh
 swag
+clients/node_modules
+clients/clients
+.DS_Store
 custom

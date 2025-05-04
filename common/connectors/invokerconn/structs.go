@@ -12,7 +12,7 @@ const (
 )
 
 type Job struct {
-	ID       string  `json:"ID"`
+	ID       string  `json:"ID"  binding:"required"`
 	SubmitID uint    `json:"SubmitID" binding:"required"`
 	Type     JobType `json:"JobType" binding:"required"`
 	Test     uint64  `json:"Test"`

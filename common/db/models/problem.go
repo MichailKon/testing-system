@@ -7,6 +7,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 	"testing_system/lib/customfields"
+	"time"
 )
 
 type ProblemType int
@@ -82,31 +83,34 @@ func (t TestGroups) GormDBDataType(db *gorm.DB, field *schema.Field) string {
 }
 
 type Problem struct {
-	gorm.Model
+	ID        uint           `gorm:"primarykey" json:"id" yaml:"id"`
+	CreatedAt time.Time      `json:"created_at" yaml:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at" yaml:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-" yaml:"-"`
 
-	ProblemType ProblemType `yaml:"ProblemType"`
+	Name string `yaml:"name" json:"name" binding:"required"`
 
-	TimeLimit   customfields.Time   `yaml:"TimeLimit"`
-	MemoryLimit customfields.Memory `yaml:"MemoryLimit"`
+	ProblemType ProblemType `yaml:"problem_type" json:"problem_type" binding:"required"`
 
-	TestsNumber uint64 `yaml:"TestsNumber"`
-	// TestGroups ignored for ICPC problems
-	TestGroups TestGroups `yaml:"TestGroups"`
+	TimeLimit   customfields.Time   `yaml:"time_limit" json:"time_limit" binding:"required"`
+	MemoryLimit customfields.Memory `yaml:"memory_limit" json:"memory_limit" binding:"required"`
+
+	TestsNumber uint64 `yaml:"tests_number" json:"tests_number" binding:"required"`
 
 	// WallTimeLimit specifies maximum execution and wait time.
 	// By default, it is max(5s, TimeLimit * 2)
-	WallTimeLimit *customfields.Time `yaml:"WallTimeLimit,omitempty"`
+	WallTimeLimit *customfields.Time `yaml:"wall_time_limit,omitempty" json:"wall_time_limit,omitempty"`
 
-	// MaxOpenFiles specifies the maximum number of files, opened by testing system.
+	// MaxOpenFiles specifies maximum number of files, opened by testing system.
 	// By default, it is 64
-	MaxOpenFiles *uint64 `yaml:"MaxOpenFiles,omitempty"`
+	MaxOpenFiles *uint64 `yaml:"max_open_files,omitempty" json:"max_open_files,omitempty"`
 
-	// MaxThreads specifies the maximum number of threads and/or processes;
-	// By default, it is a single thread
+	// MaxThreads specifies maximum number of threads and/or processes
+	// By default, it is single thread
 	// If MaxThreads equals to -1, any number of threads allowed
-	MaxThreads *int64 `yaml:"MaxThreads,omitempty"`
+	MaxThreads *int64 `yaml:"max_threads,omitempty" json:"max_threads,omitempty"`
 
 	// MaxOutputSize specifies maximum output in EACH file.
 	// By default, it is 1g
-	MaxOutputSize *customfields.Memory `yaml:"MaxOutputSize,omitempty"`
+	MaxOutputSize *customfields.Memory `yaml:"max_output_size,omitempty" json:"max_output_size,omitempty"`
 }

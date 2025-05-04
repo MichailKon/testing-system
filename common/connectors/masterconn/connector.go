@@ -1,12 +1,15 @@
 package masterconn
 
 import (
+	"context"
+	"github.com/go-resty/resty/v2"
+	"io"
+	"net/http"
+	"strconv"
 	"testing_system/common/config"
 	"testing_system/common/connectors"
 	"testing_system/common/connectors/invokerconn"
 	"testing_system/lib/connector"
-
-	"github.com/go-resty/resty/v2"
 )
 
 type Connector struct {
@@ -29,4 +32,30 @@ func (c *Connector) SendInvokerStatus(response *invokerconn.Status) error {
 	r.SetBody(response)
 
 	return connector.ReceiveEmpty(r, "/master/invoker/status", resty.MethodPost)
+}
+
+func (c *Connector) SendNewSubmission(
+	ctx context.Context,
+	problemID uint,
+	language string,
+	fileName string,
+	fileReader io.Reader,
+) (uint, error) {
+	r := c.connection.R()
+	r.SetContext(ctx)
+	r.SetFormData(map[string]string{
+		"ProblemID": strconv.FormatUint(uint64(problemID), 10),
+		"Language":  language,
+	})
+	r.SetFileReader("Solution", fileName, fileReader)
+	var submissionResponse SubmissionResponse
+	r.SetResult(&submissionResponse)
+	resp, err := r.Post("/master/submit")
+	if err != nil {
+		return 0, err
+	}
+	if resp.StatusCode() != http.StatusOK {
+		return 0, connector.ParseRespError(resp.Body(), resp)
+	}
+	return submissionResponse.SubmissionID, nil
 }

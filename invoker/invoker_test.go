@@ -199,7 +199,7 @@ func (ts *testState) testRun(submitID uint, problemID uint) *sandbox.RunResult {
 		job.Test,
 	)
 
-	defer s.finish()
+	defer s.deferFunc()
 
 	require.NoError(ts.t, s.testingProcessPipeline())
 
@@ -236,8 +236,11 @@ func testRunSandbox(t *testing.T, sandboxType string) {
 	res = ts.testRun(6, 1)
 	require.Equal(t, verdict.WA, res.Verdict)
 
-	res = ts.testRun(7, 1)
-	require.Equal(t, verdict.ML, res.Verdict)
+	if sandboxType == "isolate" {
+		// Simple sandbox does not support ML verdict
+		res = ts.testRun(7, 1)
+		require.Equal(t, verdict.ML, res.Verdict)
+	}
 
 	ts.addProblem(2)
 	res = ts.testRun(8, 2)
