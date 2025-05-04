@@ -1,7 +1,6 @@
 import React from "react";
 
 export default function ChangeAlert(alert) {
-  console.log(alert);
   if (!alert.hasAlert) {
     return <div></div>
   }

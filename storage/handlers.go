@@ -99,7 +99,7 @@ func (s *Storage) HandleGet(c *gin.Context) {
 		c.DataFromReader(
 			http.StatusOK,
 			min(stat.Size(), *resourceInfo.Request.DownloadHead),
-			" text/plain",
+			"text/plain",
 			io.LimitReader(reader, *resourceInfo.Request.DownloadHead),
 			map[string]string{
 				"Content-Disposition": mime.FormatMediaType("attachment", map[string]string{

@@ -47,8 +47,6 @@ export function RenderTest(test, testResult, changeTest) {
     })
   }
 
-  console.log(testResult)
-
   return <>
     <tr key={testResult.test_number}>
       <td>{testResult.test_number}</td>
