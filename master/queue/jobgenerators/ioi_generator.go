@@ -187,8 +187,7 @@ func doesTestPreventTestingGroup(testGroupInfo models.TestGroup, testVerdict ver
 	return false
 }
 
-func (i *IOIGenerator) calcGroupVerdict(
-	groupInfo models.TestGroup) verdict.Verdict {
+func (i *IOIGenerator) calcGroupVerdict(groupInfo models.TestGroup) verdict.Verdict {
 	firstTest, lastTest := groupInfo.FirstTest, groupInfo.LastTest
 	if slices.IndexFunc(i.submission.TestResults[firstTest-1:lastTest], func(result models.TestResult) bool {
 		return result.Verdict != verdict.OK
@@ -242,8 +241,8 @@ func (i *IOIGenerator) completeGroupTesting(groupInfo models.TestGroup) {
 	i.firstNotCompletedGroup++
 }
 
-// increaseCompletedTestsAndGroups must be done with acquired mutex
-func (i *IOIGenerator) increaseCompletedTestsAndGroups() {
+// updateSubmissionResult must be done with acquired mutex
+func (i *IOIGenerator) updateSubmissionResult() (*models.Submission, error) {
 TestsLoop:
 	for i.firstNotCompletedTest <= i.problem.TestsNumber {
 		testGroupName := i.testNumberToGroupName[i.firstNotCompletedTest-1]
@@ -257,6 +256,7 @@ TestsLoop:
 		case testRunning:
 			break TestsLoop
 		case testFinished:
+			break
 		}
 
 		if testInternalGroupInfo.shouldMarkFinalTestsSkipped {
@@ -286,43 +286,41 @@ TestsLoop:
 		}
 		i.firstNotCompletedTest++
 	}
+	if i.firstNotCompletedTest > i.problem.TestsNumber && len(i.givenJobs) == 0 {
+		i.setFinalScoreAndVerdict()
+		if int(i.firstNotCompletedGroup) <= len(i.problem.TestGroups) {
+			logger.Panic("not all the groups were filled, but the problem is considered tested")
+		}
+		return i.submission, nil
+	}
+	return nil, nil
 }
 
 // compileJobCompleted must be done with acquired mutex
-func (i *IOIGenerator) compileJobCompleted(job *invokerconn.Job, result *masterconn.InvokerJobResult) (*models.Submission, error) {
+func (i *IOIGenerator) compileJobCompleted(
+	job *invokerconn.Job,
+	result *masterconn.InvokerJobResult,
+) {
 	if job.Type != invokerconn.CompileJob {
-		return nil, fmt.Errorf("job type %s is not compile job", job.ID)
+		logger.Warn("job type %s is %v; treating is as a compile job", job.ID, job.Type)
 	}
 	switch result.Verdict {
 	case verdict.CD:
 		i.state = compilationFinished
-		return nil, nil
 	case verdict.CE:
 		i.submission.Verdict = verdict.CE
-		for t := range i.problem.TestsNumber {
-			i.internalTestResults[t] = &internalTestResult{
-				result: &models.TestResult{
-					TestNumber: t + 1,
-					Points:     nil,
-					Verdict:    verdict.SK,
-				},
-				state: testFinished,
-			}
+		for _, group := range i.problem.TestGroups {
+			i.groupNameToInternalInfo[group.Name].shouldMarkFinalTestsSkipped = true
 		}
-		i.increaseCompletedTestsAndGroups()
-		if i.firstNotCompletedTest <= i.problem.TestsNumber ||
-			int(i.firstNotCompletedGroup) <= len(i.problem.TestGroups) {
-			logger.Panic("not all tests got verdict after CE")
-		}
-		return i.submission, nil
 	default:
-		return nil, fmt.Errorf("unknown verdict for compilation completed: %v", result.Verdict)
+		logger.Panic("unknown verdict for compilation completed: %v", result.Verdict)
 	}
 }
 
 func populateTestJobResult(groupInfo models.TestGroup, result *masterconn.InvokerJobResult) error {
 	switch groupInfo.ScoringType {
 	case models.TestGroupScoringTypeComplete:
+		break
 	case models.TestGroupScoringTypeEachTest:
 		if result.Points == nil {
 			if result.Verdict == verdict.OK {
@@ -351,7 +349,10 @@ func populateTestJobResult(groupInfo models.TestGroup, result *masterconn.Invoke
 }
 
 func (i *IOIGenerator) stopGivingNewTestsIfNeeded(
-	testInternalGroupInfo *internalGroupInfo, testGroupInfo models.TestGroup, testVerdict verdict.Verdict) {
+	testInternalGroupInfo *internalGroupInfo,
+	testGroupInfo models.TestGroup,
+	testVerdict verdict.Verdict,
+) {
 	if !doesTestPreventTestingGroup(testGroupInfo, testVerdict) {
 		return
 	}
@@ -383,6 +384,10 @@ func (i *IOIGenerator) setFinalScoreAndVerdict() {
 	for _, groupResult := range i.submission.GroupResults {
 		i.submission.Score += groupResult.Points
 	}
+	if i.submission.Verdict != verdict.RU {
+		logger.Trace("submission %v already has verdict %v", i.submission, i.submission.Verdict)
+		return
+	}
 
 	hasSkipped := false
 	hasVerdict := false
@@ -404,9 +409,12 @@ func (i *IOIGenerator) setFinalScoreAndVerdict() {
 }
 
 // testJobCompleted must be done with acquired mutex
-func (i *IOIGenerator) testJobCompleted(job *invokerconn.Job, result *masterconn.InvokerJobResult) (*models.Submission, error) {
+func (i *IOIGenerator) testJobCompleted(
+	job *invokerconn.Job,
+	result *masterconn.InvokerJobResult,
+) {
 	if job.Type != invokerconn.TestJob {
-		return nil, fmt.Errorf("job type %v is not test job", job.ID)
+		logger.Warn("job type %s is %v; treating is as a testing job", job.ID, job.Type)
 	}
 	testGroupName := i.testNumberToGroupName[job.Test-1]
 	testGroupInfo := i.groupNameToGroupInfo[testGroupName]
@@ -430,14 +438,7 @@ func (i *IOIGenerator) testJobCompleted(job *invokerconn.Job, result *masterconn
 		i.internalTestResults[job.Test-1].result.Memory = result.Statistics.Memory
 	}
 	i.internalTestResults[job.Test-1].state = testFinished
-
-	i.increaseCompletedTestsAndGroups()
 	i.stopGivingNewTestsIfNeeded(testInternalGroupInfo, testGroupInfo, result.Verdict)
-	if i.firstNotCompletedTest > i.problem.TestsNumber && len(i.givenJobs) == 0 {
-		i.setFinalScoreAndVerdict()
-		return i.submission, nil
-	}
-	return nil, nil
 }
 
 func (i *IOIGenerator) JobCompleted(jobResult *masterconn.InvokerJobResult) (*models.Submission, error) {
@@ -450,12 +451,13 @@ func (i *IOIGenerator) JobCompleted(jobResult *masterconn.InvokerJobResult) (*mo
 	delete(i.givenJobs, jobResult.JobID)
 	switch job.Type {
 	case invokerconn.CompileJob:
-		return i.compileJobCompleted(job, jobResult)
+		i.compileJobCompleted(job, jobResult)
 	case invokerconn.TestJob:
-		return i.testJobCompleted(job, jobResult)
+		i.testJobCompleted(job, jobResult)
 	default:
 		return nil, fmt.Errorf("unknown job type for IOI problem: %v", job.Type)
 	}
+	return i.updateSubmissionResult()
 }
 
 func NewIOIGenerator(problem *models.Problem, submission *models.Submission) (Generator, error) {
@@ -477,6 +479,7 @@ func NewIOIGenerator(problem *models.Problem, submission *models.Submission) (Ge
 		firstNotCompletedGroup:  1,
 		firstNotGivenTest:       1,
 	}
+	generator.submission.Verdict = verdict.RU
 	if err = generator.prepareGenerator(); err != nil {
 		return nil, err
 	}
