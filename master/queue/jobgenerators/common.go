@@ -16,7 +16,7 @@ const (
 	compilationFinished
 )
 
-func buildTestResult(job *invokerconn.Job, result *masterconn.InvokerJobResult) models.TestResult {
+func buildTestResult(job *invokerconn.Job, result *masterconn.InvokerJobResult) *models.TestResult {
 	testResult := models.TestResult{
 		TestNumber: job.Test,
 		Verdict:    result.Verdict,
@@ -31,7 +31,7 @@ func buildTestResult(job *invokerconn.Job, result *masterconn.InvokerJobResult) 
 		testResult.ExitCode = &result.Statistics.ExitCode
 	}
 
-	return testResult
+	return &testResult
 }
 
 const (

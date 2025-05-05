@@ -122,8 +122,6 @@ func (i *ICPCGenerator) compileJobCompleted(job *invokerconn.Job, result *master
 	case verdict.CD:
 		// skip
 	case verdict.CE, verdict.CF:
-		// skip
-	case verdict.CE:
 		i.submission.Verdict = result.Verdict
 		i.setFail()
 	default:
