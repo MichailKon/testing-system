@@ -21,3 +21,7 @@ body {
 .token-line {
     display: table-row;
 }
+
+.submission_resource {
+    max-width: min(100vw, 1000px);
+}

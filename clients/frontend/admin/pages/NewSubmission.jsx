@@ -19,6 +19,7 @@ export default function NewSubmission() {
     formData.append("problem_id", data.problem_id);
     formData.append("language", data.language);
     formData.append("solution", data.solution);
+    formData.append("solution_text", data.solution_text);
 
     const apiUrl = `/api/new/submission`
     SendAlertRequest(axios.putForm(apiUrl, formData), setAlert, (submissionID) => {
@@ -80,7 +81,17 @@ export default function NewSubmission() {
                 className="form-control"
                 id="solution"
                 name="solution"
-                required={true}
+              />
+            </div>
+          </div>
+          <div className="row mb-md-3 mb-0">
+            <label htmlFor="solution_text" className="col-xl-3 col-md-4 col-form-label pb-0 pb-md-2 pt-3">Solution
+              text</label>
+            <div className="col-md-8 col-xl-6 col-form-label">
+              <textarea
+                className="form-control"
+                id="solution_text"
+                name="solution_text"
               />
             </div>
           </div>

@@ -3,8 +3,10 @@ import axios from "axios";
 import Body from "../components/Body";
 import {Link, useParams} from "react-router-dom";
 import Verdict from "../components/Verdict";
-import DisplaySourceCode from "../components/submission/DisplaySourceCode";
 import {RenderTest, TestDataReducer, WatchTestData} from "../components/submission/TestData";
+import {
+  CompilationDataReducer, InitialCompilationData, RenderCompilationData, WatchCompilationData
+} from "../components/submission/CompilationData";
 
 export default function Submission() {
   const params = useParams();
@@ -35,38 +37,10 @@ export default function Submission() {
     )
   }, [id]);
 
-  const [sourceCode, setSourceCode] = useState({
-    loaded: false,
-    show: false,
-  })
-
+  const [compilationData, changeCompilationData] = useReducer(CompilationDataReducer, InitialCompilationData())
   useEffect(() => {
-    if (!sourceCode.show || sourceCode.loaded) {
-      return;
-    }
-
-    if (!submission) {
-      return;
-    }
-
-    const apiURL = `/api/get/submission/${submission.id}/source`
-    axios.get(apiURL).then((resp) => {
-      setSourceCode({
-        ...sourceCode,
-        ...resp.data.response,
-        loaded: true,
-        error: resp.data.error,
-      })
-    }).catch(
-      (err) => {
-        setSourceCode({
-          ...sourceCode,
-          loaded: true,
-          error: err.response.data.error,
-        })
-      }
-    )
-  }, [sourceCode, submission]);
+    WatchCompilationData(compilationData, changeCompilationData, submission)
+  }, [compilationData, changeCompilationData])
 
   const [tests, changeTests] = useReducer(TestDataReducer, [])
   useEffect(() => {
@@ -124,29 +98,33 @@ export default function Submission() {
           </tr>
         </tbody>
       </table>
-      {DisplaySourceCode(id, sourceCode, setSourceCode)}
-      <h5 className="mb-3">Test results</h5>
-      <table className="table mb-3">
-        <thead>
-        <tr>
-          <th scope="row">#</th>
-          <th scope="row">Verdict</th>
-          <th scope="row">Points</th>
-          <th scope="row">Time</th>
-          <th scope="row">Memory</th>
-          <th scope="row">Wall time</th>
-          <th scope="row">Exit code</th>
-          <th scope="row">More info</th>
-        </tr>
-        </thead>
-        <tbody>
-        {
-          submission.test_results.map(testResult => (
-            RenderTest(tests[testResult.test_number - 1], testResult, changeTests)
-          ))
-        }
-        </tbody>
-      </table>
+      {RenderCompilationData(compilationData, submission, changeCompilationData)}
+      {submission.test_results ? (
+        <>
+        <h5 className="mb-3">Test results</h5>
+        <table className="table mb-3">
+          <thead>
+          <tr>
+            <th scope="row">#</th>
+            <th scope="row">Verdict</th>
+            <th scope="row">Points</th>
+            <th scope="row">Time</th>
+            <th scope="row">Memory</th>
+            <th scope="row">Wall time</th>
+            <th scope="row">Exit code</th>
+            <th scope="row">More info</th>
+          </tr>
+          </thead>
+          <tbody>
+          {
+            submission.test_results.map(testResult => (
+              RenderTest(tests[testResult.test_number - 1], testResult, changeTests)
+            ))
+          }
+          </tbody>
+        </table>
+        </>
+      ) : null}
     </div>
   )
 }

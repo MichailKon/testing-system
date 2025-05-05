@@ -2,10 +2,13 @@ package tsapi
 
 import (
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/xorcare/pointer"
 	"gorm.io/gorm"
+	"io"
 	"net/http"
+	"strings"
 	"testing_system/clients/tsapi/masterstatus"
 	"testing_system/common/connectors/storageconn"
 	"testing_system/common/constants/resource"
@@ -42,28 +45,39 @@ type fileData struct {
 	Size     uint64 `json:"size"`
 }
 
-func (h *Handler) getSubmissionSource(c *gin.Context) {
-	submission, ok := h.findSubmission(c)
-	if !ok {
-		return
+func (h *Handler) submissionResourceGetter(resourceType resource.Type, limit bool) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		submission, ok := h.findSubmission(c)
+		if !ok {
+			return
+		}
+
+		request := &storageconn.Request{
+			Resource:      resourceType,
+			SubmitID:      uint64(submission.ID),
+			DownloadBytes: true,
+			Ctx:           c,
+		}
+		if limit {
+			request.DownloadHead = pointer.Int64(h.config.LoadFilesHead)
+		}
+		resp := h.base.StorageConnection.Download(request)
+		if resp.Error != nil {
+			if errors.Is(resp.Error, storageconn.ErrStorageFileNotFound) {
+				respError(c, http.StatusNotFound, "%v for submission %d does not exist", resourceType, submission.ID)
+				return
+			}
+			respServerError(c, "Can not load %v, error: %v", resourceType, resp.Error)
+			return
+		}
+
+		respSuccess(c, fileData{
+			Filename: resp.Filename,
+			Data:     string(resp.RawData),
+			Size:     resp.Size,
+		})
 	}
 
-	resp := h.base.StorageConnection.Download(&storageconn.Request{
-		Resource:      resource.SourceCode,
-		SubmitID:      uint64(submission.ID),
-		DownloadBytes: true,
-		Ctx:           c,
-	})
-	if resp.Error != nil {
-		respServerError(c, "Can not load source code, error: %v", resp.Error)
-		return
-	}
-
-	respSuccess(c, fileData{
-		Filename: resp.Filename,
-		Data:     string(resp.RawData),
-		Size:     resp.Size,
-	})
 }
 
 func (h *Handler) submissionTestResourceGetter(resourceType resource.Type) func(c *gin.Context) {
@@ -115,20 +129,35 @@ func (h *Handler) addSubmission(c *gin.Context) {
 	if !ok {
 		return
 	}
+
+	var reader io.Reader
+	var filename string
 	file, err := c.FormFile("solution")
-	if err != nil {
-		respError(c, http.StatusBadRequest, "Can not parse solution")
-		return
+
+	if err == nil {
+		fd, err := file.Open()
+		if err != nil {
+			respError(c, http.StatusBadRequest, "Can not parse solution")
+			return
+		}
+		defer fd.Close()
+		reader = fd
+		filename = file.Filename
+	} else {
+		if !errors.Is(err, http.ErrMissingFile) {
+			respError(c, http.StatusBadRequest, "Can not parse solution file")
+			return
+		}
+		solutionBytes, ok := c.GetPostForm("solution_text")
+		if !ok {
+			respError(c, http.StatusBadRequest, "No solution file or text provided")
+			return
+		}
+		reader = strings.NewReader(solutionBytes)
+		filename = fmt.Sprintf("solution.%s", language)
 	}
 
-	reader, err := file.Open()
-	if err != nil {
-		respError(c, http.StatusBadRequest, "Can not parse solution")
-		return
-	}
-	defer reader.Close()
-
-	submissionID, err := h.base.MasterConnection.SendNewSubmission(c, problem.ID, language, file.Filename, reader)
+	submissionID, err := h.base.MasterConnection.SendNewSubmission(c, problem.ID, language, filename, reader)
 	if err != nil {
 		respServerError(c, "Can not send new submission, error: %v", err)
 		return

@@ -31,7 +31,7 @@ type ICPCGenerator struct {
 	testedPrefixLength uint64
 
 	givenJobs           map[string]*invokerconn.Job
-	internalTestResults map[uint64]models.TestResult
+	internalTestResults map[uint64]*models.TestResult
 }
 
 func (i *ICPCGenerator) ID() string {
@@ -69,7 +69,7 @@ func (i *ICPCGenerator) NextJob() *invokerconn.Job {
 
 func (i *ICPCGenerator) setFail() {
 	for i.firstTestToGive <= i.problem.TestsNumber {
-		i.internalTestResults[i.firstTestToGive] = models.TestResult{
+		i.internalTestResults[i.firstTestToGive] = &models.TestResult{
 			TestNumber: i.firstTestToGive,
 			Verdict:    verdict.SK,
 		}
@@ -77,7 +77,7 @@ func (i *ICPCGenerator) setFail() {
 	}
 }
 
-func (i *ICPCGenerator) incTestedPrefix() (*models.Submission, error) {
+func (i *ICPCGenerator) updateSubmissionResult() (*models.Submission, error) {
 	for i.testedPrefixLength < i.problem.TestsNumber {
 		result, ok := i.internalTestResults[i.testedPrefixLength+1]
 		if !ok {
@@ -85,7 +85,7 @@ func (i *ICPCGenerator) incTestedPrefix() (*models.Submission, error) {
 		}
 		i.testedPrefixLength++
 		if i.submission.Verdict != verdict.RU {
-			result = models.TestResult{
+			result = &models.TestResult{
 				TestNumber: i.testedPrefixLength,
 				Verdict:    verdict.SK,
 			}
@@ -110,7 +110,7 @@ func (i *ICPCGenerator) incTestedPrefix() (*models.Submission, error) {
 }
 
 // compileJobCompleted must be done with acquired mutex
-func (i *ICPCGenerator) compileJobCompleted(job *invokerconn.Job, result *masterconn.InvokerJobResult) (*models.Submission, error) {
+func (i *ICPCGenerator) compileJobCompleted(job *invokerconn.Job, result *masterconn.InvokerJobResult) {
 	if job.Type != invokerconn.CompileJob {
 		logger.Panic("Treating job %s of type %v as compile job", job.ID, job.Type)
 	}
@@ -118,23 +118,20 @@ func (i *ICPCGenerator) compileJobCompleted(job *invokerconn.Job, result *master
 	switch result.Verdict {
 	case verdict.CD:
 		// skip
-	case verdict.CE:
+	case verdict.CE, verdict.CF:
 		i.submission.Verdict = result.Verdict
 		i.setFail()
 	default:
-		i.internalTestResults[1] = models.TestResult{
-			TestNumber: 1,
-			Verdict:    verdict.CF,
-			Error:      fmt.Sprintf("unknown verdict for compilation completed: %v", result.Verdict),
-		}
-		i.firstTestToGive++
+		result.Verdict = verdict.CF
+		result.Error = fmt.Sprintf("unknown verdict for compile job: %v", result.Verdict)
+		i.submission.Verdict = result.Verdict
 		i.setFail()
 	}
-	return i.incTestedPrefix()
+	i.submission.CompilationResult = buildTestResult(job, result)
 }
 
 // testJobCompleted must be done with acquired mutex
-func (i *ICPCGenerator) testJobCompleted(job *invokerconn.Job, result *masterconn.InvokerJobResult) (*models.Submission, error) {
+func (i *ICPCGenerator) testJobCompleted(job *invokerconn.Job, result *masterconn.InvokerJobResult) {
 	if job.Type != invokerconn.TestJob {
 		logger.Panic("Treating job %s of type %v as test job", job.ID, job.Type)
 	}
@@ -149,7 +146,6 @@ func (i *ICPCGenerator) testJobCompleted(job *invokerconn.Job, result *mastercon
 		i.setFail()
 	}
 	i.internalTestResults[job.Test] = buildTestResult(job, result)
-	return i.incTestedPrefix()
 }
 
 func (i *ICPCGenerator) JobCompleted(result *masterconn.InvokerJobResult) (*models.Submission, error) {
@@ -164,14 +160,13 @@ func (i *ICPCGenerator) JobCompleted(result *masterconn.InvokerJobResult) (*mode
 
 	switch job.Type {
 	case invokerconn.CompileJob:
-		return i.compileJobCompleted(job, result)
+		i.compileJobCompleted(job, result)
 	case invokerconn.TestJob:
-		return i.testJobCompleted(job, result)
+		i.testJobCompleted(job, result)
 	default:
 		logger.Panic("unknown job type for ICPC problem: %v", job.Type)
-		// never pass here
-		return nil, nil
 	}
+	return i.updateSubmissionResult()
 }
 
 func newICPCGenerator(problem *models.Problem, submission *models.Submission) (Generator, error) {
@@ -196,6 +191,6 @@ func newICPCGenerator(problem *models.Problem, submission *models.Submission) (G
 		testedPrefixLength: 0,
 
 		givenJobs:           make(map[string]*invokerconn.Job),
-		internalTestResults: make(map[uint64]models.TestResult),
+		internalTestResults: make(map[uint64]*models.TestResult),
 	}, nil
 }

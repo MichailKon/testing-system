@@ -1,6 +1,7 @@
 import React from 'react';
 import Verdict from "../Verdict";
 import axios from "axios";
+import RenderResource from "./RenderResource";
 
 export function TestDataReducer(tests, action) {
   if (action.action === "submission") {
@@ -13,6 +14,7 @@ export function TestDataReducer(tests, action) {
         input: {},
         output: {},
         answer: {},
+        stderr: {},
         checker: {},
       })
     }
@@ -55,7 +57,7 @@ export function RenderTest(test, testResult, changeTest) {
       <td>{testResult.time || ""}</td>
       <td>{testResult.memory || ""}</td>
       <td>{testResult.wall_time || ""}</td>
-      <td>{testResult.exit_code || ""}</td>
+      <td>{testResult.exit_code == null ? "" : testResult.exit_code}</td>
       <td>
         <a href="#" onClick={toggleTest}>
           {test && test.show ? "Hide test data" : "Show test data"}
@@ -65,37 +67,16 @@ export function RenderTest(test, testResult, changeTest) {
     {test && test.show ? (
       <tr key={`${testResult.test_number}-data`}>
         <td colSpan="8">
-          {showData("error", testResult.error, null)}
-          {showData("Input", test["input"].data, test["input"].error)}
-          {showData("Output", test["output"].data, test["output"].error)}
-          {showData("Answer", test["answer"].data, test["answer"].error)}
-          {showData("Checker", test["checker"].data, test["checker"].error)}
+          {RenderResource("Error", testResult.error, null)}
+          {RenderResource("Input", test["input"].data, test["input"].error)}
+          {RenderResource("Output", test["output"].data, test["output"].error)}
+          {RenderResource("Stderr", test["stderr"].data, test["stderr"].error)}
+          {RenderResource("Answer", test["answer"].data, test["answer"].error)}
+          {RenderResource("Checker", test["checker"].data, test["checker"].error)}
         </td>
       </tr>
     ) : null }
   </>
-}
-
-function showData(name, data, error) {
-  if (!data && !error) {
-    return null
-  }
-  const wrapContent = (content) => (
-    <div>
-      <p className="m-0">{name}</p>
-      <div>
-        <pre className="bg-black bg-opacity-10" style={{maxWidth: "1000px"}}>
-          {content}
-        </pre>
-      </div>
-    </div>
-  )
-
-  if (error) {
-    return wrapContent(<span className="text-danger">{error}</span>)
-  } else {
-    return wrapContent(data)
-  }
 }
 
 export function WatchTestData(tests, changeTest, submission) {
@@ -138,6 +119,7 @@ export function WatchTestData(tests, changeTest, submission) {
       requestTest(`/api/get/problem/${submission.problem_id}/test/${i + 1}/answer`, "answer")
       requestTest(`/api/get/submission/${submission.id}/test/${i + 1}/output`, "output")
       requestTest(`/api/get/submission/${submission.id}/test/${i + 1}/check`, "checker")
+      requestTest(`/api/get/submission/${submission.id}/test/${i + 1}/stderr`, "stderr")
       return
     }
   }

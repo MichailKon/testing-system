@@ -51,8 +51,11 @@ func (h *Handler) setupRoutes() {
 
 	apiRouter.GET("/get/submissions", h.getSubmissions)
 	apiRouter.GET("/get/submission/:id", h.getSubmission)
-	apiRouter.GET("/get/submission/:id/source", h.getSubmissionSource)
+	apiRouter.GET("/get/submission/:id/source", h.submissionResourceGetter(resource.SourceCode, false))
+	apiRouter.GET("/get/submission/:id/compile_output", h.submissionResourceGetter(resource.CompileOutput, true))
+
 	apiRouter.GET("/get/submission/:id/test/:test/output", h.submissionTestResourceGetter(resource.TestOutput))
+	apiRouter.GET("/get/submission/:id/test/:test/stderr", h.submissionTestResourceGetter(resource.TestStderr))
 	apiRouter.GET("/get/submission/:id/test/:test/check", h.submissionTestResourceGetter(resource.CheckerOutput))
 
 	apiCSRFRouter.PUT("/new/submission", h.addSubmission)
