@@ -11,20 +11,12 @@ import (
 	"testing_system/lib/logger"
 )
 
-type state int
-
-const (
-	compilationNotStarted state = iota
-	compilationStarted
-	compilationFinished
-)
-
 type ICPCGenerator struct {
 	id          string
 	mutex       sync.Mutex
 	submission  *models.Submission
 	problem     *models.Problem
-	state       state
+	state       generatorState
 	hasFails    bool
 	givenJobs   map[string]*invokerconn.Job
 	futureTests []uint64
@@ -130,7 +122,7 @@ func (i *ICPCGenerator) JobCompleted(result *masterconn.InvokerJobResult) (*mode
 	defer i.mutex.Unlock()
 	job, ok := i.givenJobs[result.JobID]
 	if !ok {
-		return nil, fmt.Errorf("job not found")
+		return nil, fmt.Errorf("job %s does not exist", result.JobID)
 	}
 	delete(i.givenJobs, result.JobID)
 
@@ -150,7 +142,7 @@ func newICPCGenerator(problem *models.Problem, submission *models.Submission) (G
 		logger.Panic("Can't generate generator id: %w", err)
 	}
 
-	if problem.ProblemType != models.ProblemType_ICPC {
+	if problem.ProblemType != models.ProblemTypeICPC {
 		return nil, fmt.Errorf("problem %v is not ICPC", problem.ID)
 	}
 	futureTests := make([]uint64, 0, problem.TestsNumber)
@@ -170,6 +162,7 @@ func newICPCGenerator(problem *models.Problem, submission *models.Submission) (G
 	return &ICPCGenerator{
 		id:          id.String(),
 		submission:  submission,
+		state:       compilationNotStarted,
 		problem:     problem,
 		givenJobs:   make(map[string]*invokerconn.Job),
 		futureTests: futureTests,

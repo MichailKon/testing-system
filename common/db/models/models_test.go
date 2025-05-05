@@ -15,8 +15,8 @@ import (
 
 func fixtureDb(t *testing.T) *gorm.DB {
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	err := db.AutoMigrate(&Submission{})
-	assert.NoError(t, err)
+	assert.NoError(t, db.AutoMigrate(&Submission{}))
+	assert.NoError(t, db.AutoMigrate(&Problem{}))
 	return db
 }
 
