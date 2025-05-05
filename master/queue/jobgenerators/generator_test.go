@@ -46,7 +46,7 @@ func TestICPCGenerator(t *testing.T) {
 		require.Nil(t, err)
 		job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
 		sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   job.ID,
+			Job:     job,
 			Verdict: verdict.CE,
 		})
 		require.NotNil(t, sub)
@@ -68,7 +68,7 @@ func TestICPCGenerator(t *testing.T) {
 		job := nextJob(t, generator, 1, invokerconn.CompileJob, 0)
 		noJobs(t, generator)
 		sub, err := generator.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   job.ID,
+			Job:     job,
 			Verdict: verdict.CD,
 		})
 		require.Nil(t, sub)
@@ -76,7 +76,7 @@ func TestICPCGenerator(t *testing.T) {
 		for i := range fixtureICPCProblemTestsNumber - 1 {
 			job = nextJob(t, generator, 1, invokerconn.TestJob, uint64(i)+1)
 			sub, err = generator.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.ID,
+				Job:     job,
 				Verdict: verdict.OK,
 			})
 			require.Nil(t, sub)
@@ -84,7 +84,7 @@ func TestICPCGenerator(t *testing.T) {
 		}
 		job = nextJob(t, generator, 1, invokerconn.TestJob, fixtureICPCProblemTestsNumber)
 		sub, err = generator.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   job.ID,
+			Job:     job,
 			Verdict: verdict.OK,
 		})
 		require.NotNil(t, sub)
@@ -99,30 +99,30 @@ func TestICPCGenerator(t *testing.T) {
 	})
 
 	t.Run("Tasks finishing", func(t *testing.T) {
-		prepare := func() (Generator, []string) {
+		prepare := func() (Generator, []*invokerconn.Job) {
 			problem := fixtureICPCProblem()
 			submission := fixtureSubmission(1)
 			g, err := NewGenerator(problem, submission)
 			require.Nil(t, err)
 			job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
 			sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.ID,
+				Job:     job,
 				Verdict: verdict.CD,
 			})
 			require.Nil(t, sub)
 			require.Nil(t, err)
-			firstTwoJobIDs := make([]string, 0)
+			firstTwoJobs := make([]*invokerconn.Job, 0)
 			for i := range 2 {
 				job = nextJob(t, g, 1, invokerconn.TestJob, uint64(i)+1)
-				firstTwoJobIDs = append(firstTwoJobIDs, job.ID)
+				firstTwoJobs = append(firstTwoJobs, job)
 			}
-			return g, firstTwoJobIDs
+			return g, firstTwoJobs
 		}
 		finishOtherTests := func(g Generator) {
 			for i := 2; i < fixtureICPCProblemTestsNumber-1; i++ {
 				job := nextJob(t, g, 1, invokerconn.TestJob, uint64(i)+1)
 				sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
-					JobID:   job.ID,
+					Job:     job,
 					Verdict: verdict.OK,
 				})
 				require.Nil(t, sub)
@@ -130,7 +130,7 @@ func TestICPCGenerator(t *testing.T) {
 			}
 			job := nextJob(t, g, 1, invokerconn.TestJob, 10)
 			sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.ID,
+				Job:     job,
 				Verdict: verdict.OK,
 			})
 			require.NotNil(t, sub)
@@ -145,10 +145,10 @@ func TestICPCGenerator(t *testing.T) {
 		}
 
 		t.Run("right order", func(t *testing.T) {
-			g, firstTwoJobIDs := prepare()
-			for _, id := range firstTwoJobIDs {
+			g, firstTwoJobs := prepare()
+			for _, job := range firstTwoJobs {
 				sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
-					JobID:   id,
+					Job:     job,
 					Verdict: verdict.OK,
 				})
 				require.Nil(t, sub)
@@ -158,16 +158,16 @@ func TestICPCGenerator(t *testing.T) {
 		})
 
 		t.Run("wrong order + both ok", func(t *testing.T) {
-			g, firstTwoJobIDs := prepare()
+			g, firstTwoJobs := prepare()
 			sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   firstTwoJobIDs[1],
+				Job:     firstTwoJobs[1],
 				Verdict: verdict.OK,
 			})
 			require.Nil(t, sub)
 			require.Nil(t, err)
 
 			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   firstTwoJobIDs[0],
+				Job:     firstTwoJobs[0],
 				Verdict: verdict.OK,
 			})
 			require.Nil(t, sub)
@@ -177,16 +177,16 @@ func TestICPCGenerator(t *testing.T) {
 		})
 
 		t.Run("wrong order + 2nd fail", func(t *testing.T) {
-			g, firstTwoJobIDs := prepare()
+			g, firstTwoJobs := prepare()
 			sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   firstTwoJobIDs[1],
+				Job:     firstTwoJobs[1],
 				Verdict: verdict.WA,
 			})
 			require.Nil(t, sub)
 			require.Nil(t, err)
 
 			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   firstTwoJobIDs[0],
+				Job:     firstTwoJobs[0],
 				Verdict: verdict.OK,
 			})
 			require.NotNil(t, sub)
@@ -203,16 +203,16 @@ func TestICPCGenerator(t *testing.T) {
 		})
 
 		t.Run("wrong order + 1st fail", func(t *testing.T) {
-			g, firstTwoJobIDs := prepare()
+			g, firstTwoJobs := prepare()
 			sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   firstTwoJobIDs[1],
+				Job:     firstTwoJobs[1],
 				Verdict: verdict.OK,
 			})
 			require.Nil(t, sub)
 			require.Nil(t, err)
 
 			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   firstTwoJobIDs[0],
+				Job:     firstTwoJobs[0],
 				Verdict: verdict.WA,
 			})
 			require.NotNil(t, sub)
@@ -235,7 +235,7 @@ func TestICPCGenerator(t *testing.T) {
 		require.Nil(t, err)
 		job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
 		sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   job.ID,
+			Job:     job,
 			Verdict: verdict.CE,
 		})
 		require.NotNil(t, sub)
@@ -249,7 +249,7 @@ func TestICPCGenerator(t *testing.T) {
 		}
 
 		sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   job.ID,
+			Job:     job,
 			Verdict: verdict.CE,
 		})
 		require.Nil(t, sub)
@@ -448,7 +448,7 @@ func TestIOIGenerator(t *testing.T) {
 		require.Nil(t, err)
 		job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
 		sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   job.ID,
+			Job:     job,
 			Verdict: verdict.CE,
 		})
 		require.NotNil(t, sub)
@@ -478,7 +478,7 @@ func TestIOIGenerator(t *testing.T) {
 		job := nextJob(t, generator, 1, invokerconn.CompileJob, 0)
 		noJobs(t, generator)
 		sub, err := generator.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   job.ID,
+			Job:     job,
 			Verdict: verdict.CD,
 		})
 		require.Nil(t, sub)
@@ -486,7 +486,7 @@ func TestIOIGenerator(t *testing.T) {
 		for i := range 9 {
 			job = nextJob(t, generator, 1, invokerconn.TestJob, uint64(i)+1)
 			sub, err = generator.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.ID,
+				Job:     job,
 				Verdict: verdict.OK,
 			})
 			require.Nil(t, sub)
@@ -494,7 +494,7 @@ func TestIOIGenerator(t *testing.T) {
 		}
 		job = nextJob(t, generator, 1, invokerconn.TestJob, 10)
 		sub, err = generator.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   job.ID,
+			Job:     job,
 			Verdict: verdict.OK,
 		})
 		require.NotNil(t, sub)
@@ -547,7 +547,7 @@ func TestIOIGenerator(t *testing.T) {
 			require.NoError(t, err)
 			job := nextJob(t, gen, 0, invokerconn.CompileJob, 0)
 			sub, err := gen.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.ID,
+				Job:     job,
 				Verdict: verdict.CD,
 			})
 			require.Nil(t, sub)
@@ -560,13 +560,13 @@ func TestIOIGenerator(t *testing.T) {
 			job1 := nextJob(t, gen, 0, invokerconn.TestJob, 1)
 			job2 := nextJob(t, gen, 0, invokerconn.TestJob, 2)
 			sub, err := gen.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job1.ID,
+				Job:     job1,
 				Verdict: verdict.WA,
 			})
 			require.Nil(t, sub)
 			require.NoError(t, err)
 			sub, err = gen.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job2.ID,
+				Job:     job2,
 				Verdict: verdict.OK,
 			})
 			require.Equal(t, verdict.PT, sub.Verdict)
@@ -592,13 +592,13 @@ func TestIOIGenerator(t *testing.T) {
 			job1 := nextJob(t, gen, 0, invokerconn.TestJob, 1)
 			job2 := nextJob(t, gen, 0, invokerconn.TestJob, 2)
 			sub, err := gen.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job2.ID,
+				Job:     job2,
 				Verdict: verdict.OK,
 			})
 			require.Nil(t, sub)
 			require.NoError(t, err)
 			sub, err = gen.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job1.ID,
+				Job:     job1,
 				Verdict: verdict.WA,
 			})
 			require.Equal(t, verdict.PT, sub.Verdict)
@@ -624,13 +624,13 @@ func TestIOIGenerator(t *testing.T) {
 			job1 := nextJob(t, gen, 0, invokerconn.TestJob, 1)
 			job2 := nextJob(t, gen, 0, invokerconn.TestJob, 2)
 			sub, err := gen.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job1.ID,
+				Job:     job1,
 				Verdict: verdict.OK,
 			})
 			require.Nil(t, sub)
 			require.NoError(t, err)
 			sub, err = gen.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job2.ID,
+				Job:     job2,
 				Verdict: verdict.WA,
 			})
 			require.Equal(t, verdict.PT, sub.Verdict)
@@ -656,13 +656,13 @@ func TestIOIGenerator(t *testing.T) {
 			job1 := nextJob(t, gen, 0, invokerconn.TestJob, 1)
 			job2 := nextJob(t, gen, 0, invokerconn.TestJob, 2)
 			sub, err := gen.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job2.ID,
+				Job:     job2,
 				Verdict: verdict.WA,
 			})
 			require.Nil(t, sub)
 			require.NoError(t, err)
 			sub, err = gen.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job1.ID,
+				Job:     job1,
 				Verdict: verdict.OK,
 			})
 			require.Equal(t, verdict.PT, sub.Verdict)
@@ -687,7 +687,7 @@ func TestIOIGenerator(t *testing.T) {
 			gen := prepare()
 			job := nextJob(t, gen, 0, invokerconn.TestJob, 1)
 			sub, err := gen.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.ID,
+				Job:     job,
 				Verdict: verdict.WA,
 			})
 			require.NotNil(t, sub)
@@ -732,14 +732,14 @@ func TestIOIGenerator(t *testing.T) {
 			require.NoError(t, err)
 			job := nextJob(t, gen, 0, invokerconn.CompileJob, 0)
 			sub, err := gen.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.ID,
+				Job:     job,
 				Verdict: verdict.CD,
 			})
 			require.Nil(t, sub)
 			require.NoError(t, err)
 			job = nextJob(t, gen, 0, invokerconn.TestJob, 1)
 			sub, err = gen.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.ID,
+				Job:     job,
 				Verdict: verdict.WA,
 			})
 			require.Nil(t, gen.NextJob())
@@ -785,7 +785,7 @@ func TestIOIGenerator(t *testing.T) {
 			require.NoError(t, err)
 			job := nextJob(t, gen, 1, invokerconn.CompileJob, 0)
 			sub, err := gen.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.ID,
+				Job:     job,
 				Verdict: verdict.CD,
 			})
 			require.Nil(t, sub)
@@ -795,20 +795,20 @@ func TestIOIGenerator(t *testing.T) {
 			job3 := nextJob(t, gen, 1, invokerconn.TestJob, 3)
 			// now finish 1 and 3
 			sub, err = gen.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job1.ID,
+				Job:     job1,
 				Verdict: verdict.OK,
 			})
 			require.NoError(t, err)
 			require.Nil(t, sub)
 			sub, err = gen.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:      job3.ID,
+				Job:        job3,
 				Verdict:    verdict.WA,
 				Statistics: baseStat,
 			})
 			// this group is already failed, so the generator should not return any job
 			require.Nil(t, gen.NextJob())
 			sub, err = gen.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:      job2.ID,
+				Job:        job2,
 				Verdict:    verdict.TL,
 				Statistics: baseStat,
 			})
@@ -872,7 +872,7 @@ func TestIOIGenerator(t *testing.T) {
 			require.NotNil(t, job)
 			require.Nil(t, g.NextJob())
 			sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.ID,
+				Job:     job,
 				Verdict: verdict.CD,
 			})
 			require.NoError(t, err)
@@ -881,7 +881,7 @@ func TestIOIGenerator(t *testing.T) {
 			job = nextJob(t, g, 1, invokerconn.TestJob, 1)
 			require.NotNil(t, job)
 			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.ID,
+				Job:     job,
 				Verdict: verdict.OK,
 			})
 			job2 := nextJob(t, g, 1, invokerconn.TestJob, 2)
@@ -890,13 +890,13 @@ func TestIOIGenerator(t *testing.T) {
 			require.NotNil(t, job3)
 			require.Nil(t, g.NextJob())
 			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job2.ID,
+				Job:     job2,
 				Verdict: verdict.WA,
 			})
 			require.NoError(t, err)
 			require.Nil(t, sub)
 			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job3.ID,
+				Job:     job3,
 				Verdict: verdict.OK,
 			})
 			require.NoError(t, err)
@@ -943,7 +943,7 @@ func TestIOIGenerator(t *testing.T) {
 			require.NotNil(t, job)
 			require.Nil(t, g.NextJob())
 			sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.ID,
+				Job:     job,
 				Verdict: verdict.CD,
 			})
 			require.NoError(t, err)
@@ -952,7 +952,7 @@ func TestIOIGenerator(t *testing.T) {
 			job = nextJob(t, g, 1, invokerconn.TestJob, 1)
 			require.NotNil(t, job)
 			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.ID,
+				Job:     job,
 				Verdict: verdict.OK,
 			})
 			job2 := nextJob(t, g, 1, invokerconn.TestJob, 2)
@@ -961,13 +961,13 @@ func TestIOIGenerator(t *testing.T) {
 			require.NotNil(t, job3)
 			require.Nil(t, g.NextJob())
 			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job2.ID,
+				Job:     job2,
 				Verdict: verdict.WA,
 			})
 			require.NoError(t, err)
 			require.Nil(t, sub)
 			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job3.ID,
+				Job:     job3,
 				Verdict: verdict.OK,
 			})
 			require.NoError(t, err)
@@ -995,7 +995,7 @@ func TestIOIGenerator(t *testing.T) {
 			require.NotNil(t, job)
 			require.Nil(t, g.NextJob())
 			sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.ID,
+				Job:     job,
 				Verdict: verdict.CD,
 			})
 			require.NoError(t, err)
@@ -1004,7 +1004,7 @@ func TestIOIGenerator(t *testing.T) {
 			job = nextJob(t, g, 1, invokerconn.TestJob, 1)
 			require.NotNil(t, job)
 			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.ID,
+				Job:     job,
 				Verdict: verdict.OK,
 			})
 			job2 := nextJob(t, g, 1, invokerconn.TestJob, 2)
@@ -1013,14 +1013,14 @@ func TestIOIGenerator(t *testing.T) {
 			require.NotNil(t, job3)
 			require.Nil(t, g.NextJob())
 			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job2.ID,
+				Job:     job2,
 				Verdict: verdict.PT,
 				Points:  pointer.Float64(10),
 			})
 			require.NoError(t, err)
 			require.Nil(t, sub)
 			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job3.ID,
+				Job:     job3,
 				Verdict: verdict.OK,
 			})
 			require.NoError(t, err)
@@ -1048,7 +1048,7 @@ func TestIOIGenerator(t *testing.T) {
 			require.NotNil(t, job)
 			require.Nil(t, g.NextJob())
 			sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.ID,
+				Job:     job,
 				Verdict: verdict.CD,
 			})
 			require.NoError(t, err)
@@ -1057,7 +1057,7 @@ func TestIOIGenerator(t *testing.T) {
 			job = nextJob(t, g, 1, invokerconn.TestJob, 1)
 			require.NotNil(t, job)
 			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.ID,
+				Job:     job,
 				Verdict: verdict.OK,
 			})
 			job2 := nextJob(t, g, 1, invokerconn.TestJob, 2)
@@ -1066,13 +1066,13 @@ func TestIOIGenerator(t *testing.T) {
 			require.NotNil(t, job3)
 			require.Nil(t, g.NextJob())
 			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job2.ID,
+				Job:     job2,
 				Verdict: verdict.OK,
 			})
 			require.NoError(t, err)
 			require.Nil(t, sub)
 			sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job3.ID,
+				Job:     job3,
 				Verdict: verdict.OK,
 			})
 			require.NoError(t, err)
