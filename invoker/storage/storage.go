@@ -18,12 +18,12 @@ type InvokerStorage struct {
 
 	cache *commonCache
 
-	Source     *cacheGetter
-	Binary     *cacheGetter
-	Checker    *cacheGetter
-	Interactor *cacheGetter
-	TestInput  *cacheGetter
-	TestAnswer *cacheGetter
+	Source     *CacheGetter
+	Binary     *CacheGetter
+	Checker    *CacheGetter
+	Interactor *CacheGetter
+	TestInput  *CacheGetter
+	TestAnswer *CacheGetter
 }
 
 func NewInvokerStorage(ts *common.TestingSystem) *InvokerStorage {

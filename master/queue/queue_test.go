@@ -23,14 +23,14 @@ func doQueueCycles(t *testing.T, q *Queue, cycles int, maxNoJobs int) int {
 		}
 		if job.Type == invokerconn.CompileJob {
 			sub, err := q.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.ID,
+				Job:     job,
 				Verdict: verdict.CD,
 			})
 			assert.Nil(t, err)
 			assert.Nil(t, sub)
 		} else {
 			sub, err := q.JobCompleted(&masterconn.InvokerJobResult{
-				JobID:   job.ID,
+				Job:     job,
 				Verdict: verdict.OK,
 			})
 			assert.Nil(t, err)
@@ -132,7 +132,7 @@ func TestQueue_RescheduleJob(t *testing.T) {
 		require.Equal(t, job.SubmitID, newJob.SubmitID)
 
 		_, err = q.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   newJob.ID,
+			Job:     newJob,
 			Verdict: verdict.CD,
 		})
 		assert.Nil(t, err)
@@ -167,13 +167,13 @@ func TestQueue_RescheduleJob(t *testing.T) {
 		require.Equal(t, job.SubmitID, newJob.SubmitID)
 
 		_, err = q.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   newJob.ID,
+			Job:     newJob,
 			Verdict: verdict.CD,
 		})
 		assert.Nil(t, err) // this job should not be found
 
 		_, err = q.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   job.ID,
+			Job:     &job,
 			Verdict: verdict.CD,
 		})
 		assert.NotNil(t, err)
@@ -206,7 +206,7 @@ func TestQueue_RescheduleJob(t *testing.T) {
 		// compile 1
 		lastJob := spamJobs(q, 1)
 		_, err := q.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   lastJob.ID,
+			Job:     &lastJob,
 			Verdict: verdict.CD,
 		})
 		require.Nil(t, err)
@@ -214,7 +214,7 @@ func TestQueue_RescheduleJob(t *testing.T) {
 		// compile 2
 		lastJob = spamJobs(q, 2)
 		_, err = q.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   lastJob.ID,
+			Job:     &lastJob,
 			Verdict: verdict.CD,
 		})
 		require.Nil(t, err)
@@ -222,7 +222,7 @@ func TestQueue_RescheduleJob(t *testing.T) {
 		// test1
 		lastJob = spamJobs(q, 1)
 		_, err = q.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   lastJob.ID,
+			Job:     &lastJob,
 			Verdict: verdict.OK,
 		})
 		require.Nil(t, err)
@@ -230,7 +230,7 @@ func TestQueue_RescheduleJob(t *testing.T) {
 		// test2
 		lastJob = spamJobs(q, 2)
 		_, err = q.JobCompleted(&masterconn.InvokerJobResult{
-			JobID:   lastJob.ID,
+			Job:     &lastJob,
 			Verdict: verdict.OK,
 		})
 		require.Nil(t, err)
@@ -245,7 +245,7 @@ func TestQueue_RescheduleJob(t *testing.T) {
 func TestQueueWrongJobID(t *testing.T) {
 	q := NewQueue(nil).(*Queue)
 	sub, err := q.JobCompleted(&masterconn.InvokerJobResult{
-		JobID:   "",
+		Job:     &invokerconn.Job{},
 		Verdict: verdict.CD,
 	})
 	assert.Nil(t, sub)

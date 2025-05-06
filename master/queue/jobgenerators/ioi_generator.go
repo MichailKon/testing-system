@@ -444,11 +444,11 @@ func (i *IOIGenerator) testJobCompleted(
 func (i *IOIGenerator) JobCompleted(jobResult *masterconn.InvokerJobResult) (*models.Submission, error) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
-	job, ok := i.givenJobs[jobResult.JobID]
+	job, ok := i.givenJobs[jobResult.Job.ID]
 	if !ok {
-		return nil, fmt.Errorf("job %s does not exist", jobResult.JobID)
+		return nil, fmt.Errorf("job %s does not exist", jobResult.Job.ID)
 	}
-	delete(i.givenJobs, jobResult.JobID)
+	delete(i.givenJobs, jobResult.Job.ID)
 	switch job.Type {
 	case invokerconn.CompileJob:
 		i.compileJobCompleted(job, jobResult)

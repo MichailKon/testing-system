@@ -11,10 +11,10 @@ import (
 //
 // So we have single LRUSizeCache that holds all file types. Key for this cache is cacheKey, the internal struct with which we can determine the file type and it's keys.
 //
-// To access cache we have cacheGetter structs. Each cacheGetter responds for single file type.
-// Each cacheGetter accepts any number of uint64 that are transformed to cacheKey struct using cacheGetter.keyGen func.
+// To access cache we have CacheGetter structs. Each CacheGetter responds for single file type.
+// Each CacheGetter accepts any number of uint64 that are transformed to cacheKey struct using CacheGetter.keyGen func.
 //
-// So to access files, we call methods of cacheGetter, that transforms our request to request for LRUSizeCache and LRUSizeCache then does all the cache work.
+// So to access files, we call methods of CacheGetter, that transforms our request to request for LRUSizeCache and LRUSizeCache then does all the cache work.
 
 type commonCache = cache.LRUSizeCache[cacheKey, string]
 
@@ -29,30 +29,30 @@ type cacheKey struct {
 	TestID uint64 `json:"testID"`
 }
 
-type cacheGetter struct {
+type CacheGetter struct {
 	Cache  *commonCache
 	keyGen func(vals ...uint64) cacheKey
 }
 
-func (c *cacheGetter) Get(vals ...uint64) (*string, error) {
+func (c *CacheGetter) Get(vals ...uint64) (*string, error) {
 	return c.Cache.Get(c.keyGen(vals...))
 }
 
-func (c *cacheGetter) Lock(vals ...uint64) {
+func (c *CacheGetter) Lock(vals ...uint64) {
 	c.Cache.Lock(c.keyGen(vals...))
 }
 
-func (c *cacheGetter) Unlock(vals ...uint64) error {
+func (c *CacheGetter) Unlock(vals ...uint64) error {
 	return c.Cache.Unlock(c.keyGen(vals...))
 }
 
 // Insert can be used only for testing
-func (c *cacheGetter) Insert(file string, vals ...uint64) error {
+func (c *CacheGetter) Insert(file string, vals ...uint64) error {
 	return c.Cache.Insert(c.keyGen(vals...), &file, 1)
 }
 
-func newSourceCache(commonCache *commonCache) *cacheGetter {
-	return &cacheGetter{
+func newSourceCache(commonCache *commonCache) *CacheGetter {
+	return &CacheGetter{
 		Cache: commonCache,
 		keyGen: func(vals ...uint64) cacheKey {
 			return submitKeyGen(resource.SourceCode, vals)
@@ -60,8 +60,8 @@ func newSourceCache(commonCache *commonCache) *cacheGetter {
 	}
 }
 
-func newBinaryCache(commonCache *commonCache) *cacheGetter {
-	return &cacheGetter{
+func newBinaryCache(commonCache *commonCache) *CacheGetter {
+	return &CacheGetter{
 		Cache: commonCache,
 		keyGen: func(vals ...uint64) cacheKey {
 			return submitKeyGen(resource.CompiledBinary, vals)
@@ -69,8 +69,8 @@ func newBinaryCache(commonCache *commonCache) *cacheGetter {
 	}
 }
 
-func newCheckerCache(commonCache *commonCache) *cacheGetter {
-	return &cacheGetter{
+func newCheckerCache(commonCache *commonCache) *CacheGetter {
+	return &CacheGetter{
 		Cache: commonCache,
 		keyGen: func(vals ...uint64) cacheKey {
 			return problemIDKeyGen(resource.Checker, vals)
@@ -78,8 +78,8 @@ func newCheckerCache(commonCache *commonCache) *cacheGetter {
 	}
 }
 
-func newInteractorCache(commonCache *commonCache) *cacheGetter {
-	return &cacheGetter{
+func newInteractorCache(commonCache *commonCache) *CacheGetter {
+	return &CacheGetter{
 		Cache: commonCache,
 		keyGen: func(vals ...uint64) cacheKey {
 			return submitKeyGen(resource.Interactor, vals)
@@ -87,15 +87,15 @@ func newInteractorCache(commonCache *commonCache) *cacheGetter {
 	}
 }
 
-func newTestInputCache(commonCache *commonCache) *cacheGetter {
-	return &cacheGetter{
+func newTestInputCache(commonCache *commonCache) *CacheGetter {
+	return &CacheGetter{
 		Cache:  commonCache,
 		keyGen: func(vals ...uint64) cacheKey { return testKeyGen(resource.TestInput, vals) },
 	}
 }
 
-func newTestAnswerCache(commonCache *commonCache) *cacheGetter {
-	return &cacheGetter{
+func newTestAnswerCache(commonCache *commonCache) *CacheGetter {
+	return &CacheGetter{
 		Cache:  commonCache,
 		keyGen: func(vals ...uint64) cacheKey { return testKeyGen(resource.TestAnswer, vals) },
 	}

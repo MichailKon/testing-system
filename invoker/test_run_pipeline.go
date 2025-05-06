@@ -14,29 +14,23 @@ const (
 )
 
 func (i *Invoker) fullTestingPipeline(sandbox sandbox.ISandbox, job *Job) {
-	s := &JobPipelineState{
-		job:     job,
-		invoker: i,
-		sandbox: sandbox,
-		test:    new(pipelineTestData),
-		loggerData: fmt.Sprintf(
-			"test job: %s submission: %d problem %d test %d",
-			job.ID,
-			job.Submission.ID,
-			job.Problem.ID,
-			job.Test,
-		),
-	}
+	s := i.newPipelineState(sandbox, job)
+	s.test = new(pipelineTestData)
+	s.loggerData = fmt.Sprintf(
+		"test job: %s submission: %d problem %d test %d",
+		job.ID,
+		job.submission.ID,
+		job.problem.ID,
+		job.Test,
+	)
+	defer s.checkFinish()
 
 	logger.Trace("Starting testing for %s", s.loggerData)
-
-	s.defers = append(s.defers, job.deferFunc)
-	defer s.deferFunc()
 
 	err := s.testingProcessPipeline()
 	if err != nil {
 		logger.Error("Error in %s error: %v", s.loggerData, err)
-		i.failJob(job, "job %s error: %v", job.ID, err)
+		s.failJob("job %s error: %v", job.ID, err)
 		return
 	}
 
@@ -44,12 +38,12 @@ func (i *Invoker) fullTestingPipeline(sandbox sandbox.ISandbox, job *Job) {
 		err = s.uploadTestRunResources()
 		if err != nil {
 			logger.Error("Error in %s error: %v", s.loggerData, err)
-			i.failJob(job, "job %s error: %v", job.ID, err)
+			s.failJob("job %s error: %v", job.ID, err)
 			return
 		}
 	}
 
-	i.successJob(job, s.test.runResult)
+	s.successJob(s.test.runResult)
 }
 
 func (s *JobPipelineState) testingProcessPipeline() error {
@@ -94,7 +88,7 @@ func (s *JobPipelineState) testingProcessPipeline() error {
 
 func (s *JobPipelineState) generateTestRunConfig() error {
 	s.test.runConfig = new(sandbox.ExecuteConfig)
-	fillInTestRunConfigLimits(s.test.runConfig, s.job.Problem)
+	fillInTestRunConfigLimits(s.test.runConfig, s.job.problem)
 
 	s.test.runConfig.Command = solutionBinaryFile
 	s.test.runConfig.Stdin = &sandbox.IORedirect{FileName: testInputFile}
@@ -143,7 +137,7 @@ func fillInTestRunConfigLimits(c *sandbox.ExecuteConfig, problem *models.Problem
 
 func (s *JobPipelineState) executeTestRunCommand() error {
 	s.executeWaitGroup.Add(1)
-	s.invoker.RunQueue <- s.runSolution
+	s.runProcess(s.runSolution)
 	s.executeWaitGroup.Wait()
 
 	if s.test.runResult.Err != nil {

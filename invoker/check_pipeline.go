@@ -58,7 +58,7 @@ func (s *JobPipelineState) generateCheckerRunConfig() error {
 
 func (s *JobPipelineState) executeCheckerRunCommand() error {
 	s.executeWaitGroup.Add(1)
-	s.invoker.RunQueue <- s.runChecker
+	s.runProcess(s.runChecker)
 	s.executeWaitGroup.Wait()
 
 	if s.test.checkResult.Err != nil {
@@ -175,11 +175,11 @@ func (s *JobPipelineState) uploadTestRunResources() error {
 func (s *JobPipelineState) uploadCheckerOutput() error {
 	checkerOutputRequest := &storageconn.Request{
 		Resource: resource.CheckerOutput,
-		SubmitID: uint64(s.job.Submission.ID),
+		SubmitID: uint64(s.job.submission.ID),
 		TestID:   s.job.Test,
 		File:     s.test.checkerOutputReader,
 	}
-	resp := s.invoker.TS.StorageConn.Upload(checkerOutputRequest)
+	resp := s.uploadResource(checkerOutputRequest)
 	if resp.Error != nil {
 		return fmt.Errorf("can not upload checker output to storage, error: %s", resp.Error.Error())
 	}

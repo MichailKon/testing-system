@@ -120,11 +120,11 @@ func (i *ICPCGenerator) testJobCompleted(job *invokerconn.Job, result *mastercon
 func (i *ICPCGenerator) JobCompleted(result *masterconn.InvokerJobResult) (*models.Submission, error) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
-	job, ok := i.givenJobs[result.JobID]
+	job, ok := i.givenJobs[result.Job.ID]
 	if !ok {
-		return nil, fmt.Errorf("job %s does not exist", result.JobID)
+		return nil, fmt.Errorf("job %s does not exist", result.Job.ID)
 	}
-	delete(i.givenJobs, result.JobID)
+	delete(i.givenJobs, result.Job.ID)
 
 	switch job.Type {
 	case invokerconn.CompileJob:

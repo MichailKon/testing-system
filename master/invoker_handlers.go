@@ -29,9 +29,11 @@ func (m *Master) handleInvokerJobResult(c *gin.Context) {
 		return
 	}
 
-	logger.Trace("new job result received, job id: %s", result.JobID)
+	m.ts.Metrics.NewJobResult(result)
+
+	logger.Trace("new job result received, job id: %s", result.Job.ID)
 	if !m.invokerRegistry.HandleInvokerJobResult(result) {
-		logger.Trace("job %s is unknown or was rescheduled, skipping", result.JobID)
+		logger.Trace("job %s is unknown or was rescheduled, skipping", result.Job.ID)
 		connector.RespOK(c, nil)
 		return
 	}

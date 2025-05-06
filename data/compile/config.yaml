@@ -1,8 +1,0 @@
-DefaultLimits:
-  TL: "5s"
-  ML: "1G"
-  WL: "10s"
-Languages:
-  g++:
-    TemplateValues:
-      flags: "-O2 -Wall -Wextra"

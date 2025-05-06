@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"os/signal"
 	"runtime"
 	"slices"
@@ -12,6 +13,7 @@ import (
 	"testing_system/common/connectors/masterconn"
 	"testing_system/common/connectors/storageconn"
 	"testing_system/common/db"
+	"testing_system/common/metrics"
 	"testing_system/lib/logger"
 
 	"github.com/gin-gonic/gin"
@@ -19,9 +21,10 @@ import (
 )
 
 type TestingSystem struct {
-	Config *config.Config
-	Router *gin.Engine
-	DB     *gorm.DB
+	Config  *config.Config
+	Router  *gin.Engine
+	DB      *gorm.DB
+	Metrics *metrics.Collector
 
 	MasterConn  *masterconn.Connector
 	StorageConn *storageconn.Connector
@@ -53,6 +56,11 @@ func InitTestingSystem(configPath string) *TestingSystem {
 
 	ts.MasterConn = masterconn.NewConnector(ts.Config.MasterConnection)
 	ts.StorageConn = storageconn.NewConnector(ts.Config.StorageConnection)
+
+	ts.Metrics = metrics.NewCollector()
+	ts.Router.GET("/metrics", gin.WrapH(promhttp.HandlerFor(ts.Metrics.Registerer, promhttp.HandlerOpts{
+		ErrorLog: logger.CreateWriter(logger.LogLevelError, "[Prometheus]"),
+	})))
 
 	return ts
 }

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"gopkg.in/yaml.v3"
+	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
 )
 
 // Time is set by number and size suffix. Possible suffixes are:
@@ -58,8 +60,14 @@ func (t Time) Value() (driver.Value, error) {
 	return int64(t), nil
 }
 
-func (t *Time) GormDataType() string {
-	return "int64" // uint64 not supported by goorm
+func (t Time) GormDBDataType(db *gorm.DB, field *schema.Field) string {
+	switch db.Dialector.Name() {
+	case "mysql", "sqlite":
+		return "int64"
+	case "postgres":
+		return "bigint"
+	}
+	return ""
 }
 
 func (t *Time) FromStr(s string) error {

@@ -2,7 +2,6 @@ package logger
 
 import (
 	"fmt"
-	"io"
 	baselog "log"
 	"os"
 	"testing_system/common/config"
@@ -64,7 +63,11 @@ func (w *logWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func CreateWriter(level int, prefix string) io.Writer {
+func (w *logWriter) Println(v ...interface{}) {
+	logPrint(w.level, "%s %s", w.prefix, fmt.Sprint(v...))
+}
+
+func CreateWriter(level int, prefix string) *logWriter {
 	return &logWriter{
 		level:  level,
 		prefix: prefix,
