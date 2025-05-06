@@ -9,6 +9,7 @@ import (
 	"testing_system/common/constants/verdict"
 	"testing_system/common/db/models"
 	"testing_system/lib/logger"
+	"testing_system/master/queue/queuestatus"
 )
 
 type state int
@@ -32,6 +33,8 @@ type ICPCGenerator struct {
 
 	givenJobs           map[string]*invokerconn.Job
 	internalTestResults map[uint64]*models.TestResult
+
+	statusUpdater *queuestatus.QueueStatus
 }
 
 func (i *ICPCGenerator) ID() string {
@@ -78,11 +81,19 @@ func (i *ICPCGenerator) setFail() {
 }
 
 func (i *ICPCGenerator) updateSubmissionResult() (*models.Submission, error) {
+	updated := false
+	defer func() {
+		if updated {
+			i.statusUpdater.UpdateSubmission(i.submission)
+		}
+	}()
+
 	for i.testedPrefixLength < i.problem.TestsNumber {
 		result, ok := i.internalTestResults[i.testedPrefixLength+1]
 		if !ok {
 			return nil, nil
 		}
+		updated = true
 		i.testedPrefixLength++
 		if i.submission.Verdict != verdict.RU {
 			result = &models.TestResult{
@@ -169,7 +180,7 @@ func (i *ICPCGenerator) JobCompleted(result *masterconn.InvokerJobResult) (*mode
 	return i.updateSubmissionResult()
 }
 
-func newICPCGenerator(problem *models.Problem, submission *models.Submission) (Generator, error) {
+func newICPCGenerator(problem *models.Problem, submission *models.Submission, status *queuestatus.QueueStatus) (Generator, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		logger.Panic("Can't generate generator id: %w", err)
@@ -192,5 +203,7 @@ func newICPCGenerator(problem *models.Problem, submission *models.Submission) (G
 
 		givenJobs:           make(map[string]*invokerconn.Job),
 		internalTestResults: make(map[uint64]*models.TestResult),
+
+		statusUpdater: status,
 	}, nil
 }

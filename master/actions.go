@@ -124,5 +124,7 @@ func (m *Master) updateSubmission(ctx context.Context, submission *models.Submis
 		logger.Error("failed to save submission %d to db, error: %v", submission.ID, err)
 		return err
 	}
+	// We remove submission from status only after result is uploaded to database
+	m.queue.Status().FinishSubmissionTesting(submission.ID)
 	return nil
 }

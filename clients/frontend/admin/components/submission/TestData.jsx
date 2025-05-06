@@ -80,7 +80,7 @@ export function RenderTest(test, testResult, changeTest) {
 }
 
 export function WatchTestData(tests, changeTest, submission) {
-  if (!submission) {
+  if (!submission || !submission.test_results) {
     return
   } else if (tests.length === 0) {
     changeTest({

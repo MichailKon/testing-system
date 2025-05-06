@@ -177,8 +177,7 @@ func (h *Handler) findSubmission(c *gin.Context) (*models.Submission, bool) {
 		return nil, false
 	}
 
-	submission := new(models.Submission)
-	err = h.masterStatus.GetSubmission(c, submitID.ID, submission)
+	submission, err := h.masterStatus.GetSubmission(c, submitID.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			respError(c, http.StatusNotFound, "Submission with id %d not found", submitID.ID)

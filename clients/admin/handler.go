@@ -34,6 +34,8 @@ func (h *Handler) setupRoutes() {
 	router.GET("/submissions", h.serveFrontend)
 	router.GET("/submission/:id", h.serveFrontend)
 	router.GET("/new/submission", h.serveFrontend)
+
+	router.GET("/status", h.serveFrontend)
 }
 
 func (h *Handler) serveFrontend(c *gin.Context) {

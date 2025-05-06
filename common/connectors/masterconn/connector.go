@@ -59,3 +59,19 @@ func (c *Connector) SendNewSubmission(
 	}
 	return submissionResponse.SubmissionID, nil
 }
+
+func (c *Connector) GetStatus(ctx context.Context, prevEpoch string) (*Status, error) {
+	r := c.connection.R()
+	r.SetContext(ctx)
+	r.SetQueryParam("prevEpoch", prevEpoch)
+	var status Status
+	r.SetResult(&status)
+	resp, err := r.Get("/master/status")
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode() != http.StatusOK {
+		return nil, connector.ParseRespError(resp.Body(), resp)
+	}
+	return &status, nil
+}

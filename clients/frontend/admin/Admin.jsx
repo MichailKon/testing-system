@@ -8,6 +8,7 @@ import Submissions from "./pages/Submissions";
 import Submission from "./pages/Submission";
 import NewProblem from "./pages/NewProblem";
 import NewSubmission from "./pages/NewSubmission";
+import Status from "./pages/Status";
 
 const root = ReactDOM.createRoot(document.querySelector("#application"));
 root.render(
@@ -20,6 +21,7 @@ root.render(
       <Route path="/admin/submissions" element={<Submissions />} />
       <Route path="/admin/submission/:id" element={<Submission />} />
       <Route path="/admin/new/submission" element={<NewSubmission />} />
+      <Route path="/admin/status" element={<Status />} />
     </Routes>
   </BrowserRouter>
 );

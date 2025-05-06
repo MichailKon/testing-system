@@ -12,10 +12,10 @@ const (
 )
 
 type Job struct {
-	ID       string  `json:"ID"  binding:"required"`
-	SubmitID uint    `json:"SubmitID" binding:"required"`
-	Type     JobType `json:"JobType" binding:"required"`
-	Test     uint64  `json:"Test"`
+	ID       string  `json:"id"  binding:"required"`
+	SubmitID uint    `json:"submit_id" binding:"required"`
+	Type     JobType `json:"type" binding:"required"`
+	Test     uint64  `json:"test"`
 
 	// TODO: Add job dependency
 }
@@ -25,8 +25,8 @@ func (j Job) String() string {
 }
 
 type Status struct {
-	MaxNewJobs   uint64   `json:"MaxNewJobs"`
-	ActiveJobIDs []string `json:"ActiveJobIDs"`
-	Epoch        string   `json:"Epoch"`
-	Address      string   `json:"Address"`
+	MaxNewJobs   uint64   `json:"max_new_jobs"`
+	ActiveJobIDs []string `json:"active_job_ids"`
+	Epoch        string   `json:"epoch"`
+	Address      string   `json:"address"`
 }

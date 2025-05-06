@@ -101,3 +101,14 @@ func (r *InvokerRegistry) SendJobs() {
 		}
 	}
 }
+
+func (r *InvokerRegistry) Status() []*masterconn.InvokerStatus {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	status := make([]*masterconn.InvokerStatus, 0, len(r.invokers))
+	for _, invoker := range r.invokers {
+		status = append(status, invoker.StatusForMaster())
+	}
+	return status
+}

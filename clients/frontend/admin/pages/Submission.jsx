@@ -2,7 +2,7 @@ import React, {useEffect, useReducer, useState} from "react";
 import axios from "axios";
 import Body from "../components/Body";
 import {Link, useParams} from "react-router-dom";
-import Verdict from "../components/Verdict";
+import Verdict, {SubmissionVerdict} from "../components/Verdict";
 import {RenderTest, TestDataReducer, WatchTestData} from "../components/submission/TestData";
 import {
   CompilationDataReducer, InitialCompilationData, RenderCompilationData, WatchCompilationData
@@ -94,7 +94,7 @@ export default function Submission() {
             <td><Link to={`/admin/problem/${submission.problem_id}`}>{submission.problem_id}</Link></td>
             <td>{submission.language}</td>
             <td>{submission.score}</td>
-            <td>{Verdict(submission.verdict)}</td>
+            <td>{SubmissionVerdict(submission)}</td>
           </tr>
         </tbody>
       </table>

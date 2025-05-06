@@ -20,11 +20,11 @@ type Request struct {
 	*/
 
 	// If resource is part of problem, ProblemID is used
-	ProblemID uint64 `json:"problemID"`
+	ProblemID uint64 `json:"problem_id"`
 	// If resource is part of submit, SubmitID is used
-	SubmitID uint64 `json:"submitID"`
+	SubmitID uint64 `json:"submit_id"`
 	// If resource is a test, TestID should be specified
-	TestID uint64 `json:"testID"`
+	TestID uint64 `json:"test_id"`
 
 	// For any download, either a new file will be created or the file will be downloaded as []byte
 	DownloadBytes bool `json:"-"`
@@ -36,13 +36,13 @@ type Request struct {
 	DownloadFilename *string `json:"-"`
 
 	// For downloads, DownloadHead can be specified so that only first DownloadHead bytes will be loaded
-	DownloadHead *int64 `json:"downloadHead"`
+	DownloadHead *int64 `json:"download_head,omitempty"`
 
 	// For uploads, File should be specified
 	File io.Reader `json:"-"`
 
 	// If StorageFilename is not specified, Storage tries to get the filename automatically
-	StorageFilename string `json:"storageFilename"`
+	StorageFilename string `json:"storage_filename,omitempty"`
 
 	// Context may be specified for requests
 	Ctx context.Context `json:"-"`
@@ -55,12 +55,12 @@ type Response struct {
 
 type FileResponse struct {
 	Response
-	IsBytesArray bool   `json:"isFile"`
-	RawData      []byte `json:"rawData"`
+	IsBytesArray bool
+	RawData      []byte
 
-	Filename   string `json:"filename"`
-	BaseFolder string `json:"baseFolder"`
-	Size       uint64 `json:"size"`
+	Filename   string
+	BaseFolder string
+	Size       uint64
 }
 
 func NewFileResponse(request Request) *FileResponse {

@@ -59,4 +59,6 @@ func (h *Handler) setupRoutes() {
 	apiRouter.GET("/get/submission/:id/test/:test/check", h.submissionTestResourceGetter(resource.CheckerOutput))
 
 	apiCSRFRouter.PUT("/new/submission", h.addSubmission)
+
+	apiRouter.GET("/get/master_status", h.getMasterStatus)
 }

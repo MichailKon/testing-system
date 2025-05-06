@@ -11,6 +11,7 @@ import (
 	"testing_system/common/db/models"
 	"testing_system/lib/logger"
 	"testing_system/master/queue/jobgenerators"
+	"testing_system/master/queue/queuestatus"
 )
 
 type Queue struct {
@@ -25,15 +26,18 @@ type Queue struct {
 
 	originalJobIDToGenerator map[string]jobgenerators.Generator
 	activeGeneratorIDs       map[string]struct{}
+
+	status *queuestatus.QueueStatus
 }
 
 func (q *Queue) Submit(problem *models.Problem, submission *models.Submission) error {
-	generator, err := jobgenerators.NewGenerator(problem, submission)
+	generator, err := jobgenerators.NewGenerator(problem, submission, q.status)
 	if err != nil {
 		return err
 	}
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
+	q.status.AddSubmission(submission)
 	q.activeGenerators.PushBack(generator)
 	q.activeGeneratorIDs[generator.ID()] = struct{}{}
 	logger.Trace("Registered submission %d for problem %d in queue", submission.ID, problem.ID)
@@ -65,6 +69,7 @@ func (q *Queue) JobCompleted(jobResult *masterconn.InvokerJobResult) (submission
 
 	if _, ok = q.activeGeneratorIDs[generator.ID()]; !ok {
 		q.activeGenerators.PushBack(generator)
+		q.activeGeneratorIDs[generator.ID()] = struct{}{}
 	}
 
 	logger.Trace("Job %s result is received by queue", wasID)
@@ -128,4 +133,8 @@ func (q *Queue) NextJob() *invokerconn.Job {
 		return job
 	}
 	return nil
+}
+
+func (q *Queue) Status() *queuestatus.QueueStatus {
+	return q.status
 }

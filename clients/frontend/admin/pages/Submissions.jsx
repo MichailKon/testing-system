@@ -2,7 +2,7 @@ import React, {useEffect, useState} from "react";
 import Body from "../components/Body";
 import axios from "axios";
 import {Link, useSearchParams} from "react-router-dom";
-import Verdict from "../components/Verdict";
+import Verdict, {SubmissionVerdict} from "../components/Verdict";
 import Pagination from "../components/Pagination";
 import FiltersForm from "../components/submission/SubmissionsFilters";
 
@@ -95,7 +95,7 @@ export default function Submissions() {
               <td><Link to={`/admin/problem/${submission.problem_id}`}>{submission.problem_id}</Link></td>
               <td>{submission.language}</td>
               <td>{submission.score}</td>
-              <td>{Verdict(submission.verdict)}</td>
+              <td>{SubmissionVerdict(submission)}</td>
             </tr>
           )
         }

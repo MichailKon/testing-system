@@ -1,5 +1,3 @@
-//go:generate go run github.com/swaggo/swag/cmd/swag@latest init -g master.go --parseDependency -o ../swag
-
 package master
 
 import (

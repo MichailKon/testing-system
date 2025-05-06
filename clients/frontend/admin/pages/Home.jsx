@@ -20,6 +20,7 @@ export default function Home() {
           {Links([
             {to: "/admin/problems", text: "Problems"},
             {to: "/admin/submissions", text: "Submissions"},
+            {to: "/admin/status", text: "Status"},
           ])}
         </div>
       </div>
