@@ -133,7 +133,7 @@ func (s *JobPipelineState) uploadOutput(fileName string, resourceType resource.T
 }
 
 func (s *JobPipelineState) copyFileToSandbox(src string, dst string, perm os.FileMode) error {
-	start := time.Now()
+	defer updateMetrics(&s.metrics.FileActionsDuration, time.Now())
 	srcReader, err := os.Open(src)
 	if err != nil {
 		return err
@@ -146,7 +146,6 @@ func (s *JobPipelineState) copyFileToSandbox(src string, dst string, perm os.Fil
 	defer dstWriter.Close()
 	_, err = io.Copy(dstWriter, srcReader)
 
-	s.metrics.FileActionsDuration += time.Since(start)
 	return nil
 }
 
@@ -171,15 +170,13 @@ func (s *JobPipelineState) limitedReader(r io.Reader) io.Reader {
 }
 
 func (s *JobPipelineState) loadResource(getter *storage.CacheGetter, args ...uint64) (*string, error) {
-	start := time.Now()
+	defer updateMetrics(&s.metrics.ResourceWaitDuration, time.Now())
 	res, err := getter.Get(args...)
-	s.metrics.ResourceWaitDuration += time.Since(start)
 	return res, err
 }
 
 func (s *JobPipelineState) uploadResource(request *storageconn.Request) *storageconn.Response {
-	start := time.Now()
+	defer updateMetrics(&s.metrics.SendResultDuration, time.Now())
 	resp := s.invoker.TS.StorageConn.Upload(request)
-	s.metrics.SendResultDuration += time.Since(start)
 	return resp
 }

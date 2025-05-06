@@ -140,3 +140,7 @@ func (s *JobPipelineState) uploadJobResult(request *masterconn.InvokerJobResult)
 		logger.Error("Can not send job %s result, error: %s", s.job.ID, err.Error())
 	}
 }
+
+func updateMetrics(metric *time.Duration, start time.Time) {
+	*metric += time.Since(start)
+}
