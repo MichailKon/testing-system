@@ -25,7 +25,7 @@ func NewGenerator(problem *models.Problem, submission *models.Submission, status
 	case models.ProblemTypeICPC:
 		return newICPCGenerator(problem, submission, status)
 	case models.ProblemTypeIOI:
-		return NewIOIGenerator(problem, submissionm, status)
+		return NewIOIGenerator(problem, submission, status)
 	default:
 		return nil, fmt.Errorf("unknown problem type %v", problem.ProblemType)
 	}

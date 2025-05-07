@@ -74,6 +74,9 @@ func (h *Handler) modifyProblem(c *gin.Context) {
 		return
 	}
 	problem.ID = oldProblem.ID
+	if !checkProblemIsOK(c, problem) {
+		return
+	}
 	err := h.base.DB.WithContext(c).Save(&problem).Error
 	if err != nil {
 		respError(
@@ -165,4 +168,84 @@ func (h *Handler) findProblem(c *gin.Context, id string) (*models.Problem, bool)
 	}
 
 	return h.findProblemByID(c, uint(problemID))
+}
+
+func checkProblemIsOK(c *gin.Context, problem models.Problem) bool {
+	switch problem.ProblemType {
+	case models.ProblemTypeICPC:
+		return true
+	case models.ProblemTypeIOI:
+		lastTest := uint64(0)
+		usedGroupNames := make(map[string]struct{})
+		for _, group := range problem.TestGroups {
+			_, ok := usedGroupNames[group.Name]
+			if ok {
+				respError(c, http.StatusBadRequest, "Group %s is used more than once", group.Name)
+				return false
+			}
+
+			if group.FirstTest != lastTest+1 {
+				respError(c, http.StatusBadRequest,
+					"Group %s first test is incorrect, should be previous group last test + 1", group.Name,
+				)
+				return false
+			}
+			if group.FirstTest > group.LastTest {
+				respError(c, http.StatusBadRequest, "Group %s first test is greater than last test", group.Name)
+			}
+			lastTest = group.LastTest
+			switch group.ScoringType {
+			case models.TestGroupScoringTypeComplete, models.TestGroupScoringTypeMin:
+				if group.GroupScore == nil {
+					respError(c, http.StatusBadRequest, "Group %s has no group score", group.Name)
+					return false
+				}
+			case models.TestGroupScoringTypeEachTest:
+				if group.TestScore == nil {
+					respError(c, http.StatusBadRequest, "Group %s has no test score", group.Name)
+					return false
+				}
+			default:
+				respError(c, http.StatusBadRequest, "Group %s has invalid scoring type", group.Name)
+				return false
+			}
+
+			switch group.FeedbackType {
+			case models.TestGroupFeedbackTypeNone,
+				models.TestGroupFeedbackTypePoints,
+				models.TestGroupFeedbackTypeICPC,
+				models.TestGroupFeedbackTypeComplete,
+				models.TestGroupFeedbackTypeFull:
+				// skip
+			default:
+				respError(c, http.StatusBadRequest, "Group %s has invalid feedback type", group.Name)
+				return false
+			}
+
+			usedRequiredGroups := make(map[string]struct{})
+			for _, required := range group.RequiredGroupNames {
+				if _, ok = usedGroupNames[required]; !ok {
+					respError(c, http.StatusBadRequest,
+						"Group %s has required group name %s which is not present", group.Name, required,
+					)
+					return false
+				}
+				if _, ok = usedRequiredGroups[required]; ok {
+					respError(c, http.StatusBadRequest,
+						"Group %s has duplicate required group name %s", group.Name, required,
+					)
+				}
+			}
+
+			usedGroupNames[group.Name] = struct{}{}
+		}
+		if lastTest != problem.TestsNumber {
+			respError(c, http.StatusBadRequest, "Not all tests are present in all groups")
+			return false
+		}
+		return true
+	default:
+		respError(c, http.StatusBadRequest, "Invalid problem type")
+		return false
+	}
 }

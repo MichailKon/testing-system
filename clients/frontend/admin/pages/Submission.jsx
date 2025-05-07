@@ -99,6 +99,37 @@ export default function Submission() {
         </tbody>
       </table>
       {RenderCompilationData(compilationData, submission, changeCompilationData)}
+      {submission.group_results ? (
+        <>
+        <h5 className="mb-3">Group results</h5>
+        <div className="row">
+          <div className="col-12 col-md-10 col-lg-8">
+            <table className="table mb-3">
+              <thead>
+              <tr>
+                <th scope="row">Name</th>
+                <th scope="row">Score</th>
+                <th scope="row">Passed</th>
+              </tr>
+              </thead>
+              <tbody>
+              {submission.group_results.map((group, index) => (
+                <tr key={index}>
+                  <td>{group.group_name}</td>
+                  <td>{group.points}</td>
+                  <td>{group.passed ? (
+                    <span className="text-success">Yes</span>
+                  ) : (
+                    <span className="text-danger">No</span>
+                  )}</td>
+                </tr>
+              ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        </>
+      ) : null}
       {submission.test_results ? (
         <>
         <h5 className="mb-3">Test results</h5>

@@ -73,6 +73,7 @@ export function RenderCompilationData(compilationData, submission, changeCompila
       </table>
       {compilationData.show ? (
         <>
+          {RenderResource("Error", null, compilationResult.error)}
           {renderSourceCode(submission, compilationData["source"])}
           {RenderResource(
             "Compilation message",

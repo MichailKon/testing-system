@@ -251,12 +251,12 @@ func TestICPCGenerator(t *testing.T) {
 			require.Equal(t, uint64(i)+1, result.TestNumber)
 		}
 
-
 		require.Panics(t, func() {
 			g.JobCompleted(&masterconn.InvokerJobResult{
-				Job:   job,
+				Job:     job,
 				Verdict: verdict.CE,
 			})
+		})
 	})
 }
 

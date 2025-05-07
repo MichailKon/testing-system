@@ -3,7 +3,6 @@ package invoker
 import (
 	"fmt"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -72,14 +71,10 @@ func (ts *testState) testCompile(submitID uint) *JobPipelineState {
 			Type:     invokerconn.CompileJob,
 		},
 		problem: &models.Problem{
-			Model: gorm.Model{
-				ID: 1,
-			},
+			ID: 1,
 		},
 		submission: &models.Submission{
-			Model: gorm.Model{
-				ID: submitID,
-			},
+			ID:        submitID,
 			ProblemID: 1,
 			Language:  "cpp",
 		},
@@ -166,15 +161,11 @@ func (ts *testState) testRun(submitID uint, problemID uint) *sandbox.RunResult {
 			Test:     1,
 		},
 		problem: &models.Problem{
-			Model: gorm.Model{
-				ID: problemID,
-			},
+			ID:          problemID,
 			TestsNumber: 1,
 		},
 		submission: &models.Submission{
-			Model: gorm.Model{
-				ID: submitID,
-			},
+			ID:        submitID,
 			ProblemID: 1,
 			Language:  "cpp",
 		},
@@ -199,7 +190,7 @@ func (ts *testState) testRun(submitID uint, problemID uint) *sandbox.RunResult {
 		job.Test,
 	)
 
-	defer s.deferFunc()
+	defer s.finish()
 
 	require.NoError(ts.t, s.testingProcessPipeline())
 

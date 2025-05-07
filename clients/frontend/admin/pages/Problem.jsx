@@ -1,7 +1,7 @@
-import React, {useEffect, useState} from "react";
+import React, {useEffect, useReducer, useState} from "react";
 import {Link, useParams} from "react-router-dom";
 import axios from "axios";
-import ProblemForm from "../components/problem/ProblemForm";
+import {ProblemInitialState, ProblemReducer, RenderProblemForm} from "../components/problem/ProblemForm";
 import Body from "../components/Body";
 import ChangeAlert, {SendAlertRequest} from "../components/ChangeAlert";
 
@@ -14,7 +14,7 @@ export default function Problems() {
     error: null,
   });
 
-  const [problem, setProblem] = useState({})
+  const [problem, changeProblem] = useReducer(ProblemReducer, ProblemInitialState())
 
   useEffect(() => {
     const apiURL = `/api/get/problem/${id}`
@@ -23,7 +23,10 @@ export default function Problems() {
         loading: false,
         error: resp.data.error,
       })
-      setProblem(resp.data.response);
+      changeProblem({
+        action: "problem",
+        problem: resp.data.response,
+      })
     }).catch(
       (err) => {
         setState({
@@ -38,7 +41,7 @@ export default function Problems() {
     hasAlert: false,
   })
 
-  const changeProblem = () => {
+  const modifyProblem = () => {
     const apiUrl = `/api/modify/problem/${id}`
     SendAlertRequest(axios.post(apiUrl, problem), setAlert, null)
   }
@@ -77,7 +80,7 @@ export default function Problems() {
 
   return wrapContent(
     <div>
-      {ProblemForm(problem, setProblem, changeProblem, "Save")}
+      {RenderProblemForm(problem, changeProblem, modifyProblem, "Save")}
       <div className="row mb-md-3 mb-0">{ChangeAlert(alert)}</div>
     </div>
   )

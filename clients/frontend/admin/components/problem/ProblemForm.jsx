@@ -1,5 +1,4 @@
 import React from "react";
-import {e} from "react-router/dist/production/fog-of-war-BLArG-qZ";
 
 export function ProblemInitialState() {
   return {
@@ -61,7 +60,10 @@ export function ProblemReducer(problem, action) {
       return p
 
     case "add_group":
-      p.test_groups.push({})
+      p.test_groups.push({
+        "scoring_type": 1,
+        "feedback_type": 3,
+      })
       return p
 
     case "group":
@@ -84,15 +86,21 @@ export function ProblemReducer(problem, action) {
           if (newScoringType !== 1) {
             removeRequired(idx)
           }
+          p.test_groups[idx][action.groupAction] = newScoringType
+          return p
 
         // Score fields
-        case "score":
+        case "group_score":
         case "test_score":
-          delete p.test_groups[idx]["score"]
+          console.log(action)
+          delete p.test_groups[idx]["group_score"]
           delete p.test_groups[idx]["test_score"]
-          if (action.value !== "") {
-            p[action.groupAction] = parseFloat(action.value)
+          if (action.value === "") {
+            delete p.test_groups[idx][action.groupAction]
+          } else {
+            p.test_groups[idx][action.groupAction] = parseFloat(action.value)
           }
+          console.log(p)
           return p
 
         case "add_required":
@@ -178,7 +186,7 @@ export function RenderProblemForm(
             <option value="" key="none"></option>
           )}
           {values.map((value, index) => (
-            <option key={index} value={value.value}>value.name</option>
+            <option key={index} value={value.value}>{value.name}</option>
           ))}
         </select>
       </div>
@@ -217,23 +225,31 @@ function renderGroups(problem, changeProblem) {
     return null
   }
   return (
-    <table>
-      <thead>
-      <tr>
-        <th scope="row">Name</th>
-        <th scope="row">First test</th>
-        <th scope="row">Last test</th>
-        <th scope="row">Score</th>
-        <th scope="row">Scoring Type</th>
-        <th scope="row">Feedback Type</th>
-        <th scope="row">Required</th>
-        <th scope="row">Delete</th>
-      </tr>
-      </thead>
-      <tbody>
-      {problem.test_groups.map((group, index) => renderGroup(group, index, problem, changeProblem))}
-      </tbody>
-    </table>
+    <>
+      <table className="table table-striped">
+        <thead>
+        <tr>
+          <th style={{width: "10%"}} scope="row">Name</th>
+          <th style={{width: "10%"}} scope="row">First test</th>
+          <th style={{width: "10%"}} scope="row">Last test</th>
+          <th style={{width: "10%"}} scope="row">Score</th>
+          <th style={{width: "10%"}} scope="row">Scoring Type</th>
+          <th style={{width: "10%"}} scope="row">Feedback Type</th>
+          <th style={{width: "30%"}} scope="row">Required</th>
+          <th style={{width: "10%"}} scope="row">Delete</th>
+        </tr>
+        </thead>
+        <tbody>
+        {problem.test_groups.map((group, index) => renderGroup(group, index, problem, changeProblem))}
+        </tbody>
+      </table>
+      <a href="#" onClick={(e) => {
+        e.preventDefault();
+        changeProblem({
+          action: "add_group",
+        })
+      }}>Add group</a>
+    </>
   )
 }
 
@@ -246,7 +262,7 @@ function renderGroup(group, index, problem, changeProblem) {
         name={name}
         type={type}
         required={required}
-        value={group[name] || ""}
+        value={group[name] == null ? "" : group[name]}
         onChange={(e) => {
           changeProblem({
             action: "group",
@@ -288,9 +304,9 @@ function renderGroup(group, index, problem, changeProblem) {
     {tableInput("first_test", "number", true)}
     {tableInput("last_test", "number", true)}
     {group.scoring_type === 2 ? (
-      tableInput("test_score", "number", true, "Test score")
+      tableInput("test_score", "number", true)
     ) : (
-      tableInput("test_score", "number", true, "Group score")
+      tableInput("group_score", "number", true)
     )}
     {tableSelect("scoring_type", [
       {value: 1, name: "Complete"},
@@ -311,7 +327,7 @@ function renderGroup(group, index, problem, changeProblem) {
         changeProblem({
           action: "group",
           groupIndex: index,
-          groupAction: "delete",
+          groupAction: "remove",
         })
       }}>Delete</a>
     </td>
@@ -323,7 +339,7 @@ function renderRequiredGroups(group, index, problem, changeProblem) {
   let canAdd = []
   for (let i = 0; i < index; i++) {
     const gName = problem.test_groups[i].name
-    if (problem.test_groups[i].scoring_type === 1 || !required.includes(gName)) {
+    if (problem.test_groups[i].scoring_type === 1 && !required.includes(gName)) {
       canAdd.push(gName)
     }
   }

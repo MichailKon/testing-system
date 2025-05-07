@@ -83,8 +83,8 @@ func (t TestGroups) GormDBDataType(db *gorm.DB, field *schema.Field) string {
 }
 
 type Problem struct {
-	ID        uint           `gorm:"primarykey" json:"ID" yaml:"ID"`
-	CreatedAt time.Time      `json:"created_at" yaml:"CreatedAt"`
+	ID        uint           `gorm:"primarykey" json:"id" yaml:"id"`
+	CreatedAt time.Time      `json:"created_at" yaml:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at" yaml:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-" yaml:"-"`
 

@@ -19,7 +19,7 @@ type TestResult struct {
 	Memory     *customfields.Memory `json:"memory,omitempty" yaml:"memory,omitempty"`
 	WallTime   *customfields.Time   `json:"wall_time,omitempty" yaml:"wall_time,omitempty"`
 	Error      string               `json:"error,omitempty" yaml:"error,omitempty"`
-	ExitCode   *int                 `json:"exit_code,omitempty" yaml:"exit_code"`
+	ExitCode   *int                 `json:"exit_code,omitempty" yaml:"exit_code,omitempty"`
 }
 
 func (t TestResult) Value() (driver.Value, error) {
@@ -113,5 +113,5 @@ type Submission struct {
 	Verdict           verdict.Verdict `json:"verdict" yaml:"verdict"`
 	TestResults       TestResults     `json:"test_results" yaml:"test_results"`
 	CompilationResult *TestResult     `json:"compilation_result" yaml:"compilation_result"`
-	GroupResults GroupResults    `json:"group_results,omitempty" yaml:"group_results,omitempty"`
+	GroupResults      GroupResults    `json:"group_results,omitempty" yaml:"group_results,omitempty"`
 }
