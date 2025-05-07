@@ -44,6 +44,6 @@ func NewQueue(ts *common.TestingSystem) IQueue {
 		originalJobIDToJob:       make(map[string]*invokerconn.Job),
 		originalJobIDToGenerator: make(map[string]jobgenerators.Generator),
 		activeGeneratorIDs:       make(map[string]struct{}),
-		status:                   queuestatus.NewQueueStatus(),
+		status:                   queuestatus.NewQueueStatus(false),
 	}
 }

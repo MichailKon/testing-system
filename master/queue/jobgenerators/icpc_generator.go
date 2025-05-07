@@ -19,7 +19,7 @@ type ICPCGenerator struct {
 	submission *models.Submission
 	problem    *models.Problem
 
-	state       generatorState
+	state              generatorState
 	firstTestToGive    uint64
 	testedPrefixLength uint64
 
@@ -125,8 +125,10 @@ func (i *ICPCGenerator) compileJobCompleted(job *invokerconn.Job, result *master
 		i.submission.Verdict = result.Verdict
 		i.setFail()
 	default:
-		result.Verdict = verdict.CF
-		result.Error = fmt.Sprintf("unknown verdict for compile job: %v", result.Verdict)
+		if result.Verdict != verdict.CF {
+			result.Verdict = verdict.CF
+			result.Error = fmt.Sprintf("unknown verdict for compile job: %v", result.Verdict)
+		}
 		i.submission.Verdict = result.Verdict
 		i.setFail()
 	}

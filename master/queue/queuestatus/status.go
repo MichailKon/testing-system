@@ -14,6 +14,7 @@ type QueueStatus struct {
 
 	activeSubmissions          map[uint]*submissionHolder
 	submissionsOrderedByUpdate *list.List
+	isTesting                  bool
 }
 
 type submissionHolder struct {
@@ -22,10 +23,13 @@ type submissionHolder struct {
 	listPosition     *list.Element
 }
 
-func NewQueueStatus() *QueueStatus {
+// NewQueueStatus creates new queue status.
+// isTesting should be specified only for tests
+func NewQueueStatus(isTesting bool) *QueueStatus {
 	return &QueueStatus{
 		activeSubmissions:          make(map[uint]*submissionHolder),
 		submissionsOrderedByUpdate: list.New(),
+		isTesting:                  isTesting,
 	}
 }
 
@@ -58,10 +62,13 @@ func (s *QueueStatus) FinishSubmissionTesting(id uint) {
 func (s *QueueStatus) UpdateSubmission(submission *models.Submission) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+	if s.isTesting {
+		return
+	}
 
 	holder, ok := s.activeSubmissions[submission.ID]
 	if !ok {
-		logger.Panic("Updating submission that is not added to queue status", submission.ID)
+		logger.Panic("Updating submission %d that is not added to queue status", submission.ID)
 	}
 
 	// We will not have data race with pointers here.

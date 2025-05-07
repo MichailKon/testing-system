@@ -47,15 +47,15 @@ const (
 
 type TestGroup struct {
 	Name      string `json:"name" yaml:"name"`
-	FirstTest uint64 `json:"FirstTest" yaml:"FirstTest"`
-	LastTest  uint64 `json:"LastTest" yaml:"LastTest"`
+	FirstTest uint64 `json:"first_test" yaml:"first_test"`
+	LastTest  uint64 `json:"last_test" yaml:"last_test"`
 	// TestScore meaningful only in case of TestGroupScoringTypeEachTest
-	TestScore *float64 `json:"TestScore" yaml:"TestScore"`
+	TestScore *float64 `json:"test_score" yaml:"test_score"`
 	// GroupScore meaningful only in case of TestGroupScoringTypeComplete
-	GroupScore         *float64              `json:"GroupScore" yaml:"GroupScore"`
-	ScoringType        TestGroupScoringType  `json:"ScoringType" yaml:"ScoringType"`
-	FeedbackType       TestGroupFeedbackType `json:"FeedbackType" yaml:"FeedbackType"`
-	RequiredGroupNames []string              `json:"RequiredGroupNames" yaml:"RequiredGroupNames"`
+	GroupScore         *float64              `json:"group_score" yaml:"group_score"`
+	ScoringType        TestGroupScoringType  `json:"scoring_type" yaml:"scoring_type"`
+	FeedbackType       TestGroupFeedbackType `json:"feedback_type" yaml:"feedback_type"`
+	RequiredGroupNames []string              `json:"required_group_names" yaml:"required_group_names"`
 }
 
 type TestGroups []TestGroup
@@ -91,6 +91,9 @@ type Problem struct {
 	Name string `yaml:"name" json:"name" binding:"required"`
 
 	ProblemType ProblemType `yaml:"problem_type" json:"problem_type" binding:"required"`
+
+	// TestGroups ignored for ICPC problems
+	TestGroups TestGroups `yaml:"test_groups" json:"test_groups"`
 
 	TimeLimit   customfields.Time   `yaml:"time_limit" json:"time_limit" binding:"required"`
 	MemoryLimit customfields.Memory `yaml:"memory_limit" json:"memory_limit" binding:"required"`
