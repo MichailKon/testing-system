@@ -1,13 +1,11 @@
 package master
 
 import (
+	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
 	"testing_system/common/connectors/masterconn"
-	"testing_system/lib/connector"
 	"testing_system/lib/logger"
-
-	"github.com/gin-gonic/gin"
 )
 
 // @Summary Submit
@@ -29,13 +27,13 @@ func (m *Master) handleNewSubmission(c *gin.Context) {
 
 	problemID, err := strconv.ParseUint(problemIDStr, 10, 0)
 	if err != nil {
-		connector.RespErr(c, http.StatusBadRequest, "ProblemID is not uint")
+		c.String(http.StatusBadRequest, "ProblemID is not uint")
 		return
 	}
 
 	file, err := c.FormFile("Solution")
 	if err != nil {
-		connector.RespErr(c, http.StatusBadRequest, "No source code")
+		c.String(http.StatusBadRequest, "No source code")
 		return
 	}
 
@@ -61,11 +59,44 @@ func (m *Master) handleNewSubmission(c *gin.Context) {
 		m.retryUntilOK(m.removeSubmissionFromStorage, submission)
 
 		logger.Error("failed to submit to queue, error: %s", err.Error())
-		connector.RespErr(c, http.StatusInternalServerError, "internal error")
+		c.String(http.StatusInternalServerError, "internal server error")
 		return
 	}
+	m.ts.Metrics.MasterQueueSize.Inc()
 
 	m.invokerRegistry.SendJobs()
 
 	c.JSON(http.StatusOK, masterconn.SubmissionResponse{submission.ID})
+}
+
+// @Summary Status
+// @Description Status of master
+// @Tags Client
+// @Produce json
+// @Param prevEpoch query string false "epoch of previous update" example:"long-epoch-name"
+// @Success 200 {object} masterconn.Status
+// @Failure 500 {object} string
+// @Router /master/status [get]
+func (m *Master) handleStatus(c *gin.Context) {
+	prevEpoch := c.Query("prevEpoch")
+	status := m.queue.Status().GetStatus(prevEpoch)
+	status.Invokers = m.invokerRegistry.Status()
+	c.JSON(http.StatusOK, status)
+}
+
+// @Summary Reset invoker cache
+// @Description Resetting cache in all invokers
+// @Tags Client
+// @Produce plain
+// @Success 200 {string} Helloworld
+// @Failure 500 {object} string
+// @Router /master/reset_invoker_cache [post]
+func (m *Master) handleResetInvokerCache(c *gin.Context) {
+	err := m.invokerRegistry.ResetCache()
+	if err != nil {
+		logger.Error("failed to reset invoker cache, error: %v", err)
+		c.String(http.StatusInternalServerError, "internal server error")
+		return
+	}
+	c.String(http.StatusOK, "OK")
 }

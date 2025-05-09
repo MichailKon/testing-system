@@ -61,4 +61,6 @@ func (h *Handler) setupRoutes() {
 	apiCSRFRouter.PUT("/new/submission", h.addSubmission)
 
 	apiRouter.GET("/get/master_status", h.getMasterStatus)
+
+	apiCSRFRouter.POST("/reset/invoker_cache", h.resetInvokerCache)
 }

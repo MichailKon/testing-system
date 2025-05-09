@@ -9,7 +9,6 @@ import (
 	"testing_system/common/constants/resource"
 	"testing_system/common/constants/verdict"
 	"testing_system/common/db/models"
-	"testing_system/lib/connector"
 	"testing_system/lib/logger"
 
 	"github.com/cenkalti/backoff/v5"
@@ -47,10 +46,10 @@ func (m *Master) loadProblem(c *gin.Context, problemID uint) *models.Problem {
 	}
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		connector.RespErr(c, http.StatusNotFound, "problem not found")
+		c.String(http.StatusNotFound, "Problem not found")
 	} else {
 		logger.Error("failed to find problem in db, error: %s", err.Error())
-		connector.RespErr(c, http.StatusInternalServerError, "internal error")
+		c.String(http.StatusInternalServerError, "internal server error")
 	}
 	return nil
 }
@@ -58,7 +57,7 @@ func (m *Master) loadProblem(c *gin.Context, problemID uint) *models.Problem {
 func (m *Master) saveSubmissionInStorage(c *gin.Context, submission *models.Submission, file *multipart.FileHeader) bool {
 	reader, err := file.Open()
 	if err != nil {
-		connector.RespErr(c, http.StatusBadRequest, "failed to read source code")
+		c.String(http.StatusBadRequest, "failed to read source code")
 		return false
 	}
 	defer reader.Close()
@@ -73,7 +72,7 @@ func (m *Master) saveSubmissionInStorage(c *gin.Context, submission *models.Subm
 
 	if err := m.ts.StorageConn.Upload(request).Error; err != nil {
 		logger.Error("failed to save solution file, error: %s", err.Error())
-		connector.RespErr(c, http.StatusInternalServerError, "internal error")
+		c.String(http.StatusInternalServerError, "internal server error")
 		return false
 	}
 
@@ -89,7 +88,7 @@ func (m *Master) saveSubmissionInDB(c *gin.Context, problemID uint, language str
 
 	if err := m.ts.DB.WithContext(c).Save(submission).Error; err != nil {
 		logger.Error("failed to save submission to db, error: %s", err.Error())
-		connector.RespErr(c, http.StatusInternalServerError, "internal error")
+		c.String(http.StatusInternalServerError, "internal server error")
 		return nil
 	}
 
@@ -119,12 +118,13 @@ func (m *Master) removeSubmissionFromStorage(ctx context.Context, submission *mo
 	return nil
 }
 
-func (m *Master) updateSubmission(ctx context.Context, submission *models.Submission) error {
+func (m *Master) finishSubmissionTesting(ctx context.Context, submission *models.Submission) error {
 	if err := m.ts.DB.WithContext(ctx).Save(submission).Error; err != nil {
 		logger.Error("failed to save submission %d to db, error: %v", submission.ID, err)
 		return err
 	}
 	// We remove submission from status only after result is uploaded to database
 	m.queue.Status().FinishSubmissionTesting(submission.ID)
+	m.ts.Metrics.MasterQueueSize.Sub(1)
 	return nil
 }

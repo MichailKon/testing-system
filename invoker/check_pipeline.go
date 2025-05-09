@@ -58,11 +58,14 @@ func (s *JobPipelineState) generateCheckerRunConfig() error {
 
 func (s *JobPipelineState) executeCheckerRunCommand() error {
 	s.executeWaitGroup.Add(1)
-	s.runProcess(s.runChecker)
+	err := s.runProcess(s.runChecker)
+	if err != nil {
+		return fmt.Errorf("can not execute checker command, error: %v", err)
+	}
 	s.executeWaitGroup.Wait()
 
 	if s.test.checkResult.Err != nil {
-		return fmt.Errorf("can not run checker in sandbox, error: %v", s.test.checkResult.Err)
+		return fmt.Errorf("error while running checker in sandbox, error: %v", s.test.checkResult.Err)
 	}
 
 	switch s.test.checkResult.Verdict {

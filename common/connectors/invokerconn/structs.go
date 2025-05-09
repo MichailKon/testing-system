@@ -2,7 +2,10 @@
 
 package invokerconn
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type JobType int
 
@@ -25,8 +28,21 @@ func (j Job) String() string {
 }
 
 type Status struct {
-	MaxNewJobs   uint64   `json:"max_new_jobs"`
+	MaxNewJobs   int      `json:"max_new_jobs"`
 	ActiveJobIDs []string `json:"active_job_ids"`
 	Epoch        string   `json:"epoch"`
 	Address      string   `json:"address"`
+
+	Metrics *StatusMetrics `json:"metrics"`
+}
+
+type StatusMetrics struct {
+	Lifetime       time.Duration         `json:"life_time"`
+	SandboxMetrics *StatusThreadsMetrics `json:"sandbox_metrics"`
+	ThreadMetrics  *StatusThreadsMetrics `json:"runners_metrics"`
+}
+
+type StatusThreadsMetrics struct {
+	Count             int             `json:"count"`
+	TotalWaitDuration []time.Duration `json:"waitTime"`
 }

@@ -29,7 +29,7 @@ func (m *Master) handleInvokerJobResult(c *gin.Context) {
 		return
 	}
 
-	m.ts.Metrics.NewJobResult(result)
+	m.ts.Metrics.ProcessJobResult(result)
 
 	logger.Trace("new job result received, job id: %s", result.Job.ID)
 	if !m.invokerRegistry.HandleInvokerJobResult(result) {
@@ -49,7 +49,7 @@ func (m *Master) handleInvokerJobResult(c *gin.Context) {
 
 	if submission != nil {
 		logger.Trace("submission #%d is tested, saving results to db", submission.ID)
-		m.retryUntilOK(m.updateSubmission, submission)
+		m.retryUntilOK(m.finishSubmissionTesting, submission)
 	}
 
 	connector.RespOK(c, nil)

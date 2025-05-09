@@ -78,14 +78,14 @@ func (s *JobPipelineState) initSandbox() error {
 	return nil
 }
 
-func (s *JobPipelineState) runProcess(f func()) {
+func (s *JobPipelineState) runProcess(f func()) error {
 	queueEnter := time.Now()
-	s.invoker.RunQueue <- func() {
+	return s.invoker.RunnerThreads.add(func() {
 		processStart := time.Now()
 		s.metrics.ExecutionWaitDuration += processStart.Sub(queueEnter)
 		f()
 		s.metrics.ExecutionDuration += time.Since(processStart)
-	}
+	})
 }
 
 func (s *JobPipelineState) checkFinish() {

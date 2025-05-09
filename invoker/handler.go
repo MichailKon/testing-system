@@ -7,11 +7,11 @@ import (
 	"testing_system/lib/connector"
 )
 
-func (i *Invoker) HandleStatus(c *gin.Context) {
+func (i *Invoker) handleStatus(c *gin.Context) {
 	connector.RespOK(c, i.getStatus())
 }
 
-func (i *Invoker) HandleNewJob(c *gin.Context) {
+func (i *Invoker) handleNewJob(c *gin.Context) {
 	job := new(Job)
 	err := c.BindJSON(&job.Job)
 	if err != nil {
@@ -23,7 +23,9 @@ func (i *Invoker) HandleNewJob(c *gin.Context) {
 	}
 	switch job.Type {
 	case invokerconn.CompileJob:
-		i.newCompileJob(c, job)
+		if !i.newCompileJob(c, job) {
+			return
+		}
 	case invokerconn.TestJob:
 		if !i.newTestJob(c, job) {
 			return
@@ -36,4 +38,9 @@ func (i *Invoker) HandleNewJob(c *gin.Context) {
 	i.ActiveJobs[job.ID] = job
 	i.Mutex.Unlock() // We unlock mutex without defer because getStatus uses mutex
 	connector.RespOK(c, i.getStatus())
+}
+
+func (i *Invoker) resetCache(c *gin.Context) {
+	i.Storage.Reset()
+	connector.RespOK(c, nil)
 }

@@ -2,7 +2,7 @@ import React from "react";
 
 export default function ChangeAlert(alert) {
   if (!alert.hasAlert) {
-    return <div></div>
+    return null
   }
   if (alert.ok) {
     return <div className="alert alert-success mt-3" role="alert">

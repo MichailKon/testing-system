@@ -41,6 +41,7 @@ func SetupMaster(ts *common.TestingSystem) error {
 	// client handlers
 	router.POST("/submit", master.handleNewSubmission)
 	router.GET("/status", master.handleStatus)
+	router.POST("/reset_invoker_cache", master.handleResetInvokerCache)
 
 	return nil
 }

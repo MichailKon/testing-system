@@ -103,6 +103,8 @@ func (q *Queue) RescheduleJob(jobID string) error {
 	q.jobIDToOriginalJobID[origJob.ID] = jobID
 	q.newFailedJobs = append(q.newFailedJobs, origJob)
 
+	q.ts.Metrics.MasterJobReschedules.Inc()
+
 	logger.Trace("Rescheduled job %s, new id: %s", wasID, newUUID)
 	return nil
 }

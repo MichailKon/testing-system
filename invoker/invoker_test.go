@@ -50,16 +50,17 @@ func newTestState(t *testing.T, sandboxType string) *testState {
 		TS:       ts.TS,
 		Storage:  storage.NewInvokerStorage(ts.TS),
 		Compiler: compiler.NewCompiler(ts.TS),
-		RunQueue: make(chan func()),
+		RunnerThreads: &threadsExecutor[func()]{
+			valueReceiver: make(chan func()),
+		},
 	}
 	go func() {
-		for {
-			f := <-ts.Invoker.RunQueue
+		for f := range ts.Invoker.RunnerThreads.valueReceiver {
 			f()
 		}
 	}()
 	require.NoError(t, os.CopyFS(ts.FilesDir, os.DirFS("testdata/files")))
-	ts.Sandbox = newSandbox(ts.TS, 1)
+	ts.Sandbox = ts.Invoker.newSandbox(1)
 	return ts
 }
 
@@ -81,6 +82,7 @@ func (ts *testState) testCompile(submitID uint) *JobPipelineState {
 	}
 
 	require.NoError(ts.t, ts.Invoker.Storage.Source.Insert(
+		ts.Invoker.Storage.GetEpoch(),
 		fmt.Sprintf("%s/source/%d/%d.cpp", ts.FilesDir, submitID, submitID),
 		uint64(submitID),
 	))
@@ -130,11 +132,13 @@ func testCompileSandbox(t *testing.T, sandboxType string) {
 
 func (ts *testState) addProblem(problemID uint) {
 	require.NoError(ts.t, ts.Invoker.Storage.TestInput.Insert(
+		ts.Invoker.Storage.GetEpoch(),
 		fmt.Sprintf("%s/test_input/%d-1/1", ts.FilesDir, problemID),
 		uint64(problemID), 1,
 	))
 
 	require.NoError(ts.t, ts.Invoker.Storage.TestAnswer.Insert(
+		ts.Invoker.Storage.GetEpoch(),
 		fmt.Sprintf("%s/test_answer/%d-1/1.a", ts.FilesDir, problemID),
 		uint64(problemID), 1,
 	))
@@ -149,7 +153,11 @@ func (ts *testState) addProblem(problemID uint) {
 	cmd.Dir = checkerDir
 	require.NoError(ts.t, cmd.Run())
 
-	require.NoError(ts.t, ts.Invoker.Storage.Checker.Insert(filepath.Join(checkerDir, "check"), uint64(problemID)))
+	require.NoError(ts.t, ts.Invoker.Storage.Checker.Insert(
+		ts.Invoker.Storage.GetEpoch(),
+		filepath.Join(checkerDir, "check"),
+		uint64(problemID),
+	))
 }
 
 func (ts *testState) testRun(submitID uint, problemID uint) *sandbox.RunResult {
@@ -178,7 +186,11 @@ func (ts *testState) testRun(submitID uint, problemID uint) *sandbox.RunResult {
 	cmd.Dir = sourceDir
 	require.NoError(ts.t, cmd.Run())
 
-	require.NoError(ts.t, ts.Invoker.Storage.Binary.Insert(filepath.Join(sourceDir, "binary"), uint64(submitID)))
+	require.NoError(ts.t, ts.Invoker.Storage.Binary.Insert(
+		ts.Invoker.Storage.GetEpoch(),
+		filepath.Join(sourceDir, "binary"),
+		uint64(submitID),
+	))
 
 	s := ts.Invoker.newPipelineState(ts.Sandbox, job)
 	s.test = new(pipelineTestData)

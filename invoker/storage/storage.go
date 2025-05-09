@@ -1,11 +1,13 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
 	"github.com/xorcare/pointer"
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"testing_system/common"
 	"testing_system/common/connectors/storageconn"
 	"testing_system/common/constants/resource"
@@ -24,6 +26,9 @@ type InvokerStorage struct {
 	Interactor *CacheGetter
 	TestInput  *CacheGetter
 	TestAnswer *CacheGetter
+
+	epoch      int
+	epochMutex sync.Mutex
 }
 
 func NewInvokerStorage(ts *common.TestingSystem) *InvokerStorage {
@@ -51,6 +56,18 @@ func NewInvokerStorage(ts *common.TestingSystem) *InvokerStorage {
 	return s
 }
 
+func (s *InvokerStorage) Reset() {
+	s.epochMutex.Lock()
+	defer s.epochMutex.Unlock()
+	s.epoch++
+}
+
+func (s *InvokerStorage) GetEpoch() int {
+	s.epochMutex.Lock()
+	defer s.epochMutex.Unlock()
+	return s.epoch
+}
+
 func (s *InvokerStorage) getFiles(key cacheKey) (*string, error, uint64) {
 	request := &storageconn.Request{
 		Resource:  key.Resource,
@@ -58,10 +75,10 @@ func (s *InvokerStorage) getFiles(key cacheKey) (*string, error, uint64) {
 		SubmitID:  key.SubmitID,
 		TestID:    key.TestID,
 	}
-	setRequestBaseFolder(request, s.ts.Config.Invoker.CachePath)
+	setRequestBaseFolder(request, filepath.Join(s.ts.Config.Invoker.CachePath, strconv.Itoa(key.Epoch)))
 	response := s.ts.StorageConn.Download(request)
 	if response.Error != nil {
-		if response.Error == storageconn.ErrStorageFileNotFound {
+		if errors.Is(response.Error, storageconn.ErrStorageFileNotFound) {
 			return nil, fmt.Errorf("file not exists"), 0
 		}
 		return nil, response.Error, 0

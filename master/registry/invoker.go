@@ -163,7 +163,7 @@ func (i *Invoker) TrySendJob(job *invokerconn.Job) bool {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	if i.failed || i.jobTypesCount[SendingJob]+1 > int(i.status.MaxNewJobs) {
+	if i.failed || i.jobTypesCount[SendingJob]+1 > i.status.MaxNewJobs {
 		return false
 	}
 
@@ -215,6 +215,8 @@ func (i *Invoker) updateStatus(status *invokerconn.Status) {
 			logger.Panic("invoker shouldn't store job of type UnknownJob")
 		}
 	}
+
+	i.ts.Metrics.ProcessInvokerStatus(status)
 
 	logger.Trace(
 		"status of invoker %s is updated; active jobs: %d, max new jobs: %d",
@@ -282,7 +284,7 @@ func (i *Invoker) StatusForMaster() *masterconn.InvokerStatus {
 
 	status := &masterconn.InvokerStatus{
 		Address:     i.address(),
-		MaxNewJobs:  int(i.status.MaxNewJobs) - i.jobTypesCount[SendingJob],
+		MaxNewJobs:  i.status.MaxNewJobs - i.jobTypesCount[SendingJob],
 		TimeAdded:   i.timeAdded,
 		TestingJobs: make([]*invokerconn.Job, 0),
 	}
@@ -291,4 +293,16 @@ func (i *Invoker) StatusForMaster() *masterconn.InvokerStatus {
 		status.TestingJobs = append(status.TestingJobs, holder.job)
 	}
 	return status
+}
+
+func (i *Invoker) ResetCache() error {
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+	return i.connector.ResetCache()
+}
+
+func (i *Invoker) ID() string {
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+	return i.status.Address
 }

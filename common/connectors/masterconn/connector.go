@@ -75,3 +75,16 @@ func (c *Connector) GetStatus(ctx context.Context, prevEpoch string) (*Status, e
 	}
 	return &status, nil
 }
+
+func (c *Connector) ResetInvokerCache(ctx context.Context) error {
+	r := c.connection.R()
+	r.SetContext(ctx)
+	resp, err := r.Post("/master/reset_invoker_cache")
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode() != http.StatusOK {
+		return connector.ParseRespError(resp.Body(), resp)
+	}
+	return nil
+}

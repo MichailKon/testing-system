@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"fmt"
 	"slices"
 	"sync"
 	"testing_system/common"
@@ -111,4 +112,33 @@ func (r *InvokerRegistry) Status() []*masterconn.InvokerStatus {
 		status = append(status, invoker.StatusForMaster())
 	}
 	return status
+}
+
+func (r *InvokerRegistry) invokersAction(f func(i *Invoker) error) error {
+	r.mutex.Lock()
+	invokersCount := len(r.invokers)
+	receiveChan := make(chan error, invokersCount)
+	for _, invoker := range r.invokers {
+		r.ts.Go(func() {
+			err := f(invoker)
+			if err != nil {
+				err = fmt.Errorf("invoker %s error: %v", invoker.ID(), err)
+			}
+			receiveChan <- err
+		})
+	}
+	r.mutex.Unlock()
+	for range invokersCount {
+		err := <-receiveChan
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *InvokerRegistry) ResetCache() error {
+	return r.invokersAction(func(i *Invoker) error {
+		return i.ResetCache()
+	})
 }

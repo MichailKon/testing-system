@@ -2,6 +2,7 @@ import React, {useEffect, useState} from 'react';
 import axios from "axios";
 import Body from "../components/Body";
 import {Link} from "react-router-dom";
+import ChangeAlert, {SendAlertRequest} from "../components/ChangeAlert";
 
 export default function Status() {
   const [state, setState] = useState({
@@ -29,6 +30,20 @@ export default function Status() {
     )
   }, [state]);
 
+  const [resetInvokerCacheAlert, setResetInvokerCacheAlert] = useState({})
+
+  const resetInvokerCache = (e) => {
+    e.preventDefault()
+    const apiUrl = `/api/reset/invoker_cache`
+    SendAlertRequest(axios.post(apiUrl), setResetInvokerCacheAlert, (_) => {
+      setResetInvokerCacheAlert({
+        hasAlert: true,
+        ok: true,
+        message: "Reseted invoker cache",
+      })
+    })
+  }
+
   if (state.loading) {
     return wrapContent(null)
   }
@@ -41,51 +56,56 @@ export default function Status() {
 
   return wrapContent(
     <div>
-      <h5 className="mb-4"><Link to="/admin/submissions?verdict=RU">Submissions testing</Link>: {status.testing_submissions.length}</h5>
+      <h5 className="mb-4"><Link to="/admin/submissions?verdict=RU">Submissions
+        testing</Link>: {status.testing_submissions.length}</h5>
       <h5 className="mb-4">Invokers:</h5>
+      <div className="mb-3">
+        <a href="#" className="mb-3" onClick={resetInvokerCache}>Reset cache</a>
+      </div>
+      <div className="row">{ChangeAlert(resetInvokerCacheAlert)}</div>
       <div className="mx-3 mx-md-4">
-      {status.invokers.map((invoker, index) => (
-        <div key={index}>
-          <div className="row mb-2">
-            <div className="col-xl-2 col-sm-3 col-12"><b>Address:</b></div>
-            <div className="col-sm-9 col-12">
-              {invoker.address}
+        {status.invokers.map((invoker, index) => (
+          <div key={index}>
+            <div className="row mb-2">
+              <div className="col-xl-2 col-sm-3 col-12"><b>Address:</b></div>
+              <div className="col-sm-9 col-12">
+                {invoker.address}
+              </div>
             </div>
-          </div>
-          <div className="row mb-2">
-            <div className="col-xl-2 col-sm-3 col-12"><b>Time added:</b></div>
-            <div className="col-sm-9 col-12">
-              {invoker.time_added}
+            <div className="row mb-2">
+              <div className="col-xl-2 col-sm-3 col-12"><b>Time added:</b></div>
+              <div className="col-sm-9 col-12">
+                {invoker.time_added}
+              </div>
             </div>
-          </div>
-          <div className="row mb-2">
-            <div className="col-xl-2 col-sm-3 col-12"><b>Max new jobs:</b></div>
-            <div className="col-sm-9 col-12">
-              {invoker.max_new_jobs}
+            <div className="row mb-2">
+              <div className="col-xl-2 col-sm-3 col-12"><b>Max new jobs:</b></div>
+              <div className="col-sm-9 col-12">
+                {invoker.max_new_jobs}
+              </div>
             </div>
-          </div>
-          <table className="table mb-3">
-            <thead>
-            <tr>
-              <th scope="row">Job Type</th>
-              <th scope="row">Submission</th>
-              <th scope="row">Test</th>
-              <th scope="row">ID</th>
-            </tr>
-            </thead>
-            <tbody>
-            {invoker.active_jobs.map((job, jobIndex) => (
-              <tr key={`${index}-${jobIndex}`}>
-                <td>{getJobType(job.type)}</td>
-                <td>{job.submit_id}</td>
-                <td>{job.test ? job.test : ""}</td>
-                <td>{job.id}</td>
+            <table className="table mb-3">
+              <thead>
+              <tr>
+                <th scope="row">Job Type</th>
+                <th scope="row">Submission</th>
+                <th scope="row">Test</th>
+                <th scope="row">ID</th>
               </tr>
-            ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
+              </thead>
+              <tbody>
+              {invoker.active_jobs.map((job, jobIndex) => (
+                <tr key={`${index}-${jobIndex}`}>
+                  <td>{getJobType(job.type)}</td>
+                  <td>{job.submit_id}</td>
+                  <td>{job.test ? job.test : ""}</td>
+                  <td>{job.id}</td>
+                </tr>
+              ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
       </div>
     </div>
   )

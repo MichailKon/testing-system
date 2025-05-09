@@ -2,6 +2,7 @@ package masterstatus
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing_system/clients/common"
 	"testing_system/common/connectors/masterconn"
@@ -17,7 +18,9 @@ type MasterStatus struct {
 
 	submissions map[uint]*models.Submission
 
-	status *masterconn.Status
+	statusUpdateInterval time.Duration
+	status               *masterconn.Status
+	lastUpdated          time.Time
 }
 
 func NewMasterStatus(clientBase *common.ClientBase) (*MasterStatus, error) {
@@ -26,22 +29,21 @@ func NewMasterStatus(clientBase *common.ClientBase) (*MasterStatus, error) {
 		submissions: make(map[uint]*models.Submission),
 	}
 
-	var updateInterval time.Duration
 	if clientBase.Config.TestingSystemAPI.StatusUpdateInterval > 0 {
-		updateInterval = clientBase.Config.TestingSystemAPI.StatusUpdateInterval
+		s.statusUpdateInterval = clientBase.Config.TestingSystemAPI.StatusUpdateInterval
 	} else {
-		updateInterval = time.Second
+		s.statusUpdateInterval = time.Second
 	}
 
-	go s.runUpdateThread(updateInterval)
+	go s.runUpdateThread()
 
 	return s, nil
 }
 
-func (s *MasterStatus) runUpdateThread(interval time.Duration) {
+func (s *MasterStatus) runUpdateThread() {
 	logger.Info("Starting master status update thread")
 
-	t := time.Tick(interval)
+	t := time.Tick(s.statusUpdateInterval)
 	for {
 		select {
 		case <-t:
@@ -67,6 +69,7 @@ func (s *MasterStatus) updateStatus() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	s.lastUpdated = time.Now()
 	s.status = status
 
 	for _, submission := range status.UpdatedSubmissions {
@@ -156,8 +159,14 @@ func (s *MasterStatus) GetSubmissions(ctx context.Context, filter *SubmissionsFi
 	return submissions, err
 }
 
-func (s *MasterStatus) Status() *masterconn.Status {
+func (s *MasterStatus) Status() (*masterconn.Status, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	return s.status
+	if s.status == nil {
+		return nil, fmt.Errorf("master status is unavaliable")
+	}
+	if time.Since(s.lastUpdated) > time.Second+s.statusUpdateInterval*2 {
+		return nil, fmt.Errorf("master status is outdated")
+	}
+	return s.status, nil
 }
