@@ -44,8 +44,7 @@ export function RenderCompilationData(compilationData, submission, changeCompila
       action: "show",
     })
   }
-
-  console.log(compilationData)
+  
   return (
     <>
       <h5 className="mb-3">Compilation result</h5>

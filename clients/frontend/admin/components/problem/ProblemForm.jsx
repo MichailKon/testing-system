@@ -92,7 +92,6 @@ export function ProblemReducer(problem, action) {
         // Score fields
         case "group_score":
         case "test_score":
-          console.log(action)
           delete p.test_groups[idx]["group_score"]
           delete p.test_groups[idx]["test_score"]
           if (action.value === "") {
@@ -100,7 +99,6 @@ export function ProblemReducer(problem, action) {
           } else {
             p.test_groups[idx][action.groupAction] = parseFloat(action.value)
           }
-          console.log(p)
           return p
 
         case "add_required":
