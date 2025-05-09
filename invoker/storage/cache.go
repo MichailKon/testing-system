@@ -19,6 +19,8 @@ import (
 type commonCache = cache.LRUSizeCache[cacheKey, string]
 
 type cacheKey struct {
+	Epoch int
+
 	Resource resource.Type `json:"resource"`
 
 	// If resource is part of problem, ProblemID is used
@@ -31,31 +33,31 @@ type cacheKey struct {
 
 type CacheGetter struct {
 	Cache  *commonCache
-	keyGen func(vals ...uint64) cacheKey
+	keyGen func(epoch int, vals ...uint64) cacheKey
 }
 
-func (c *CacheGetter) Get(vals ...uint64) (*string, error) {
-	return c.Cache.Get(c.keyGen(vals...))
+func (c *CacheGetter) Get(epoch int, vals ...uint64) (*string, error) {
+	return c.Cache.Get(c.keyGen(epoch, vals...))
 }
 
-func (c *CacheGetter) Lock(vals ...uint64) {
-	c.Cache.Lock(c.keyGen(vals...))
+func (c *CacheGetter) Lock(epoch int, vals ...uint64) {
+	c.Cache.Lock(c.keyGen(epoch, vals...))
 }
 
-func (c *CacheGetter) Unlock(vals ...uint64) error {
-	return c.Cache.Unlock(c.keyGen(vals...))
+func (c *CacheGetter) Unlock(epoch int, vals ...uint64) error {
+	return c.Cache.Unlock(c.keyGen(epoch, vals...))
 }
 
 // Insert can be used only for testing
-func (c *CacheGetter) Insert(file string, vals ...uint64) error {
-	return c.Cache.Insert(c.keyGen(vals...), &file, 1)
+func (c *CacheGetter) Insert(epoch int, file string, vals ...uint64) error {
+	return c.Cache.Insert(c.keyGen(epoch, vals...), &file, 1)
 }
 
 func newSourceCache(commonCache *commonCache) *CacheGetter {
 	return &CacheGetter{
 		Cache: commonCache,
-		keyGen: func(vals ...uint64) cacheKey {
-			return submitKeyGen(resource.SourceCode, vals)
+		keyGen: func(epoch int, vals ...uint64) cacheKey {
+			return submitKeyGen(epoch, resource.SourceCode, vals)
 		},
 	}
 }
@@ -63,8 +65,8 @@ func newSourceCache(commonCache *commonCache) *CacheGetter {
 func newBinaryCache(commonCache *commonCache) *CacheGetter {
 	return &CacheGetter{
 		Cache: commonCache,
-		keyGen: func(vals ...uint64) cacheKey {
-			return submitKeyGen(resource.CompiledBinary, vals)
+		keyGen: func(epoch int, vals ...uint64) cacheKey {
+			return submitKeyGen(epoch, resource.CompiledBinary, vals)
 		},
 	}
 }
@@ -72,8 +74,8 @@ func newBinaryCache(commonCache *commonCache) *CacheGetter {
 func newCheckerCache(commonCache *commonCache) *CacheGetter {
 	return &CacheGetter{
 		Cache: commonCache,
-		keyGen: func(vals ...uint64) cacheKey {
-			return problemIDKeyGen(resource.Checker, vals)
+		keyGen: func(epoch int, vals ...uint64) cacheKey {
+			return problemIDKeyGen(epoch, resource.Checker, vals)
 		},
 	}
 }
@@ -81,8 +83,8 @@ func newCheckerCache(commonCache *commonCache) *CacheGetter {
 func newInteractorCache(commonCache *commonCache) *CacheGetter {
 	return &CacheGetter{
 		Cache: commonCache,
-		keyGen: func(vals ...uint64) cacheKey {
-			return submitKeyGen(resource.Interactor, vals)
+		keyGen: func(epoch int, vals ...uint64) cacheKey {
+			return submitKeyGen(epoch, resource.Interactor, vals)
 		},
 	}
 }
@@ -90,50 +92,53 @@ func newInteractorCache(commonCache *commonCache) *CacheGetter {
 func newTestInputCache(commonCache *commonCache) *CacheGetter {
 	return &CacheGetter{
 		Cache:  commonCache,
-		keyGen: func(vals ...uint64) cacheKey { return testKeyGen(resource.TestInput, vals) },
+		keyGen: func(epoch int, vals ...uint64) cacheKey { return testKeyGen(epoch, resource.TestInput, vals) },
 	}
 }
 
 func newTestAnswerCache(commonCache *commonCache) *CacheGetter {
 	return &CacheGetter{
 		Cache:  commonCache,
-		keyGen: func(vals ...uint64) cacheKey { return testKeyGen(resource.TestAnswer, vals) },
+		keyGen: func(epoch int, vals ...uint64) cacheKey { return testKeyGen(epoch, resource.TestAnswer, vals) },
 	}
 }
 
-func problemIDKeyGen(resource resource.Type, vals []uint64) cacheKey {
+func problemIDKeyGen(epoch int, resource resource.Type, vals []uint64) cacheKey {
 	if len(vals) != 1 {
 		logger.PanicLevel(3,
 			"wrong usage of storage cache, can not get problem %s for id %v, too many ids passed",
 			resource.String(), vals)
 	}
 	key := cacheKey{
+		Epoch:     epoch,
 		Resource:  resource,
 		ProblemID: vals[0],
 	}
 	return key
 }
 
-func submitKeyGen(resource resource.Type, vals []uint64) cacheKey {
+func submitKeyGen(epoch int, resource resource.Type, vals []uint64) cacheKey {
 	if len(vals) != 1 {
 		logger.PanicLevel(3,
 			"wrong usage of storage cache, can not get submit %s for id %v, too many ids passed",
 			resource.String(), vals)
 	}
 	key := cacheKey{
+		Epoch:    epoch,
 		Resource: resource,
 		SubmitID: vals[0],
 	}
 	return key
 }
 
-func testKeyGen(resource resource.Type, vals []uint64) cacheKey {
+func testKeyGen(epoch int, resource resource.Type, vals []uint64) cacheKey {
 	if len(vals) != 2 {
 		logger.PanicLevel(3,
 			"wrong usage of storage cache, can not get problem test for ids %v, exactly 2 ids should be passed",
 			vals)
 	}
 	key := cacheKey{
+		Epoch:     epoch,
 		Resource:  resource,
 		ProblemID: vals[0],
 		TestID:    vals[1],

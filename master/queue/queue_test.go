@@ -6,10 +6,12 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing_system/common"
 	"testing_system/common/connectors/invokerconn"
 	"testing_system/common/connectors/masterconn"
 	"testing_system/common/constants/verdict"
 	"testing_system/common/db/models"
+	"testing_system/common/metrics"
 )
 
 func doQueueCycles(t *testing.T, q *Queue, cycles int, maxNoJobs int) int {
@@ -50,8 +52,15 @@ func isQueueEmpty(q *Queue) bool {
 		q.activeGenerators.Len() == 0
 }
 
+func createQueue() *Queue {
+	ts := &common.TestingSystem{
+		Metrics: metrics.NewCollector(),
+	}
+	return NewQueue(ts).(*Queue)
+}
+
 func TestQueueWork(t *testing.T) {
-	q := NewQueue(nil).(*Queue)
+	q := createQueue()
 	problem1 := models.Problem{
 		TestsNumber: 2,
 		ProblemType: models.ProblemTypeICPC,
@@ -74,7 +83,7 @@ func TestQueueWork(t *testing.T) {
 }
 
 func TestQueueFairness(t *testing.T) {
-	q := NewQueue(nil).(*Queue)
+	q := createQueue()
 	problem1 := models.Problem{
 		TestsNumber: 500,
 		ProblemType: models.ProblemTypeICPC,
@@ -100,7 +109,7 @@ func TestQueueFairness(t *testing.T) {
 
 func TestQueue_RescheduleJob(t *testing.T) {
 	prepare := func() *Queue {
-		q := NewQueue(nil).(*Queue)
+		q := createQueue()
 		require.True(t, isQueueEmpty(q))
 		problem1 := models.Problem{
 			TestsNumber: 1,
@@ -243,7 +252,7 @@ func TestQueue_RescheduleJob(t *testing.T) {
 }
 
 func TestQueueWrongJobID(t *testing.T) {
-	q := NewQueue(nil).(*Queue)
+	q := createQueue()
 	sub, err := q.JobCompleted(&masterconn.InvokerJobResult{
 		Job:     &invokerconn.Job{},
 		Verdict: verdict.CD,

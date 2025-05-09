@@ -5,6 +5,7 @@ import (
 	"testing_system/common/connectors/invokerconn"
 	"testing_system/common/connectors/masterconn"
 	"testing_system/common/db/models"
+	"testing_system/master/queue/queuestatus"
 )
 
 type Generator interface {
@@ -19,12 +20,12 @@ type Generator interface {
 	JobCompleted(jobResult *masterconn.InvokerJobResult) (*models.Submission, error)
 }
 
-func NewGenerator(problem *models.Problem, submission *models.Submission) (Generator, error) {
+func NewGenerator(problem *models.Problem, submission *models.Submission, status *queuestatus.QueueStatus) (Generator, error) {
 	switch problem.ProblemType {
 	case models.ProblemTypeICPC:
-		return newICPCGenerator(problem, submission)
+		return newICPCGenerator(problem, submission, status)
 	case models.ProblemTypeIOI:
-		return NewIOIGenerator(problem, submission)
+		return NewIOIGenerator(problem, submission, status)
 	default:
 		return nil, fmt.Errorf("unknown problem type %v", problem.ProblemType)
 	}

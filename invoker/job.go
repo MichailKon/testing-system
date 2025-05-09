@@ -16,8 +16,9 @@ import (
 type Job struct {
 	invokerconn.Job
 
-	submission *models.Submission
-	problem    *models.Problem
+	submission   *models.Submission
+	problem      *models.Problem
+	storageEpoch int
 
 	defers     []func()
 	createTime time.Time
@@ -33,6 +34,7 @@ func (j *Job) deferFunc() {
 
 func (i *Invoker) initJob(c *gin.Context, job *Job) bool {
 	job.createTime = time.Now()
+	job.storageEpoch = i.Storage.GetEpoch()
 
 	var submission models.Submission
 	if err := i.TS.DB.WithContext(c).Find(&submission, job.SubmitID).Error; err != nil {
@@ -60,11 +62,17 @@ func (i *Invoker) initJob(c *gin.Context, job *Job) bool {
 	return true
 }
 
-func (i *Invoker) newCompileJob(c *gin.Context, job *Job) {
-	i.Storage.Source.Lock(uint64(job.submission.ID))
-	job.defers = append(job.defers, func() { i.Storage.Source.Unlock(uint64(job.submission.ID)) })
+func (i *Invoker) newCompileJob(c *gin.Context, job *Job) bool {
+	i.Storage.Source.Lock(job.storageEpoch, uint64(job.submission.ID))
+	job.defers = append(job.defers, func() { i.Storage.Source.Unlock(job.storageEpoch, uint64(job.submission.ID)) })
 
-	i.JobQueue <- job
+	err := i.SandboxThreads.add(job)
+	if err != nil {
+		logger.Error("Error while adding compile job %s to sandbox queue, error: %s", job.ID, err.Error())
+		connector.RespErr(c, http.StatusInternalServerError, "server error")
+		return false
+	}
+	return true
 }
 
 func (i *Invoker) newTestJob(c *gin.Context, job *Job) bool {
@@ -76,19 +84,25 @@ func (i *Invoker) newTestJob(c *gin.Context, job *Job) bool {
 		return false
 	}
 
-	i.Storage.Binary.Lock(uint64(job.submission.ID))
-	job.defers = append(job.defers, func() { i.Storage.Binary.Unlock(uint64(job.submission.ID)) })
+	i.Storage.Binary.Lock(job.storageEpoch, uint64(job.submission.ID))
+	job.defers = append(job.defers, func() { i.Storage.Binary.Unlock(job.storageEpoch, uint64(job.submission.ID)) })
 
-	i.Storage.TestInput.Lock(uint64(job.problem.ID), job.Test)
-	job.defers = append(job.defers, func() { i.Storage.TestInput.Unlock(uint64(job.problem.ID), job.Test) })
+	i.Storage.TestInput.Lock(job.storageEpoch, uint64(job.problem.ID), job.Test)
+	job.defers = append(job.defers, func() { i.Storage.TestInput.Unlock(job.storageEpoch, uint64(job.problem.ID), job.Test) })
 
-	i.Storage.TestAnswer.Lock(uint64(job.problem.ID), job.Test)
-	job.defers = append(job.defers, func() { i.Storage.TestAnswer.Unlock(uint64(job.problem.ID), job.Test) })
+	i.Storage.TestAnswer.Lock(job.storageEpoch, uint64(job.problem.ID), job.Test)
+	job.defers = append(job.defers, func() { i.Storage.TestAnswer.Unlock(job.storageEpoch, uint64(job.problem.ID), job.Test) })
 
-	i.Storage.Checker.Lock(uint64(job.problem.ID))
-	job.defers = append(job.defers, func() { i.Storage.Checker.Unlock(uint64(job.problem.ID)) })
+	i.Storage.Checker.Lock(job.storageEpoch, uint64(job.problem.ID))
+	job.defers = append(job.defers, func() { i.Storage.Checker.Unlock(job.storageEpoch, uint64(job.problem.ID)) })
 
 	// TODO: interactor
-	i.JobQueue <- job
+
+	err := i.SandboxThreads.add(job)
+	if err != nil {
+		logger.Error("Error while adding test job %s to sandbox queue, error: %s", job.ID, err.Error())
+		connector.RespErr(c, http.StatusInternalServerError, "server error")
+		return false
+	}
 	return true
 }

@@ -178,8 +178,6 @@ func (s *Sandbox) Run(config *sandbox.ExecuteConfig) *sandbox.RunResult {
 		result.Verdict = verdict.RT
 	} else if result.Statistics.Time > config.TimeLimit {
 		result.Verdict = verdict.TL
-	} else if result.Statistics.Memory > config.MemoryLimit {
-		result.Verdict = verdict.ML
 	} else if wallTimeLimit {
 		result.Verdict = verdict.WL
 	} else {

@@ -93,6 +93,14 @@ func (t *Time) FromStr(s string) error {
 	return nil
 }
 
+func NewTime(s string) (*Time, error) {
+	var t Time
+	if err := t.FromStr(s); err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
 func (t Time) String() string {
 	v := t.Val()
 	suf := "ns"

@@ -6,6 +6,7 @@ import (
 	"testing_system/common/connectors/masterconn"
 	"testing_system/common/db/models"
 	"testing_system/master/queue/jobgenerators"
+	"testing_system/master/queue/queuestatus"
 )
 
 /*
@@ -31,6 +32,8 @@ type IQueue interface {
 
 	// NextJob returns a new job or nil if no jobs to do; each job should be completed or rescheduled
 	NextJob() *invokerconn.Job
+
+	Status() *queuestatus.QueueStatus
 }
 
 func NewQueue(ts *common.TestingSystem) IQueue {
@@ -41,5 +44,6 @@ func NewQueue(ts *common.TestingSystem) IQueue {
 		originalJobIDToJob:       make(map[string]*invokerconn.Job),
 		originalJobIDToGenerator: make(map[string]jobgenerators.Generator),
 		activeGeneratorIDs:       make(map[string]struct{}),
+		status:                   queuestatus.NewQueueStatus(false),
 	}
 }

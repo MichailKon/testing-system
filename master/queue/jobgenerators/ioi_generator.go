@@ -11,6 +11,7 @@ import (
 	"testing_system/common/constants/verdict"
 	"testing_system/common/db/models"
 	"testing_system/lib/logger"
+	"testing_system/master/queue/queuestatus"
 )
 
 type IOIGenerator struct {
@@ -31,6 +32,8 @@ type IOIGenerator struct {
 	firstNotCompletedGroup uint64
 	// firstNotGivenTest = first test with internalTestState = testNotGiven; 1-based indexing
 	firstNotGivenTest uint64
+
+	statusUpdater *queuestatus.QueueStatus
 }
 
 type internalTestState int
@@ -189,7 +192,7 @@ func doesTestPreventTestingGroup(testGroupInfo models.TestGroup, testVerdict ver
 
 func (i *IOIGenerator) calcGroupVerdict(groupInfo models.TestGroup) verdict.Verdict {
 	firstTest, lastTest := groupInfo.FirstTest, groupInfo.LastTest
-	if slices.IndexFunc(i.submission.TestResults[firstTest-1:lastTest], func(result models.TestResult) bool {
+	if slices.IndexFunc(i.submission.TestResults[firstTest-1:lastTest], func(result *models.TestResult) bool {
 		return result.Verdict != verdict.OK
 	}) != -1 {
 		return verdict.PT
@@ -243,6 +246,13 @@ func (i *IOIGenerator) completeGroupTesting(groupInfo models.TestGroup) {
 
 // updateSubmissionResult must be done with acquired mutex
 func (i *IOIGenerator) updateSubmissionResult() (*models.Submission, error) {
+	updated := false
+	defer func() {
+		if updated {
+			i.statusUpdater.UpdateSubmission(i.submission)
+		}
+	}()
+
 TestsLoop:
 	for i.firstNotCompletedTest <= i.problem.TestsNumber {
 		testGroupName := i.testNumberToGroupName[i.firstNotCompletedTest-1]
@@ -258,16 +268,19 @@ TestsLoop:
 		case testFinished:
 			break
 		}
+		updated = true
 
 		if testInternalGroupInfo.shouldMarkFinalTestsSkipped {
 			i.submission.TestResults = append(i.submission.TestResults,
-				models.TestResult{
+				&models.TestResult{
 					TestNumber: i.internalTestResults[i.firstNotCompletedTest-1].result.TestNumber,
 					Verdict:    verdict.SK,
 				})
 		} else {
-			i.submission.TestResults = append(i.submission.TestResults,
-				*i.internalTestResults[i.firstNotCompletedTest-1].result)
+			i.submission.TestResults = append(
+				i.submission.TestResults,
+				i.internalTestResults[i.firstNotCompletedTest-1].result,
+			)
 			testVerdict := i.internalTestResults[i.firstNotCompletedTest-1].result.Verdict
 			if doesTestPreventTestingGroup(testGroupInfo, testVerdict) {
 				testInternalGroupInfo.shouldMarkFinalTestsSkipped = true
@@ -287,6 +300,7 @@ TestsLoop:
 		i.firstNotCompletedTest++
 	}
 	if i.firstNotCompletedTest > i.problem.TestsNumber && len(i.givenJobs) == 0 {
+		updated = true
 		i.setFinalScoreAndVerdict()
 		if int(i.firstNotCompletedGroup) <= len(i.problem.TestGroups) {
 			logger.Panic("not all the groups were filled, but the problem is considered tested")
@@ -313,8 +327,16 @@ func (i *IOIGenerator) compileJobCompleted(
 			i.groupNameToInternalInfo[group.Name].shouldMarkFinalTestsSkipped = true
 		}
 	default:
-		logger.Panic("unknown verdict for compilation completed: %v", result.Verdict)
+		if result.Verdict != verdict.CF {
+			result.Verdict = verdict.CF
+			result.Error = fmt.Sprintf("unknown verdict for compile job: %v", result.Verdict)
+		}
+		i.submission.Verdict = verdict.CF
+		for _, group := range i.problem.TestGroups {
+			i.groupNameToInternalInfo[group.Name].shouldMarkFinalTestsSkipped = true
+		}
 	}
+	i.submission.CompilationResult = buildTestResult(job, result)
 }
 
 func populateTestJobResult(groupInfo models.TestGroup, result *masterconn.InvokerJobResult) error {
@@ -430,13 +452,7 @@ func (i *IOIGenerator) testJobCompleted(
 		}
 		result.Error += err.Error()
 	}
-	i.internalTestResults[job.Test-1].result.Points = result.Points
-	i.internalTestResults[job.Test-1].result.Verdict = result.Verdict
-	i.internalTestResults[job.Test-1].result.Error = result.Error
-	if result.Statistics != nil {
-		i.internalTestResults[job.Test-1].result.Time = result.Statistics.Time
-		i.internalTestResults[job.Test-1].result.Memory = result.Statistics.Memory
-	}
+	i.internalTestResults[job.Test-1].result = buildTestResult(job, result)
 	i.internalTestResults[job.Test-1].state = testFinished
 	i.stopGivingNewTestsIfNeeded(testInternalGroupInfo, testGroupInfo, result.Verdict)
 }
@@ -460,7 +476,11 @@ func (i *IOIGenerator) JobCompleted(jobResult *masterconn.InvokerJobResult) (*mo
 	return i.updateSubmissionResult()
 }
 
-func NewIOIGenerator(problem *models.Problem, submission *models.Submission) (Generator, error) {
+func NewIOIGenerator(
+	problem *models.Problem,
+	submission *models.Submission,
+	status *queuestatus.QueueStatus,
+) (Generator, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		logger.Panic("Can't generate generator id: %w", err)
@@ -478,6 +498,7 @@ func NewIOIGenerator(problem *models.Problem, submission *models.Submission) (Ge
 		firstNotCompletedTest:   1,
 		firstNotCompletedGroup:  1,
 		firstNotGivenTest:       1,
+		statusUpdater:           status,
 	}
 	generator.submission.Verdict = verdict.RU
 	if err = generator.prepareGenerator(); err != nil {

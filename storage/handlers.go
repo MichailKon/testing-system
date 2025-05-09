@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"io"
 	"mime"
 	"net/http"
 	"os"
@@ -45,7 +46,7 @@ func (s *Storage) HandleRemove(c *gin.Context) {
 	err = s.filesystem.RemoveFile(resourceInfo)
 	if err != nil {
 		connector.RespErr(c, http.StatusInternalServerError, "Server error")
-		logger.Error("Failed to remove file: id=%d, dataType=%s, filepath=%s\n %v",
+		logger.Error("Failed to remove file: id=%d, dataType=%s, filepath=%s error: %v",
 			resourceInfo.ID, resourceInfo.DataType.String(), resourceInfo.Filepath, err)
 		return
 	}
@@ -66,16 +67,46 @@ func (s *Storage) HandleGet(c *gin.Context) {
 			connector.RespErr(c, http.StatusNotFound, "File doesn't exist: %v", err)
 			return
 		}
-		logger.Error("Failed to get file: id=%d, dataType=%s, filePath=%s\n %v",
+		logger.Error("Failed to get file: id=%d, dataType=%s, filePath=%s error: %v",
 			resourceInfo.ID, resourceInfo.DataType.String(), resourceInfo.Filepath, err)
 		connector.RespErr(c, http.StatusInternalServerError, "Server error")
 		return
 	}
 
 	filename := filepath.Base(fullPath)
-	c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{
-		"filename": filename,
-	}))
 
-	c.File(fullPath)
+	if resourceInfo.Request.DownloadHead == nil {
+		c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{
+			"filename": filename,
+		}))
+		c.File(fullPath)
+	} else {
+		reader, err := os.Open(fullPath)
+		if err != nil {
+			logger.Error("Failed to open file: id=%d, dataType=%s, filepath=%s error: %v",
+				resourceInfo.ID, resourceInfo.DataType.String(), resourceInfo.Filepath, err)
+			connector.RespErr(c, http.StatusInternalServerError, "Server error")
+			return
+		}
+		stat, err := reader.Stat()
+		if err != nil {
+			logger.Error("Failed to stat file: id=%d, dataType=%s, filepath=%s error: %v",
+				resourceInfo.ID, resourceInfo.DataType.String(), resourceInfo.Filepath, err)
+			connector.RespErr(c, http.StatusInternalServerError, "Server error")
+			return
+		}
+
+		c.DataFromReader(
+			http.StatusOK,
+			min(stat.Size(), *resourceInfo.Request.DownloadHead),
+			"text/plain",
+			io.LimitReader(reader, *resourceInfo.Request.DownloadHead),
+			map[string]string{
+				"Content-Disposition": mime.FormatMediaType("attachment", map[string]string{
+					"filename": filename,
+				}),
+			},
+		)
+	}
+
 }

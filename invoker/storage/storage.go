@@ -1,11 +1,13 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
 	"github.com/xorcare/pointer"
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"testing_system/common"
 	"testing_system/common/connectors/storageconn"
 	"testing_system/common/constants/resource"
@@ -24,6 +26,9 @@ type InvokerStorage struct {
 	Interactor *CacheGetter
 	TestInput  *CacheGetter
 	TestAnswer *CacheGetter
+
+	epoch      int
+	epochMutex sync.Mutex
 }
 
 func NewInvokerStorage(ts *common.TestingSystem) *InvokerStorage {
@@ -51,6 +56,18 @@ func NewInvokerStorage(ts *common.TestingSystem) *InvokerStorage {
 	return s
 }
 
+func (s *InvokerStorage) Reset() {
+	s.epochMutex.Lock()
+	defer s.epochMutex.Unlock()
+	s.epoch++
+}
+
+func (s *InvokerStorage) GetEpoch() int {
+	s.epochMutex.Lock()
+	defer s.epochMutex.Unlock()
+	return s.epoch
+}
+
 func (s *InvokerStorage) getFiles(key cacheKey) (*string, error, uint64) {
 	request := &storageconn.Request{
 		Resource:  key.Resource,
@@ -58,27 +75,27 @@ func (s *InvokerStorage) getFiles(key cacheKey) (*string, error, uint64) {
 		SubmitID:  key.SubmitID,
 		TestID:    key.TestID,
 	}
-	setRequestBaseFolder(request, s.ts.Config.Invoker.CachePath)
+	setRequestBaseFolder(request, filepath.Join(s.ts.Config.Invoker.CachePath, strconv.Itoa(key.Epoch)))
 	response := s.ts.StorageConn.Download(request)
 	if response.Error != nil {
-		if response.Error == storageconn.ErrStorageFileNotFound {
+		if errors.Is(response.Error, storageconn.ErrStorageFileNotFound) {
 			return nil, fmt.Errorf("file not exists"), 0
 		}
 		return nil, response.Error, 0
 	} else {
-		return pointer.String(filepath.Join(request.BaseFolder, response.Filename)), nil, response.Size
+		return pointer.String(filepath.Join(request.DownloadFolder, response.Filename)), nil, response.Size
 	}
 }
 
 func setRequestBaseFolder(request *storageconn.Request, parent string) {
-	request.BaseFolder = filepath.Join(parent, request.Resource.String())
+	request.DownloadFolder = filepath.Join(parent, request.Resource.String())
 	switch request.Resource {
 	case resource.SourceCode, resource.CompiledBinary, resource.CompileOutput:
-		request.BaseFolder = filepath.Join(request.BaseFolder, strconv.FormatUint(request.SubmitID, 10))
+		request.DownloadFolder = filepath.Join(request.DownloadFolder, strconv.FormatUint(request.SubmitID, 10))
 	case resource.Checker, resource.Interactor:
-		request.BaseFolder = filepath.Join(request.BaseFolder, strconv.FormatUint(request.ProblemID, 10))
+		request.DownloadFolder = filepath.Join(request.DownloadFolder, strconv.FormatUint(request.ProblemID, 10))
 	case resource.TestInput, resource.TestAnswer:
-		request.BaseFolder = filepath.Join(request.BaseFolder, fmt.Sprintf("%d-%d", request.ProblemID, request.TestID))
+		request.DownloadFolder = filepath.Join(request.DownloadFolder, fmt.Sprintf("%d-%d", request.ProblemID, request.TestID))
 	default:
 		logger.Panic("Can not fill base folder for storageconn request of type %v", request.Resource)
 	}

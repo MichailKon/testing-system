@@ -81,7 +81,9 @@ func testMultiSubmit(t *testing.T, sandbox string) {
 	h.newSubmit(3)
 	h.newSubmit(4)
 	h.newSubmit(5)
-	h.newSubmit(6)
+	if sandbox == "isolate" {
+		h.newSubmit(6) // We can not detect ML with simple sandbox
+	}
 	h.newSubmit(7)
 
 	h.waitSubmits()

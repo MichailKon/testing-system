@@ -171,7 +171,7 @@ func (s *JobPipelineState) limitedReader(r io.Reader) io.Reader {
 
 func (s *JobPipelineState) loadResource(getter *storage.CacheGetter, args ...uint64) (*string, error) {
 	defer updateMetrics(&s.metrics.ResourceWaitDuration, time.Now())
-	res, err := getter.Get(args...)
+	res, err := getter.Get(s.job.storageEpoch, args...)
 	return res, err
 }
 

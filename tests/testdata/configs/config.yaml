@@ -3,7 +3,7 @@ Port: 8483
 Invoker:
   Threads: 1
   Sandboxes: 2
-  QueueSize: 2
+  QueueSize: 1
   SandboxType: "TODO"
   SandboxHomePath: "TODO"
   CacheSize: 1000000000

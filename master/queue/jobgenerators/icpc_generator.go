@@ -9,49 +9,33 @@ import (
 	"testing_system/common/constants/verdict"
 	"testing_system/common/db/models"
 	"testing_system/lib/logger"
+	"testing_system/master/queue/queuestatus"
 )
 
 type ICPCGenerator struct {
-	id          string
-	mutex       sync.Mutex
-	submission  *models.Submission
-	problem     *models.Problem
-	state       generatorState
-	hasFails    bool
-	givenJobs   map[string]*invokerconn.Job
-	futureTests []uint64
+	id    string
+	mutex sync.Mutex
+
+	submission *models.Submission
+	problem    *models.Problem
+
+	state              generatorState
+	firstTestToGive    uint64
+	testedPrefixLength uint64
+
+	givenJobs           map[string]*invokerconn.Job
+	internalTestResults map[uint64]*models.TestResult
+
+	statusUpdater *queuestatus.QueueStatus
 }
 
 func (i *ICPCGenerator) ID() string {
 	return i.id
 }
 
-// finalizeResults must be done with acquired mutex
-func (i *ICPCGenerator) finalizeResults() {
-	setSkipped := false
-	for j := range i.submission.TestResults {
-		if setSkipped {
-			i.submission.TestResults[j].Verdict = verdict.SK
-			continue
-		}
-		if i.submission.TestResults[j].Verdict == verdict.OK || i.submission.TestResults[j].Verdict == verdict.SK {
-			continue
-		}
-		setSkipped = true
-		i.submission.Verdict = i.submission.TestResults[j].Verdict
-	}
-	if !setSkipped {
-		i.submission.Score = 1
-		i.submission.Verdict = verdict.OK
-	}
-}
-
 func (i *ICPCGenerator) NextJob() *invokerconn.Job {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
-	if i.state == compilationFinished && len(i.futureTests) == 0 {
-		return nil
-	}
 	if i.state == compilationStarted {
 		return nil
 	}
@@ -66,55 +50,107 @@ func (i *ICPCGenerator) NextJob() *invokerconn.Job {
 	if i.state == compilationNotStarted {
 		job.Type = invokerconn.CompileJob
 		i.state = compilationStarted
+	} else if i.firstTestToGive > i.problem.TestsNumber {
+		return nil
 	} else {
-		if i.hasFails {
-			return nil
-		}
-		job.Test = i.futureTests[0]
-		i.futureTests = i.futureTests[1:]
 		job.Type = invokerconn.TestJob
+		job.Test = i.firstTestToGive
+		i.firstTestToGive++
 	}
+
 	i.givenJobs[job.ID] = job
 	return job
 }
 
-// compileJobCompleted must be done with acquired mutex
-func (i *ICPCGenerator) compileJobCompleted(job *invokerconn.Job, result *masterconn.InvokerJobResult) (*models.Submission, error) {
-	if job.Type != invokerconn.CompileJob {
-		return nil, fmt.Errorf("job type %s is not compile job", job.ID)
-	}
-	switch result.Verdict {
-	case verdict.CD:
-		i.state = compilationFinished
-		return nil, nil
-	case verdict.CE:
-		i.submission.Verdict = result.Verdict
-		return i.submission, nil
-	default:
-		return nil, fmt.Errorf("unknown verdict for compilation completed: %v", result.Verdict)
+func (i *ICPCGenerator) setFail() {
+	for i.firstTestToGive <= i.problem.TestsNumber {
+		i.internalTestResults[i.firstTestToGive] = &models.TestResult{
+			TestNumber: i.firstTestToGive,
+			Verdict:    verdict.SK,
+		}
+		i.firstTestToGive++
 	}
 }
 
+func (i *ICPCGenerator) updateSubmissionResult() (*models.Submission, error) {
+	updated := false
+	defer func() {
+		if updated {
+			i.statusUpdater.UpdateSubmission(i.submission)
+		}
+	}()
+
+	for i.testedPrefixLength < i.problem.TestsNumber {
+		result, ok := i.internalTestResults[i.testedPrefixLength+1]
+		if !ok {
+			return nil, nil
+		}
+		updated = true
+		i.testedPrefixLength++
+		if i.submission.Verdict != verdict.RU {
+			result = &models.TestResult{
+				TestNumber: i.testedPrefixLength,
+				Verdict:    verdict.SK,
+			}
+		}
+		switch result.Verdict {
+		case verdict.OK, verdict.SK:
+			// skip
+		default:
+			if i.submission.Verdict != verdict.RU {
+				logger.Panic("Trying to change bad verdict in ICPC problem")
+			}
+			i.submission.Verdict = result.Verdict
+		}
+		i.submission.TestResults = append(i.submission.TestResults, result)
+	}
+	// If we went here, then submission is tested
+	if i.submission.Verdict == verdict.RU {
+		i.submission.Verdict = verdict.OK
+		i.submission.Score = 1
+	}
+	return i.submission, nil
+}
+
+// compileJobCompleted must be done with acquired mutex
+func (i *ICPCGenerator) compileJobCompleted(job *invokerconn.Job, result *masterconn.InvokerJobResult) {
+	if job.Type != invokerconn.CompileJob {
+		logger.Panic("Treating job %s of type %v as compile job", job.ID, job.Type)
+	}
+	i.state = compilationFinished
+	switch result.Verdict {
+	case verdict.CD:
+		// skip
+	case verdict.CE, verdict.CF:
+		i.submission.Verdict = result.Verdict
+		i.setFail()
+	default:
+		if result.Verdict != verdict.CF {
+			result.Verdict = verdict.CF
+			result.Error = fmt.Sprintf("unknown verdict for compile job: %v", result.Verdict)
+		}
+		i.submission.Verdict = result.Verdict
+		i.setFail()
+	}
+	i.submission.CompilationResult = buildTestResult(job, result)
+}
+
 // testJobCompleted must be done with acquired mutex
-func (i *ICPCGenerator) testJobCompleted(job *invokerconn.Job, result *masterconn.InvokerJobResult) (*models.Submission, error) {
-	i.submission.TestResults[job.Test-1].Verdict = result.Verdict
+func (i *ICPCGenerator) testJobCompleted(job *invokerconn.Job, result *masterconn.InvokerJobResult) {
+	if job.Type != invokerconn.TestJob {
+		logger.Panic("Treating job %s of type %v as test job", job.ID, job.Type)
+	}
 	switch result.Verdict {
 	case verdict.OK:
-		if len(i.givenJobs) == 0 && (len(i.futureTests) == 0 || i.hasFails) {
-			i.finalizeResults()
-			return i.submission, nil
-		}
-		return nil, nil
+		// skip
 	case verdict.PT, verdict.WA, verdict.RT, verdict.ML, verdict.TL, verdict.WL, verdict.SE, verdict.CF:
-		i.hasFails = true
-		if len(i.givenJobs) == 0 {
-			i.finalizeResults()
-			return i.submission, nil
-		}
-		return nil, nil
+		i.setFail()
 	default:
-		return nil, fmt.Errorf("unknown verdict for testing completed: %v", result.Verdict)
+		result.Verdict = verdict.CF
+		result.Error = fmt.Sprintf("unknown verdict for test job: %v", result.Verdict)
+		i.setFail()
 	}
+	i.internalTestResults[job.Test] = buildTestResult(job, result)
 }
 
 func (i *ICPCGenerator) JobCompleted(result *masterconn.InvokerJobResult) (*models.Submission, error) {
@@ -122,21 +158,24 @@ func (i *ICPCGenerator) JobCompleted(result *masterconn.InvokerJobResult) (*mode
 	defer i.mutex.Unlock()
 	job, ok := i.givenJobs[result.Job.ID]
 	if !ok {
-		return nil, fmt.Errorf("job %s does not exist", result.Job.ID)
+		logger.Panic("Wrong job %s is passed to ICPC generator", job.ID)
+		return nil, nil
 	}
 	delete(i.givenJobs, result.Job.ID)
 
 	switch job.Type {
 	case invokerconn.CompileJob:
-		return i.compileJobCompleted(job, result)
+		i.compileJobCompleted(job, result)
 	case invokerconn.TestJob:
-		return i.testJobCompleted(job, result)
+		i.testJobCompleted(job, result)
 	default:
-		return nil, fmt.Errorf("unknown job type for ICPC problem: %v", job.Type)
+		logger.Panic("unknown job type for ICPC problem: %v", job.Type)
+		// never pass here
 	}
+	return i.updateSubmissionResult()
 }
 
-func newICPCGenerator(problem *models.Problem, submission *models.Submission) (Generator, error) {
+func newICPCGenerator(problem *models.Problem, submission *models.Submission, status *queuestatus.QueueStatus) (Generator, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		logger.Panic("Can't generate generator id: %w", err)
@@ -145,26 +184,21 @@ func newICPCGenerator(problem *models.Problem, submission *models.Submission) (G
 	if problem.ProblemType != models.ProblemTypeICPC {
 		return nil, fmt.Errorf("problem %v is not ICPC", problem.ID)
 	}
-	futureTests := make([]uint64, 0, problem.TestsNumber)
-	testResults := make([]models.TestResult, 0, problem.TestsNumber)
-	for i := range problem.TestsNumber {
-		futureTests = append(futureTests, i+1)
-		testResults = append(testResults, models.TestResult{
-			TestNumber: i + 1,
-			Verdict:    verdict.SK,
-			Time:       0,
-			Memory:     0,
-		})
-	}
-
-	submission.TestResults = testResults
+	submission.Verdict = verdict.RU
 
 	return &ICPCGenerator{
-		id:          id.String(),
-		submission:  submission,
-		state:       compilationNotStarted,
-		problem:     problem,
-		givenJobs:   make(map[string]*invokerconn.Job),
-		futureTests: futureTests,
+		id: id.String(),
+
+		submission: submission,
+		problem:    problem,
+
+		state:              compilationNotStarted,
+		firstTestToGive:    1,
+		testedPrefixLength: 0,
+
+		givenJobs:           make(map[string]*invokerconn.Job),
+		internalTestResults: make(map[uint64]*models.TestResult),
+
+		statusUpdater: status,
 	}, nil
 }
