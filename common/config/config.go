@@ -12,7 +12,7 @@ type Config struct {
 	Port int     `yaml:"Port"`
 	Host *string `yaml:"Host,omitempty"` // leave empty for localhost
 
-	Logger *logger.Config `yaml:"Logger"`
+	Logger *logger.Config `yaml:"Logger,omitempty"`
 
 	Invoker *InvokerConfig `yaml:"Invoker,omitempty"`
 	Master  *MasterConfig  `yaml:"Master,omitempty"`

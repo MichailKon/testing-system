@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"testing_system/common"
 	"testing_system/common/config"
@@ -16,6 +17,7 @@ import (
 	"testing_system/invoker/compiler"
 	"testing_system/invoker/sandbox"
 	"testing_system/invoker/storage"
+	"time"
 )
 
 type testState struct {
@@ -51,13 +53,20 @@ func newTestState(t *testing.T, sandboxType string) *testState {
 		Storage:  storage.NewInvokerStorage(ts.TS),
 		Compiler: compiler.NewCompiler(ts.TS),
 		RunnerThreads: &threadsExecutor[func()]{
-			valueReceiver: make(chan func()),
+			values:         make([]func(), 0),
+			closed:         false,
+			threadsCount:   1,
+			name:           "test",
+			waitDuration:   make([]time.Duration, 1),
+			lastActiveTime: make([]time.Time, 1),
+			isActive:       make([]bool, 1),
 		},
 	}
+	ts.Invoker.RunnerThreads.cond = sync.NewCond(&ts.Invoker.RunnerThreads.mutex)
 	go func() {
-		for f := range ts.Invoker.RunnerThreads.valueReceiver {
+		ts.Invoker.RunnerThreads.runThread(1, func(f func()) {
 			f()
-		}
+		})
 	}()
 	require.NoError(t, os.CopyFS(ts.FilesDir, os.DirFS("testdata/files")))
 	ts.Sandbox = ts.Invoker.newSandbox(1)
@@ -128,6 +137,8 @@ func testCompileSandbox(t *testing.T, sandboxType string) {
 	s = ts.testCompile(2)
 	require.Equal(t, verdict.CE, s.compile.result.Verdict)
 	s.finish()
+
+	ts.Invoker.RunnerThreads.stop()
 }
 
 func (ts *testState) addProblem(problemID uint) {
@@ -249,4 +260,6 @@ func testRunSandbox(t *testing.T, sandboxType string) {
 	res = ts.testRun(8, 2)
 	require.Equal(t, verdict.PT, res.Verdict)
 	require.EqualValues(t, 5, *res.Points)
+
+	ts.Invoker.RunnerThreads.stop()
 }

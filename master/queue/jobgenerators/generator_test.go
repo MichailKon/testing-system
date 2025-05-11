@@ -258,6 +258,43 @@ func TestICPCGenerator(t *testing.T) {
 			})
 		})
 	})
+
+	t.Run("Fails in 3rd and 2nd tests", func(t *testing.T) {
+		problem, submission := &models.Problem{
+			ProblemType: models.ProblemTypeICPC,
+			TestsNumber: 3,
+		}, fixtureSubmission(1)
+		g, err := NewGenerator(problem, submission, status)
+		require.NoError(t, err)
+		job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
+		sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
+			Job:     job,
+			Verdict: verdict.CD,
+		})
+		require.NoError(t, err)
+		require.Nil(t, sub)
+		job1 := nextJob(t, g, 1, invokerconn.TestJob, 1)
+		job2 := nextJob(t, g, 1, invokerconn.TestJob, 2)
+		job3 := nextJob(t, g, 1, invokerconn.TestJob, 3)
+		sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+			Job:     job3,
+			Verdict: verdict.WA,
+		})
+		require.NoError(t, err)
+		require.Nil(t, sub)
+		sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+			Job:     job2,
+			Verdict: verdict.WA,
+		})
+		require.NoError(t, err)
+		require.Nil(t, sub)
+		sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+			Job:     job1,
+			Verdict: verdict.OK,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, sub)
+	})
 }
 
 func TestIOIGenerator(t *testing.T) {

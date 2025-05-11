@@ -48,7 +48,7 @@ func SetupInvoker(ts *common.TestingSystem) error {
 	invoker.MaxJobs = ts.Config.Invoker.QueueSize + ts.Config.Invoker.Sandboxes
 
 	invoker.initializeSandboxThreads()
-	invoker.initialiseRunnerThreads()
+	invoker.initializeRunnerThreads()
 
 	r := ts.Router.Group("/invoker")
 	r.GET("/status", invoker.handleStatus)

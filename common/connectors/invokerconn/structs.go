@@ -39,10 +39,10 @@ type Status struct {
 type StatusMetrics struct {
 	Lifetime       time.Duration         `json:"life_time"`
 	SandboxMetrics *StatusThreadsMetrics `json:"sandbox_metrics"`
-	ThreadMetrics  *StatusThreadsMetrics `json:"runners_metrics"`
+	ThreadMetrics  *StatusThreadsMetrics `json:"thread_metrics"`
 }
 
 type StatusThreadsMetrics struct {
 	Count             int             `json:"count"`
-	TotalWaitDuration []time.Duration `json:"waitTime"`
+	TotalWaitDuration []time.Duration `json:"total_wait_duration"`
 }

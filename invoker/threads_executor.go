@@ -15,8 +15,8 @@ import (
 )
 
 type threadsExecutor[Value any] struct {
-	valueReceiver chan Value
-	closed        bool
+	values []Value
+	closed bool
 
 	threadsCount int
 	name         string
@@ -25,15 +25,17 @@ type threadsExecutor[Value any] struct {
 	lastActiveTime []time.Time
 	isActive       []bool
 	mutex          sync.Mutex
+	cond           *sync.Cond
 }
 
 func (e *threadsExecutor[Value]) add(v Value) error {
 	e.mutex.Lock()
+	defer e.mutex.Unlock()
 	if e.closed {
 		return fmt.Errorf("%s threads are stopped", e.name)
 	}
-	e.mutex.Unlock()
-	e.valueReceiver <- v
+	e.values = append(e.values, v)
+	e.cond.Signal()
 	return nil
 }
 
@@ -43,8 +45,11 @@ func (e *threadsExecutor[Value]) stop() {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
+	if e.closed {
+		logger.Warn("%s threads are already stopped, calling stop twice", e.name)
+	}
 	e.closed = true
-	close(e.valueReceiver)
+	e.cond.Broadcast()
 }
 
 func (e *threadsExecutor[Value]) metrics() *invokerconn.StatusThreadsMetrics {
@@ -65,13 +70,21 @@ func (e *threadsExecutor[Value]) metrics() *invokerconn.StatusThreadsMetrics {
 
 func (e *threadsExecutor[Value]) runThread(id int, valueProcessor func(Value)) {
 	e.mutex.Lock()
+	defer e.mutex.Unlock()
 	e.lastActiveTime[id-1] = time.Now()
-	e.mutex.Unlock()
-
 	logger.Info("Starting invoker %s thread id: %d", e.name, id)
 
-	for value := range e.valueReceiver {
-		e.mutex.Lock()
+receiverLoop:
+	for {
+		for len(e.values) == 0 {
+			if e.closed {
+				break receiverLoop
+			}
+			e.cond.Wait()
+		}
+		value := e.values[0]
+		e.values = e.values[1:]
+
 		e.waitDuration[id-1] += time.Since(e.lastActiveTime[id-1])
 		e.isActive[id-1] = true
 		e.mutex.Unlock()
@@ -81,7 +94,6 @@ func (e *threadsExecutor[Value]) runThread(id int, valueProcessor func(Value)) {
 		e.mutex.Lock()
 		e.isActive[id-1] = false
 		e.lastActiveTime[id-1] = time.Now()
-		e.mutex.Unlock()
 	}
 
 	logger.Info("Finished invoker %s thread id: %d", e.name, id)
@@ -115,7 +127,7 @@ func (i *Invoker) newSandbox(id int) sandbox.ISandbox {
 
 func (i *Invoker) initializeSandboxThreads() {
 	i.SandboxThreads = &threadsExecutor[*Job]{
-		valueReceiver:  make(chan *Job, i.MaxJobs*2),
+		values:         make([]*Job, 0),
 		closed:         false,
 		threadsCount:   i.TS.Config.Invoker.Sandboxes,
 		name:           "sandbox",
@@ -123,6 +135,7 @@ func (i *Invoker) initializeSandboxThreads() {
 		lastActiveTime: make([]time.Time, i.TS.Config.Invoker.Sandboxes),
 		isActive:       make([]bool, i.TS.Config.Invoker.Sandboxes),
 	}
+	i.SandboxThreads.cond = sync.NewCond(&i.SandboxThreads.mutex)
 
 	var threadsWaiter sync.WaitGroup
 	threadsWaiter.Add(i.SandboxThreads.threadsCount)
@@ -157,9 +170,9 @@ func (i *Invoker) initializeSandboxThreads() {
 	})
 }
 
-func (i *Invoker) initialiseRunnerThreads() {
+func (i *Invoker) initializeRunnerThreads() {
 	i.RunnerThreads = &threadsExecutor[func()]{
-		valueReceiver:  make(chan func(), i.TS.Config.Invoker.Threads),
+		values:         make([]func(), 0),
 		closed:         false,
 		threadsCount:   i.TS.Config.Invoker.Threads,
 		name:           "process execution",
@@ -167,6 +180,7 @@ func (i *Invoker) initialiseRunnerThreads() {
 		lastActiveTime: make([]time.Time, i.TS.Config.Invoker.Threads),
 		isActive:       make([]bool, i.TS.Config.Invoker.Threads),
 	}
+	i.RunnerThreads.cond = sync.NewCond(&i.RunnerThreads.mutex)
 	for id := 1; id <= i.TS.Config.Invoker.Threads; id++ {
 		i.TS.AddProcess(func() {
 			i.RunnerThreads.runThread(id, func(f func()) {

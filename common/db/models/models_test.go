@@ -76,6 +76,6 @@ func TestTestResultsDB(t *testing.T) {
 		require.Equal(t, submission.Language, newSubmission.Language)
 		require.Equal(t, submission.Score, newSubmission.Score)
 		require.Equal(t, submission.Verdict, newSubmission.Verdict)
-		//require.Equal(t, submission.TestResults, newSubmission.TestResults)
+		require.Equal(t, submission.TestResults, newSubmission.TestResults)
 	})
 }

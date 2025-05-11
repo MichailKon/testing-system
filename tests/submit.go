@@ -65,6 +65,14 @@ func (h *TSHolder) sendSubmit(s *submitTest) bool {
 }
 
 func (h *TSHolder) waitSubmits() {
+	for {
+		status, err := h.ts.MasterConn.GetStatus(context.Background(), "")
+		require.NoError(h.t, err)
+		if len(status.TestingSubmissions) == 0 {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
 	for _, s := range h.submits {
 		h.verifySubmit(s)
 	}

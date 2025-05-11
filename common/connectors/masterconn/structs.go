@@ -48,15 +48,15 @@ type InvokerStatus struct {
 	Address     string             `json:"address"`
 	TimeAdded   time.Time          `json:"time_added"`
 	MaxNewJobs  int                `json:"max_new_jobs"`
-	TestingJobs []*invokerconn.Job `json:"active_jobs"`
+	TestingJobs []*invokerconn.Job `json:"testing_jobs"`
 }
 
 type InvokerJobMetrics struct {
-	TestingWaitDuration    time.Duration `json:"InvokerWaitDuration"`
-	TotalSandboxOccupation time.Duration `json:"TotalSandboxOccupation"`
-	ResourceWaitDuration   time.Duration `json:"ResourceWaitDuration"`
-	FileActionsDuration    time.Duration `json:"FileActionsDuration"`
-	ExecutionWaitDuration  time.Duration `json:"ExecutionWaitDuration"`
-	ExecutionDuration      time.Duration `json:"ExecutionDuration"`
-	SendResultDuration     time.Duration `json:"SendResultDuration"`
+	TestingWaitDuration    time.Duration `json:"testing_wait_duration"`
+	TotalSandboxOccupation time.Duration `json:"total_sandbox_occupation"`
+	ResourceWaitDuration   time.Duration `json:"resource_wait_duration"`
+	FileActionsDuration    time.Duration `json:"file_actions_duration"`
+	ExecutionWaitDuration  time.Duration `json:"execution_wait_duration"`
+	ExecutionDuration      time.Duration `json:"execution_duration"`
+	SendResultDuration     time.Duration `json:"send_result_duration"`
 }
