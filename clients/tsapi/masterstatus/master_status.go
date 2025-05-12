@@ -45,9 +45,9 @@ func (s *MasterStatus) runUpdateThread() {
 
 	t := time.Tick(s.statusUpdateInterval)
 	for {
+		s.updateStatus()
 		select {
 		case <-t:
-			s.updateStatus()
 		}
 	}
 }
@@ -122,9 +122,7 @@ type SubmissionsFilter struct {
 func (s *MasterStatus) GetSubmissions(ctx context.Context, filter *SubmissionsFilter) ([]SubmissionInList, error) {
 	request := s.base.DB.
 		WithContext(ctx).
-		Model(&models.Submission{}).
-		Limit(filter.Count).
-		Offset((filter.Page - 1) * filter.Count)
+		Model(&models.Submission{})
 
 	if filter.ProblemID != nil {
 		request = request.Where("problem_id=?", *filter.ProblemID)
@@ -139,6 +137,8 @@ func (s *MasterStatus) GetSubmissions(ctx context.Context, filter *SubmissionsFi
 
 	err := request.
 		Order("id desc").
+		Limit(filter.Count).
+		Offset((filter.Page - 1) * filter.Count).
 		Find(&submissions).
 		Error
 

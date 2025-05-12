@@ -29,12 +29,20 @@ func (h *Handler) getProblems(c *gin.Context) {
 		return
 	}
 	var problems []problemInList
+	if filter.Count <= 0 {
+		respError(c, http.StatusBadRequest, "Count should be positive number")
+		return
+	}
+	if filter.Page <= 0 {
+		respError(c, http.StatusBadRequest, "Page should be positive number")
+		return
+	}
 	err := h.base.DB.
 		WithContext(c).
 		Model(&models.Problem{}).
+		Order("id desc").
 		Limit(filter.Count).
 		Offset((filter.Page - 1) * filter.Count).
-		Order("id desc").
 		Find(&problems).
 		Error
 	if err != nil {

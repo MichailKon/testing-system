@@ -47,6 +47,7 @@ func (e *threadsExecutor[Value]) stop() {
 
 	if e.closed {
 		logger.Warn("%s threads are already stopped, calling stop twice", e.name)
+		return
 	}
 	e.closed = true
 	e.cond.Broadcast()
