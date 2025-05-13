@@ -7,6 +7,7 @@ import (
 	"testing_system/common"
 	"testing_system/common/connectors/invokerconn"
 	"testing_system/common/connectors/masterconn"
+	"testing_system/common/constants/verdict"
 	"testing_system/lib/logger"
 	"testing_system/master/queue"
 )
@@ -19,6 +20,7 @@ type InvokerRegistry struct {
 
 	invokers       []*Invoker
 	invokerByJobID map[string]*Invoker
+	testingJobs    map[string]*invokerconn.Job
 
 	nextJob *invokerconn.Job
 }
@@ -28,6 +30,7 @@ func NewInvokerRegistry(queue queue.IQueue, ts *common.TestingSystem) *InvokerRe
 		ts:             ts,
 		queue:          queue,
 		invokerByJobID: make(map[string]*Invoker),
+		testingJobs:    make(map[string]*invokerconn.Job),
 	}
 }
 
@@ -42,6 +45,7 @@ func (r *InvokerRegistry) OnInvokerFailure(invoker *Invoker) {
 		if exists {
 			r.queue.RescheduleJob(jobID)
 			delete(r.invokerByJobID, jobID)
+			delete(r.testingJobs, jobID)
 		}
 	}
 
@@ -75,7 +79,20 @@ func (r *InvokerRegistry) HandleInvokerJobResult(result *masterconn.InvokerJobRe
 		return false
 	}
 
+	if result.Verdict != verdict.OK {
+		for runningJobID, runningJob := range r.testingJobs {
+			if slices.Contains(runningJob.RequiredJobIDs, result.Job.ID) {
+				jobInvoker, ok := r.invokerByJobID[runningJobID]
+				if !ok {
+					logger.Panic("Job %s is marked as testing, but no invoker found for it", runningJobID)
+				}
+				jobInvoker.StopJob(runningJobID)
+			}
+		}
+	}
+
 	delete(r.invokerByJobID, result.Job.ID)
+	delete(r.testingJobs, result.Job.ID)
 	return invoker.JobTested(result.Job.ID)
 }
 
@@ -98,6 +115,7 @@ func (r *InvokerRegistry) SendJobs() {
 				break
 			}
 			r.invokerByJobID[r.nextJob.ID] = invoker
+			r.testingJobs[r.nextJob.ID] = r.nextJob
 			r.nextJob = nil
 		}
 	}

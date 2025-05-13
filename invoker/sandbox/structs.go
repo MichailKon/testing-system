@@ -1,6 +1,7 @@
 package sandbox
 
 import (
+	"context"
 	"io"
 	"testing_system/common/config"
 	"testing_system/common/connectors/masterconn"
@@ -17,6 +18,8 @@ type ExecuteConfig struct {
 	Stdout         *IORedirect `yaml:"-"`
 	Stderr         *IORedirect `yaml:"-"`
 	StderrToStdout bool        `yaml:"-"`
+
+	Ctx context.Context
 }
 
 // IORedirect specifies files to read/write to.

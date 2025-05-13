@@ -4,7 +4,8 @@ import "time"
 
 type InvokerConfig struct {
 	// PublicAddress defines address for public access to invoker from master if the server is set up locally with some proxy
-	PublicAddress *string `yaml:"PublicAddress,omitempty"`
+	PublicAddress           *string `yaml:"PublicAddress,omitempty"`
+	AutodetectPublicAddress *bool   `yaml:"AutodetectPublicAddress,omitempty"`
 
 	Threads   int `yaml:"Threads"`
 	Sandboxes int `yaml:"Sandboxes"`

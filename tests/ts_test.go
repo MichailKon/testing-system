@@ -1,8 +1,11 @@
 package tests
 
 import (
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/require"
 	"os"
+	"sync"
 	"testing"
 	"time"
 )
@@ -40,14 +43,18 @@ func TestTSPanic(t *testing.T) {
 
 func testTSPanic(t *testing.T, sandbox string) {
 	h := initTS(t, sandbox)
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
 		require.Panics(t, h.start)
+		wg.Done()
 	}()
 	h.ts.Go(func() {
 		// Wait until testing system is set up
 		time.Sleep(10 * time.Millisecond)
 		panic("PANIC!!!")
 	})
+	wg.Wait()
 }
 
 func TestSingleSubmit(t *testing.T) {
@@ -87,6 +94,30 @@ func testMultiSubmit(t *testing.T, sandbox string) {
 	h.newSubmit(7)
 
 	h.waitSubmits()
+	h.stop()
+}
+
+func TestSkipJobs(t *testing.T) {
+	runSanbodxTests(t, testSkipJobs)
+}
+
+func testSkipJobs(t *testing.T, sandbox string) {
+	h := initTS(t, sandbox)
+	go h.start()
+	time.Sleep(10 * time.Millisecond)
+	h.newSubmit(8)
+	h.waitSubmits()
+	metrics := make(chan prometheus.Metric, 100)
+
+	h.ts.Metrics.InvokerSkippedJobs.Collect(metrics)
+	close(metrics)
+	var skippedJobs float64
+	for singleMetric := range metrics {
+		var metric dto.Metric
+		require.NoError(t, singleMetric.Write(&metric))
+		skippedJobs += metric.Counter.GetValue()
+	}
+	require.Greater(t, skippedJobs, float64(0))
 	h.stop()
 }
 

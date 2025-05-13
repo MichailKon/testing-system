@@ -1,7 +1,9 @@
 package invoker
 
 import (
+	"errors"
 	"fmt"
+	"net"
 	"strconv"
 	"sync"
 	"testing_system/common"
@@ -54,6 +56,7 @@ func SetupInvoker(ts *common.TestingSystem) error {
 	r.GET("/status", invoker.handleStatus)
 	r.POST("/job/new", invoker.handleNewJob)
 	r.POST("/reset_cache", invoker.resetCache)
+	r.POST("/job/stop", invoker.stopJob)
 
 	ts.AddProcess(invoker.runStatusLoop)
 
@@ -64,6 +67,12 @@ func SetupInvoker(ts *common.TestingSystem) error {
 func (i *Invoker) setupAddress() {
 	if i.TS.Config.Invoker.PublicAddress != nil {
 		i.Address = *i.TS.Config.Invoker.PublicAddress
+	} else if i.TS.Config.Invoker.AutodetectPublicAddress != nil && *i.TS.Config.Invoker.AutodetectPublicAddress {
+		host, err := getPublicIP()
+		if err != nil {
+			logger.Panic("Can not detect public address for invoker, error: %v", err.Error())
+		}
+		i.Address = fmt.Sprintf("http://%s:%d", host, i.TS.Config.Port)
 	} else {
 		// TODO: Handle master and invoker on same server
 		var host string
@@ -74,6 +83,22 @@ func (i *Invoker) setupAddress() {
 		}
 		i.Address = "http://" + host + ":" + strconv.Itoa(i.TS.Config.Port)
 	}
+}
+
+func getPublicIP() (string, error) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "", err
+	}
+	for _, address := range addrs {
+		// check the address type and if it is not a loopback the display it
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String(), nil
+			}
+		}
+	}
+	return "", errors.New("public ip address is not detected")
 }
 
 func (i *Invoker) getStatus() *invokerconn.Status {

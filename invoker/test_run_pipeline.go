@@ -34,7 +34,7 @@ func (i *Invoker) fullTestingPipeline(sandbox sandbox.ISandbox, job *Job) {
 		return
 	}
 
-	if s.test.hasResources {
+	if s.test.hasResources && s.test.runResult.Verdict != verdict.SK {
 		err = s.uploadTestRunResources()
 		if err != nil {
 			logger.Error("Error in %s error: %v", s.loggerData, err)
@@ -94,6 +94,8 @@ func (s *JobPipelineState) generateTestRunConfig() error {
 	s.test.runConfig.Stdin = &sandbox.IORedirect{FileName: testInputFile}
 	s.test.runConfig.Stdout = &sandbox.IORedirect{FileName: testOutputFile}
 	s.test.runConfig.Stderr = &sandbox.IORedirect{FileName: testErrorFile}
+
+	s.test.runConfig.Ctx = s.job.stopCtx
 
 	// TODO: support interactive problems
 

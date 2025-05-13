@@ -7,3 +7,5 @@ clients/clients
 .DS_Store
 clients/configs
 custom
+tools/polygon_importer/polygon_importer
+tools/polygon_importer/run.sh

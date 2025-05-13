@@ -1,6 +1,7 @@
 package invoker
 
 import (
+	"context"
 	"errors"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -22,6 +23,9 @@ type Job struct {
 
 	defers     []func()
 	createTime time.Time
+
+	stopCtx  context.Context
+	stopFunc context.CancelFunc
 }
 
 func (j *Job) deferFunc() {
@@ -35,6 +39,7 @@ func (j *Job) deferFunc() {
 func (i *Invoker) initJob(c *gin.Context, job *Job) bool {
 	job.createTime = time.Now()
 	job.storageEpoch = i.Storage.GetEpoch()
+	job.stopCtx, job.stopFunc = context.WithCancel(context.Background())
 
 	var submission models.Submission
 	if err := i.TS.DB.WithContext(c).Find(&submission, job.SubmitID).Error; err != nil {

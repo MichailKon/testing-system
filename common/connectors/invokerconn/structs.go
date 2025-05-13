@@ -20,7 +20,7 @@ type Job struct {
 	Type     JobType `json:"type" binding:"required"`
 	Test     uint64  `json:"test"`
 
-	// TODO: Add job dependency
+	RequiredJobIDs []string
 }
 
 func (j Job) String() string {
