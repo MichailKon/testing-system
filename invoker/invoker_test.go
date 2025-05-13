@@ -1,6 +1,7 @@
 package invoker
 
 import (
+	"context"
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"os"
@@ -171,7 +172,7 @@ func (ts *testState) addProblem(problemID uint) {
 	))
 }
 
-func (ts *testState) testRun(submitID uint, problemID uint) *sandbox.RunResult {
+func (ts *testState) prepareTestRun(submitID uint, problemID uint) *JobPipelineState {
 	job := &Job{
 		Job: invokerconn.Job{
 			ID:       "JOB",
@@ -213,6 +214,11 @@ func (ts *testState) testRun(submitID uint, problemID uint) *sandbox.RunResult {
 		job.Test,
 	)
 
+	return s
+}
+
+func (ts *testState) testRun(submitID uint, problemID uint) *sandbox.RunResult {
+	s := ts.prepareTestRun(submitID, problemID)
 	defer s.finish()
 
 	require.NoError(ts.t, s.testingProcessPipeline())
@@ -260,6 +266,20 @@ func testRunSandbox(t *testing.T, sandboxType string) {
 	res = ts.testRun(8, 2)
 	require.Equal(t, verdict.PT, res.Verdict)
 	require.EqualValues(t, 5, *res.Points)
+
+	{
+		s := ts.prepareTestRun(9, 1)
+		defer s.finish()
+		startTime := time.Now()
+		s.job.stopCtx, s.job.stopFunc = context.WithCancel(context.Background())
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			s.job.stopFunc() // I can not use context.WithDeadline here as the ctx.Error() should be cancelled
+		}()
+		require.NoError(t, s.testingProcessPipeline())
+		require.Less(t, time.Since(startTime), time.Millisecond*900)
+		require.Equal(t, verdict.SK, s.test.runResult.Verdict)
+	}
 
 	ts.Invoker.RunnerThreads.stop()
 }

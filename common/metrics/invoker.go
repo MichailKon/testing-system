@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"testing_system/common/connectors/invokerconn"
 	"testing_system/common/connectors/masterconn"
+	"testing_system/common/constants/verdict"
 )
 
 func (c *Collector) setupInvokerMetrics() {
@@ -46,6 +47,11 @@ func (c *Collector) setupInvokerMetrics() {
 	c.InvokerSendResultDuration = c.createInvokerCounter(
 		"send_result_duration_sum",
 		"Total time spent on sending results from invoker to storage",
+	)
+
+	c.InvokerSkippedJobs = c.createInvokerCounter(
+		"skipped_jobs_count",
+		"Total number of jobs that are aborted during execution and marked skipped",
 	)
 
 	c.InvokerLifetimeDuration = c.createInvokerGauge(
@@ -128,6 +134,11 @@ func (c *Collector) ProcessJobResult(result *masterconn.InvokerJobResult) {
 	c.InvokerExecutionWaitDuration.With(labels).Add(result.Metrics.ExecutionWaitDuration.Seconds())
 	c.InvokerExecutionDuration.With(labels).Add(result.Metrics.ExecutionDuration.Seconds())
 	c.InvokerSendResultDuration.With(labels).Add(result.Metrics.SendResultDuration.Seconds())
+
+	if result.Verdict == verdict.SK {
+		c.InvokerSkippedJobs.With(labels).Inc()
+	}
+	c.InvokerSkippedJobs.With(labels).Desc()
 }
 
 func (c *Collector) ProcessInvokerStatus(status *invokerconn.Status) {

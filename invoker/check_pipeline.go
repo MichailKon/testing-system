@@ -52,6 +52,7 @@ func (s *JobPipelineState) generateCheckerRunConfig() error {
 	s.test.checkConfig.Args = []string{
 		testInputFile, testOutputFile, testAnswerFile, checkResultFile, checkResultFileArg,
 	}
+	s.test.checkConfig.Ctx = s.job.stopCtx
 	logger.Trace("Generated checker run config for %s", s.loggerData)
 	return nil
 }
@@ -69,7 +70,7 @@ func (s *JobPipelineState) executeCheckerRunCommand() error {
 	}
 
 	switch s.test.checkResult.Verdict {
-	case verdict.OK, verdict.RT:
+	case verdict.OK, verdict.RT, verdict.SK:
 		logger.Trace("Finished checker run for %s", s.loggerData)
 		return nil
 	case verdict.TL:
@@ -91,6 +92,11 @@ func (s *JobPipelineState) runChecker() {
 }
 
 func (s *JobPipelineState) parseCheckerResult() error {
+	if s.test.checkResult.Verdict == verdict.SK {
+		s.test.runResult.Verdict = verdict.SK
+		logger.Trace("Check result is not parsed because job is stopped", s.loggerData)
+		return nil
+	}
 	_, err := os.Stat(filepath.Join(s.sandbox.Dir(), checkResultFile))
 	if err == nil {
 		return s.parseTestlibCheckerResult()

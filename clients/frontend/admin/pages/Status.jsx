@@ -94,7 +94,7 @@ export default function Status() {
               </tr>
               </thead>
               <tbody>
-              {invoker.active_jobs.map((job, jobIndex) => (
+              {invoker.testing_jobs.map((job, jobIndex) => (
                 <tr key={`${index}-${jobIndex}`}>
                   <td>{getJobType(job.type)}</td>
                   <td>{job.submit_id}</td>

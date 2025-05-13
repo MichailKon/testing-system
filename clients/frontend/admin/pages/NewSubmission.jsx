@@ -6,7 +6,7 @@ import axios from "axios";
 import {useNavigate, useSearchParams} from "react-router-dom";
 
 export default function NewSubmission() {
-  const [params, setParams] = useSearchParams()
+  const [params, _] = useSearchParams()
 
   const [alert, setAlert] = useState({
     hasAlert: false,
@@ -56,7 +56,7 @@ export default function NewSubmission() {
                 name="problem_id"
                 id="problem_id"
                 required={true}
-                defaultValue={params.problem_id || ""}
+                defaultValue={params.get("problem_id") || ""}
               />
             </div>
           </div>
