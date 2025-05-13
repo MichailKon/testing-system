@@ -10,6 +10,7 @@ import (
 	"testing"
 	"testing_system/common/constants/verdict"
 	"testing_system/lib/customfields"
+	"time"
 )
 
 func fixtureDb(t *testing.T) *gorm.DB {
@@ -62,11 +63,29 @@ memory: 5m
 func TestTestResultsDB(t *testing.T) {
 	t.Run("sqlite", func(t *testing.T) {
 		db := fixtureDb(t)
+		oneSec := customfields.Time(1 * time.Second)
+		tenMB := customfields.Memory(10 * 1024 * 1024)
 		submission := Submission{
 			ProblemID: 1,
 			Language:  "cpp",
 			Score:     1,
 			Verdict:   verdict.TL,
+			TestResults: []*TestResult{
+				{
+					TestNumber: 1,
+					Points:     nil,
+					Verdict:    verdict.OK,
+					Time:       &oneSec,
+					Memory:     &tenMB,
+				},
+				{
+					TestNumber: 0,
+					Points:     nil,
+					Verdict:    "",
+					Time:       &oneSec,
+					Memory:     &tenMB,
+				},
+			},
 		}
 		tx := db.Create(&submission)
 		require.Nil(t, tx.Error)
