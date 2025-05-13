@@ -27,12 +27,12 @@ const (
 )
 
 type Sandbox struct {
-	id           uint64
+	id           int
 	localHomeDir string
 	initialized  bool
 }
 
-func NewSandbox(id uint64, localHomeDir string) (*Sandbox, error) {
+func NewSandbox(id int, localHomeDir string) (*Sandbox, error) {
 	s := &Sandbox{
 		id:           id,
 		localHomeDir: localHomeDir,
@@ -63,7 +63,7 @@ func (s *Sandbox) command() *exec.Cmd {
 }
 
 func (s *Sandbox) metaPath() string {
-	return filepath.Join(s.localHomeDir, "meta-"+strconv.FormatUint(s.id, 10))
+	return filepath.Join(s.localHomeDir, "meta-"+strconv.Itoa(s.id))
 }
 
 func (s *Sandbox) Init() error {

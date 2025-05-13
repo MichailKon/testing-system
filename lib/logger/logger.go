@@ -4,7 +4,6 @@ import (
 	"fmt"
 	baselog "log"
 	"os"
-	"testing_system/common/config"
 )
 
 const (
@@ -47,9 +46,22 @@ func Error(format string, values ...any) error {
 	return fmt.Errorf(format, values...)
 }
 
+func ErrorLevel(level int, format string, values ...any) error {
+	logPrint(LogLevelError, format, values...)
+	logErr.Printf(logErrPrefix(level)+format, values...)
+	return fmt.Errorf(format, values...)
+}
+
 func Panic(format string, values ...any) {
 	logPrint(LogLevelError, format, values...)
 	logErr.Printf(logErrPrefix(0)+format, values...)
+	panic(fmt.Errorf(format, values...))
+}
+
+// PanicLevel will output to log the code line which is reachable by level call depth. May be applied in some library code
+func PanicLevel(level int, format string, values ...any) {
+	logPrint(LogLevelError, format, values...)
+	logErr.Printf(logErrPrefix(level)+format, values...)
 	panic(fmt.Errorf(format, values...))
 }
 
@@ -74,14 +86,15 @@ func CreateWriter(level int, prefix string) *logWriter {
 	}
 }
 
-// PanicLevel will output to log the code line which is reachable by level call depth. May be applied in some library code
-func PanicLevel(level int, format string, values ...any) {
-	logPrint(LogLevelError, format, values...)
-	logErr.Printf(logErrPrefix(level)+format, values...)
-	panic(fmt.Errorf(format, values...))
+type Config struct {
+	LogPath  *string `yaml:"LogPath,omitempty"`
+	LogLevel *int    `yaml:"LogLevel,omitempty"`
 }
 
-func InitLogger(config *config.Config) {
+func InitLogger(config *Config) {
+	if config == nil {
+		config = &Config{}
+	}
 	logLevel = LogLevelInfo
 	if config.LogLevel != nil {
 		logLevel = *config.LogLevel

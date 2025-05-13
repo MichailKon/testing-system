@@ -6,9 +6,9 @@ type InvokerConfig struct {
 	// PublicAddress defines address for public access to invoker from master if the server is set up locally with some proxy
 	PublicAddress *string `yaml:"PublicAddress,omitempty"`
 
-	Threads   uint64 `yaml:"Threads"`
-	Sandboxes uint64 `yaml:"Sandboxes"`
-	QueueSize uint64 `yaml:"QueueSize"`
+	Threads   int `yaml:"Threads"`
+	Sandboxes int `yaml:"Sandboxes"`
+	QueueSize int `yaml:"QueueSize"`
 
 	SandboxType     string `yaml:"SandboxType"`
 	SandboxHomePath string `yaml:"SandboxHomePath"`
@@ -30,11 +30,10 @@ func FillInInvokerConfig(config *InvokerConfig) {
 		config.Threads = 1
 	}
 	if config.Sandboxes == 0 {
-		// TODO: find out what number is the best
-		config.Sandboxes = 1
+		config.Sandboxes = 2
 	}
 	if config.QueueSize == 0 {
-		config.QueueSize = 10
+		config.QueueSize = 2
 	}
 	if config.SandboxType == "" {
 		config.SandboxType = "simple"

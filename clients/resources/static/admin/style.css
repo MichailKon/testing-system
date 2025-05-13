@@ -1,0 +1,27 @@
+body {
+    background: #f8f9fd;
+}
+
+.nav-links {
+    background: #477eaf;
+}
+
+.line-num {
+    display: table-cell;
+    text-align: right;
+    padding-right: 1em;
+    user-select: none;
+    opacity: 0.5;
+}
+
+.line-content {
+    display: table-cell;
+}
+
+.token-line {
+    display: table-row;
+}
+
+.submission_resource {
+    max-width: min(100vw, 1000px);
+}

@@ -1,4 +1,4 @@
-ProblemType: 1
-TimeLimit: 1s
-MemoryLimit: 64m
-TestsNumber: 2
+problem_type: 1
+time_limit: 1s
+memory_limit: 64m
+tests_number: 2

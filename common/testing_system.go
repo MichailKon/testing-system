@@ -44,7 +44,7 @@ func InitTestingSystem(configPath string) *TestingSystem {
 	ts := &TestingSystem{
 		Config: config.ReadConfig(configPath),
 	}
-	logger.InitLogger(ts.Config)
+	logger.InitLogger(ts.Config.Logger)
 
 	ts.InitServer()
 

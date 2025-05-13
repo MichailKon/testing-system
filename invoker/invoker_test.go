@@ -3,11 +3,11 @@ package invoker
 import (
 	"fmt"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"testing_system/common"
 	"testing_system/common/config"
@@ -17,6 +17,7 @@ import (
 	"testing_system/invoker/compiler"
 	"testing_system/invoker/sandbox"
 	"testing_system/invoker/storage"
+	"time"
 )
 
 type testState struct {
@@ -51,16 +52,24 @@ func newTestState(t *testing.T, sandboxType string) *testState {
 		TS:       ts.TS,
 		Storage:  storage.NewInvokerStorage(ts.TS),
 		Compiler: compiler.NewCompiler(ts.TS),
-		RunQueue: make(chan func()),
+		RunnerThreads: &threadsExecutor[func()]{
+			values:         make([]func(), 0),
+			closed:         false,
+			threadsCount:   1,
+			name:           "test",
+			waitDuration:   make([]time.Duration, 1),
+			lastActiveTime: make([]time.Time, 1),
+			isActive:       make([]bool, 1),
+		},
 	}
+	ts.Invoker.RunnerThreads.cond = sync.NewCond(&ts.Invoker.RunnerThreads.mutex)
 	go func() {
-		for {
-			f := <-ts.Invoker.RunQueue
+		ts.Invoker.RunnerThreads.runThread(1, func(f func()) {
 			f()
-		}
+		})
 	}()
 	require.NoError(t, os.CopyFS(ts.FilesDir, os.DirFS("testdata/files")))
-	ts.Sandbox = newSandbox(ts.TS, 1)
+	ts.Sandbox = ts.Invoker.newSandbox(1)
 	return ts
 }
 
@@ -72,20 +81,17 @@ func (ts *testState) testCompile(submitID uint) *JobPipelineState {
 			Type:     invokerconn.CompileJob,
 		},
 		problem: &models.Problem{
-			Model: gorm.Model{
-				ID: 1,
-			},
+			ID: 1,
 		},
 		submission: &models.Submission{
-			Model: gorm.Model{
-				ID: submitID,
-			},
+			ID:        submitID,
 			ProblemID: 1,
 			Language:  "cpp",
 		},
 	}
 
 	require.NoError(ts.t, ts.Invoker.Storage.Source.Insert(
+		ts.Invoker.Storage.GetEpoch(),
 		fmt.Sprintf("%s/source/%d/%d.cpp", ts.FilesDir, submitID, submitID),
 		uint64(submitID),
 	))
@@ -131,15 +137,19 @@ func testCompileSandbox(t *testing.T, sandboxType string) {
 	s = ts.testCompile(2)
 	require.Equal(t, verdict.CE, s.compile.result.Verdict)
 	s.finish()
+
+	ts.Invoker.RunnerThreads.stop()
 }
 
 func (ts *testState) addProblem(problemID uint) {
 	require.NoError(ts.t, ts.Invoker.Storage.TestInput.Insert(
+		ts.Invoker.Storage.GetEpoch(),
 		fmt.Sprintf("%s/test_input/%d-1/1", ts.FilesDir, problemID),
 		uint64(problemID), 1,
 	))
 
 	require.NoError(ts.t, ts.Invoker.Storage.TestAnswer.Insert(
+		ts.Invoker.Storage.GetEpoch(),
 		fmt.Sprintf("%s/test_answer/%d-1/1.a", ts.FilesDir, problemID),
 		uint64(problemID), 1,
 	))
@@ -154,7 +164,11 @@ func (ts *testState) addProblem(problemID uint) {
 	cmd.Dir = checkerDir
 	require.NoError(ts.t, cmd.Run())
 
-	require.NoError(ts.t, ts.Invoker.Storage.Checker.Insert(filepath.Join(checkerDir, "check"), uint64(problemID)))
+	require.NoError(ts.t, ts.Invoker.Storage.Checker.Insert(
+		ts.Invoker.Storage.GetEpoch(),
+		filepath.Join(checkerDir, "check"),
+		uint64(problemID),
+	))
 }
 
 func (ts *testState) testRun(submitID uint, problemID uint) *sandbox.RunResult {
@@ -166,15 +180,11 @@ func (ts *testState) testRun(submitID uint, problemID uint) *sandbox.RunResult {
 			Test:     1,
 		},
 		problem: &models.Problem{
-			Model: gorm.Model{
-				ID: problemID,
-			},
+			ID:          problemID,
 			TestsNumber: 1,
 		},
 		submission: &models.Submission{
-			Model: gorm.Model{
-				ID: submitID,
-			},
+			ID:        submitID,
 			ProblemID: 1,
 			Language:  "cpp",
 		},
@@ -187,7 +197,11 @@ func (ts *testState) testRun(submitID uint, problemID uint) *sandbox.RunResult {
 	cmd.Dir = sourceDir
 	require.NoError(ts.t, cmd.Run())
 
-	require.NoError(ts.t, ts.Invoker.Storage.Binary.Insert(filepath.Join(sourceDir, "binary"), uint64(submitID)))
+	require.NoError(ts.t, ts.Invoker.Storage.Binary.Insert(
+		ts.Invoker.Storage.GetEpoch(),
+		filepath.Join(sourceDir, "binary"),
+		uint64(submitID),
+	))
 
 	s := ts.Invoker.newPipelineState(ts.Sandbox, job)
 	s.test = new(pipelineTestData)
@@ -236,11 +250,16 @@ func testRunSandbox(t *testing.T, sandboxType string) {
 	res = ts.testRun(6, 1)
 	require.Equal(t, verdict.WA, res.Verdict)
 
-	res = ts.testRun(7, 1)
-	require.Equal(t, verdict.ML, res.Verdict)
+	if sandboxType == "isolate" {
+		// Simple sandbox does not support ML verdict
+		res = ts.testRun(7, 1)
+		require.Equal(t, verdict.ML, res.Verdict)
+	}
 
 	ts.addProblem(2)
 	res = ts.testRun(8, 2)
 	require.Equal(t, verdict.PT, res.Verdict)
 	require.EqualValues(t, 5, *res.Points)
+
+	ts.Invoker.RunnerThreads.stop()
 }

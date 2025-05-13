@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"testing_system/lib/logger"
 
 	"github.com/xorcare/pointer"
 	"gopkg.in/yaml.v3"
@@ -11,8 +12,7 @@ type Config struct {
 	Port int     `yaml:"Port"`
 	Host *string `yaml:"Host,omitempty"` // leave empty for localhost
 
-	LogPath  *string `yaml:"LogPath,omitempty"`
-	LogLevel *int    `yaml:"LogLevel,omitempty"`
+	Logger *logger.Config `yaml:"Logger,omitempty"`
 
 	Invoker *InvokerConfig `yaml:"Invoker,omitempty"`
 	Master  *MasterConfig  `yaml:"Master,omitempty"`

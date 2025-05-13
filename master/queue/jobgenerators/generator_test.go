@@ -9,6 +9,7 @@ import (
 	"testing_system/common/connectors/masterconn"
 	"testing_system/common/constants/verdict"
 	"testing_system/common/db/models"
+	"testing_system/master/queue/queuestatus"
 )
 
 func fixtureSubmission(ID uint) *models.Submission {
@@ -40,9 +41,11 @@ func TestICPCGenerator(t *testing.T) {
 		}
 	}
 
+	status := queuestatus.NewQueueStatus(true)
+
 	t.Run("Fail compilation", func(t *testing.T) {
 		problem, submission := fixtureICPCProblem(), fixtureSubmission(1)
-		g, err := NewGenerator(problem, submission)
+		g, err := NewGenerator(problem, submission, status)
 		require.Nil(t, err)
 		job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
 		sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
@@ -63,7 +66,7 @@ func TestICPCGenerator(t *testing.T) {
 	t.Run("Straight tasks finishing", func(t *testing.T) {
 		problem := fixtureICPCProblem()
 		submission := fixtureSubmission(1)
-		generator, err := NewGenerator(problem, submission)
+		generator, err := NewGenerator(problem, submission, status)
 		require.Nil(t, err)
 		job := nextJob(t, generator, 1, invokerconn.CompileJob, 0)
 		noJobs(t, generator)
@@ -102,7 +105,7 @@ func TestICPCGenerator(t *testing.T) {
 		prepare := func() (Generator, []*invokerconn.Job) {
 			problem := fixtureICPCProblem()
 			submission := fixtureSubmission(1)
-			g, err := NewGenerator(problem, submission)
+			g, err := NewGenerator(problem, submission, status)
 			require.Nil(t, err)
 			job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
 			sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
@@ -231,7 +234,7 @@ func TestICPCGenerator(t *testing.T) {
 
 	t.Run("Finish same job twice", func(t *testing.T) {
 		problem, submission := fixtureICPCProblem(), fixtureSubmission(1)
-		g, err := NewGenerator(problem, submission)
+		g, err := NewGenerator(problem, submission, status)
 		require.Nil(t, err)
 		job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
 		sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
@@ -248,16 +251,54 @@ func TestICPCGenerator(t *testing.T) {
 			require.Equal(t, uint64(i)+1, result.TestNumber)
 		}
 
-		sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
-			Job:     job,
-			Verdict: verdict.CE,
+		require.Panics(t, func() {
+			g.JobCompleted(&masterconn.InvokerJobResult{
+				Job:     job,
+				Verdict: verdict.CE,
+			})
 		})
+	})
+
+	t.Run("Fails in 3rd and 2nd tests", func(t *testing.T) {
+		problem, submission := &models.Problem{
+			ProblemType: models.ProblemTypeICPC,
+			TestsNumber: 3,
+		}, fixtureSubmission(1)
+		g, err := NewGenerator(problem, submission, status)
+		require.NoError(t, err)
+		job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
+		sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
+			Job:     job,
+			Verdict: verdict.CD,
+		})
+		require.NoError(t, err)
 		require.Nil(t, sub)
-		require.NotNil(t, err)
+		job1 := nextJob(t, g, 1, invokerconn.TestJob, 1)
+		job2 := nextJob(t, g, 1, invokerconn.TestJob, 2)
+		job3 := nextJob(t, g, 1, invokerconn.TestJob, 3)
+		sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+			Job:     job3,
+			Verdict: verdict.WA,
+		})
+		require.NoError(t, err)
+		require.Nil(t, sub)
+		sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+			Job:     job2,
+			Verdict: verdict.WA,
+		})
+		require.NoError(t, err)
+		require.Nil(t, sub)
+		sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+			Job:     job1,
+			Verdict: verdict.OK,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, sub)
 	})
 }
 
 func TestIOIGenerator(t *testing.T) {
+	status := queuestatus.NewQueueStatus(true)
 	t.Run("Bad problem configuration", func(t *testing.T) {
 		badProblems := []models.Problem{
 			// type EachTest, but TestScore is nil
@@ -420,7 +461,7 @@ func TestIOIGenerator(t *testing.T) {
 			},
 		}
 		for _, problem := range badProblems {
-			_, err := NewIOIGenerator(&problem, &models.Submission{})
+			_, err := NewIOIGenerator(&problem, &models.Submission{}, status)
 			require.Error(t, err)
 		}
 	})
@@ -444,7 +485,7 @@ func TestIOIGenerator(t *testing.T) {
 	t.Run("Fail compilation", func(t *testing.T) {
 		submission := fixtureSubmission(1)
 		wasProblem := problemWithOneGroup
-		g, err := NewGenerator(&problemWithOneGroup, submission)
+		g, err := NewGenerator(&problemWithOneGroup, submission, status)
 		require.Nil(t, err)
 		job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
 		sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
@@ -473,7 +514,7 @@ func TestIOIGenerator(t *testing.T) {
 	t.Run("Straight task finishing", func(t *testing.T) {
 		wasProblem := problemWithOneGroup
 		submission := fixtureSubmission(1)
-		generator, err := NewGenerator(&problemWithOneGroup, submission)
+		generator, err := NewGenerator(&problemWithOneGroup, submission, status)
 		require.Nil(t, err)
 		job := nextJob(t, generator, 1, invokerconn.CompileJob, 0)
 		noJobs(t, generator)
@@ -543,7 +584,7 @@ func TestIOIGenerator(t *testing.T) {
 					},
 				},
 			}
-			gen, err := NewGenerator(&problem, &models.Submission{})
+			gen, err := NewGenerator(&problem, &models.Submission{}, status)
 			require.NoError(t, err)
 			job := nextJob(t, gen, 0, invokerconn.CompileJob, 0)
 			sub, err := gen.JobCompleted(&masterconn.InvokerJobResult{
@@ -728,7 +769,7 @@ func TestIOIGenerator(t *testing.T) {
 					},
 				},
 			}
-			gen, err := NewGenerator(&problem, &models.Submission{})
+			gen, err := NewGenerator(&problem, &models.Submission{}, status)
 			require.NoError(t, err)
 			job := nextJob(t, gen, 0, invokerconn.CompileJob, 0)
 			sub, err := gen.JobCompleted(&masterconn.InvokerJobResult{
@@ -781,7 +822,7 @@ func TestIOIGenerator(t *testing.T) {
 					},
 				},
 			}
-			gen, err := NewGenerator(&problem, fixtureSubmission(1))
+			gen, err := NewGenerator(&problem, fixtureSubmission(1), status)
 			require.NoError(t, err)
 			job := nextJob(t, gen, 1, invokerconn.CompileJob, 0)
 			sub, err := gen.JobCompleted(&masterconn.InvokerJobResult{
@@ -825,24 +866,22 @@ func TestIOIGenerator(t *testing.T) {
 					Passed:    false,
 				},
 			})
-			require.Equal(t, models.TestResult{
+			requireEqualTestResult(t, &models.TestResult{
 				TestNumber: 1,
 				Points:     nil,
 				Verdict:    verdict.OK,
 			}, sub.TestResults[0])
-			require.Equal(t, models.TestResult{
+			requireEqualTestResult(t, &models.TestResult{
 				TestNumber: 2,
 				Points:     nil,
 				Verdict:    verdict.TL,
-				Time:       100,
-				Memory:     100,
 			}, sub.TestResults[1])
-			require.Equal(t, models.TestResult{
+			requireEqualTestResult(t, &models.TestResult{
 				TestNumber: 3,
 				Points:     nil,
 				Verdict:    verdict.SK,
 			}, sub.TestResults[2])
-			require.Equal(t, models.TestResult{
+			requireEqualTestResult(t, &models.TestResult{
 				TestNumber: 4,
 				Points:     nil,
 				Verdict:    verdict.SK,
@@ -866,7 +905,7 @@ func TestIOIGenerator(t *testing.T) {
 					},
 				},
 			}
-			g, err := NewIOIGenerator(&problem, fixtureSubmission(1))
+			g, err := NewIOIGenerator(&problem, fixtureSubmission(1), status)
 			require.NoError(t, err)
 			job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
 			require.NotNil(t, job)
@@ -937,7 +976,7 @@ func TestIOIGenerator(t *testing.T) {
 
 		t.Run("WA in the middle of the group", func(t *testing.T) {
 			problem := prepare()
-			g, err := NewIOIGenerator(&problem, fixtureSubmission(1))
+			g, err := NewIOIGenerator(&problem, fixtureSubmission(1), status)
 			require.NoError(t, err)
 			job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
 			require.NotNil(t, job)
@@ -989,7 +1028,7 @@ func TestIOIGenerator(t *testing.T) {
 
 		t.Run("PT in the middle of the group", func(t *testing.T) {
 			problem := prepare()
-			g, err := NewIOIGenerator(&problem, fixtureSubmission(1))
+			g, err := NewIOIGenerator(&problem, fixtureSubmission(1), status)
 			require.NoError(t, err)
 			job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
 			require.NotNil(t, job)
@@ -1042,7 +1081,7 @@ func TestIOIGenerator(t *testing.T) {
 
 		t.Run("no fails", func(t *testing.T) {
 			problem := prepare()
-			g, err := NewIOIGenerator(&problem, fixtureSubmission(1))
+			g, err := NewIOIGenerator(&problem, fixtureSubmission(1), status)
 			require.NoError(t, err)
 			job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
 			require.NotNil(t, job)
@@ -1092,4 +1131,20 @@ func TestIOIGenerator(t *testing.T) {
 			})
 		})
 	})
+}
+
+func requireEqualTestResult(t *testing.T, expected *models.TestResult, actual *models.TestResult) {
+	require.Equal(t, expected.TestNumber, actual.TestNumber)
+	require.Equal(t, expected.Verdict, actual.Verdict)
+	if expected.Points == nil {
+		require.Nil(t, actual.Points)
+	} else {
+		require.Equal(t, *expected.Points, *actual.Points)
+	}
+	if expected.Time != nil {
+		require.Equal(t, *expected.Time, *actual.Time)
+	}
+	if expected.Memory != nil {
+		require.Equal(t, *expected.Memory, *actual.Memory)
+	}
 }

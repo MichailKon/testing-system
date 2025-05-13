@@ -1,16 +1,15 @@
 package tests
 
 import (
+	"context"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"testing_system/common/constants/verdict"
 	"testing_system/common/db/models"
 	"testing_system/lib/logger"
-	"testing_system/master"
 	"time"
 )
 
@@ -19,12 +18,12 @@ type submitTest struct {
 	dir     string `yaml:"-"`
 	ID      uint   `yaml:"-"`
 
-	ProblemID  uint   `yaml:"ProblemID"`
-	Language   string `yaml:"Language"`
-	SourceFile string `yaml:"SourceFile"`
+	ProblemID  uint   `yaml:"problem_id"`
+	Language   string `yaml:"language"`
+	SourceFile string `yaml:"source_file"`
 
 	result         *models.Submission `yaml:"-"`
-	RequiredResult *models.Submission `yaml:"RequiredResult"`
+	RequiredResult *models.Submission `yaml:"required_result"`
 }
 
 func (h *TSHolder) newSubmit(id uint) {
@@ -54,28 +53,26 @@ func (h *TSHolder) sendSubmit(s *submitTest) bool {
 	sourceReader, err := os.Open(filepath.Join(s.dir, s.SourceFile))
 	require.NoError(h.t, err)
 	defer sourceReader.Close()
-
-	r := h.client.R()
-	r.SetFormData(map[string]string{
-		"ProblemID": strconv.FormatUint(uint64(s.ProblemID), 10),
-		"Language":  s.Language,
-	})
-	r.SetFileReader("Solution", s.SourceFile, sourceReader)
-
-	var response master.SubmissionResponse
-	r.SetResult(&response)
-
-	resp, err := r.Post("/master/submit")
+	s.ID, err = h.ts.MasterConn.SendNewSubmission(
+		context.Background(),
+		s.ProblemID,
+		s.Language,
+		s.SourceFile,
+		sourceReader,
+	)
 	require.NoError(h.t, err)
-	if resp.StatusCode() != http.StatusOK {
-		return false
-	}
-
-	s.ID = response.SubmissionID
 	return true
 }
 
 func (h *TSHolder) waitSubmits() {
+	for {
+		status, err := h.ts.MasterConn.GetStatus(context.Background(), "")
+		require.NoError(h.t, err)
+		if len(status.TestingSubmissions) == 0 {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
 	for _, s := range h.submits {
 		h.verifySubmit(s)
 	}
@@ -129,7 +126,7 @@ func (h *TSHolder) waitTesting(s *submitTest) {
 
 		// We retry sending submits because in memory sqlite sucks and may lock db for each request
 		var err error
-		for _ = range 100 {
+		for _ = range 1000 {
 			if err = h.ts.DB.Find(submission, s.ID).Error; err == nil {
 				break
 			}

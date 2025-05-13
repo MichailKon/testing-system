@@ -88,11 +88,14 @@ func (s *JobPipelineState) setupCompileScript() error {
 
 func (s *JobPipelineState) executeCompilationCommand() error {
 	s.executeWaitGroup.Add(1)
-	s.runProcess(s.runCompilationCommand)
+	err := s.runProcess(s.runCompilationCommand)
+	if err != nil {
+		return fmt.Errorf("can not execute compile command, error: %v", err)
+	}
 	s.executeWaitGroup.Wait()
 
 	if s.compile.result.Err != nil {
-		return fmt.Errorf("can not run compilation in sandbox, error: %v", s.compile.result.Err)
+		return fmt.Errorf("error while running compilation in sandbox, error: %v", s.compile.result.Err)
 	}
 	logger.Trace("Executed compilation for %s with verdict %s", s.loggerData, s.compile.result.Verdict)
 	return nil

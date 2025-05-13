@@ -1,12 +1,12 @@
-ProblemID: 1
-Language: cpp
-SourceFile: "source.cpp"
+problem_id: 1
+language: cpp
+source_file: "source.cpp"
 
-RequiredResult:
-  Verdict: OK
-  Score: 1
-  TestResults:
-    - TestNumber: 1
-      Verdict: OK
-    - TestNumber: 2
-      Verdict: OK
+required_result:
+  verdict: OK
+  score: 1
+  test_results:
+    - test_number: 1
+      verdict: OK
+    - test_number: 2
+      verdict: OK

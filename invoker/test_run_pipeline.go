@@ -137,11 +137,14 @@ func fillInTestRunConfigLimits(c *sandbox.ExecuteConfig, problem *models.Problem
 
 func (s *JobPipelineState) executeTestRunCommand() error {
 	s.executeWaitGroup.Add(1)
-	s.runProcess(s.runSolution)
+	err := s.runProcess(s.runSolution)
+	if err != nil {
+		return fmt.Errorf("can not execute sulution command, error: %v", err)
+	}
 	s.executeWaitGroup.Wait()
 
 	if s.test.runResult.Err != nil {
-		return fmt.Errorf("can not run solution in sandbox, error: %v", s.test.runResult.Err)
+		return fmt.Errorf("error while running solution in sandbox, error: %v", s.test.runResult.Err)
 	}
 	logger.Trace("Finished test run for %s with verdict %s", s.loggerData, s.test.runResult.Verdict)
 	return nil

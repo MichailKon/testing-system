@@ -28,3 +28,8 @@ func (c *Connector) NewJob(job *Job) (*Status, error) {
 
 	return connector.Receive[Status](r, "/invoker/job/new", resty.MethodPost)
 }
+
+func (c *Connector) ResetCache() error {
+	r := c.connection.R()
+	return connector.ReceiveEmpty(r, "/invoker/reset_cache", resty.MethodPost)
+}

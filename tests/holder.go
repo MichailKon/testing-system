@@ -85,7 +85,9 @@ func (h *TSHolder) initTSConfig(configPath string, sandbox string) {
 	cfg.Invoker.CompilerConfigsFolder = filepath.Join(filepath.Dir(configPath), "compiler")
 
 	cfg.Invoker.SandboxType = sandbox
-	cfg.LogLevel = pointer.Int(defaultLogLevel)
+	cfg.Logger = &logger.Config{
+		LogLevel: pointer.Int(defaultLogLevel),
+	}
 
 	configContent, err = yaml.Marshal(cfg)
 	require.NoError(h.t, err)
