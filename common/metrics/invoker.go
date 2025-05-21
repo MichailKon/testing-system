@@ -138,7 +138,6 @@ func (c *Collector) ProcessJobResult(result *masterconn.InvokerJobResult) {
 	if result.Verdict == verdict.SK {
 		c.InvokerSkippedJobs.With(labels).Inc()
 	}
-	c.InvokerSkippedJobs.With(labels).Desc()
 }
 
 func (c *Collector) ProcessInvokerStatus(status *invokerconn.Status) {
