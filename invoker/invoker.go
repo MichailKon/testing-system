@@ -91,7 +91,7 @@ func getPublicIP() (string, error) {
 		return "", err
 	}
 	for _, address := range addrs {
-		// check the address type and if it is not a loopback the display it
+		// check the address type and if it is not a loopback then display it
 		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To4() != nil {
 				return ipnet.IP.String(), nil
@@ -124,7 +124,7 @@ func (i *Invoker) getStatus() *invokerconn.Status {
 	status.Metrics = &invokerconn.StatusMetrics{
 		Lifetime:       time.Since(i.TimeStarted),
 		SandboxMetrics: i.SandboxThreads.metrics(),
-		ThreadMetrics:  i.SandboxThreads.metrics(),
+		ThreadMetrics:  i.RunnerThreads.metrics(),
 	}
 
 	return status

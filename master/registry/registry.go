@@ -79,7 +79,7 @@ func (r *InvokerRegistry) HandleInvokerJobResult(result *masterconn.InvokerJobRe
 		return false
 	}
 
-	if result.Verdict != verdict.OK {
+	if result.Verdict != verdict.OK && result.Verdict != verdict.PT {
 		for runningJobID, runningJob := range r.testingJobs {
 			if slices.Contains(runningJob.RequiredJobIDs, result.Job.ID) {
 				jobInvoker, ok := r.invokerByJobID[runningJobID]

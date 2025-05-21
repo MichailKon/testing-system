@@ -140,12 +140,8 @@ func (i *IOIGenerator) ID() string {
 
 func (i *IOIGenerator) doesGroupDependOnJob(groupName string, job *invokerconn.Job) bool {
 	groupInfo := i.groupNameToGroupInfo[groupName]
-	if groupInfo.ScoringType == models.TestGroupScoringTypeEachTest {
-		return false
-	}
-
-	jobGroupName := i.testNumberToGroupName[job.Test]
-	if jobGroupName == groupName {
+	jobGroupName := i.testNumberToGroupName[job.Test-1]
+	if jobGroupName == groupName && groupInfo.ScoringType != models.TestGroupScoringTypeEachTest {
 		return true
 	}
 	return slices.Contains(groupInfo.RequiredGroupNames, jobGroupName)
