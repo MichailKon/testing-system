@@ -181,14 +181,14 @@ func (i *IOIGenerator) NextJob() *invokerconn.Job {
 		}
 		i.internalTestResults[i.firstNotGivenTest-1].state = testRunning
 		job.Test = i.firstNotGivenTest
-		i.givenJobs[job.ID] = job
-		i.firstNotGivenTest++
 
 		for givenJobID, testingJob := range i.givenJobs {
 			if i.doesGroupDependOnJob(groupName, testingJob) {
 				job.RequiredJobIDs = append(job.RequiredJobIDs, givenJobID)
 			}
 		}
+		i.givenJobs[job.ID] = job
+		i.firstNotGivenTest++
 		return job
 	}
 	return nil
