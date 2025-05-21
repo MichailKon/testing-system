@@ -1,0 +1,47 @@
+Port: # enter the port to run the invoker
+# Host: "enter the host string value" # By default, Host equals to localhost
+
+Logger:
+  # LogPath: "path to save logs" # By default, logs are written to stdout and stderr
+  # LogLevel: 0. # By default LogLevel is 0.
+  # Possible log levels are: 0 (Trace), 1 (Debug), 2 (Info), 3 (Warn), 4 (Error)
+
+Invoker:
+  # AutodetectPublicAddress is used to automatically detect public address of invoker.
+  # This address will be used for master to communicate with invoker.
+  # With this parameter, the configuration file can be the same for all invokers that are started in some cloud service.
+  AutodetectPublicAddress: true
+  # Threads defines the number of simultaneous processes allowed to run at the same time.
+  # It is strongly recommended to keep this config equal to 1
+  Threads: 1
+  # Sandboxes defines the number of simultaneous test runs that are processed at the same time.
+  # The best value for this parameter is Threads * 2
+  Sandboxes: 2
+  # QueueSize defines the number of test runs that are added to invoker and their resources are loading.
+  # The best value for this parameter is 1, but for slow networks it can be grater
+  QueueSize: 1
+  # SandboxType defines the type of sandbox used for process isolation. Possible values are "isolate" and "simple"
+  # It is strongly recommended to use "isolate" for safe process execution
+  SandboxType: "isolate"
+  # CacheSize defines the size of the cached files (in bytes). It is recommended to have it al least 10^9 or more.
+  CacheSize: 1000000000
+  # SaveOutputHead defines the number of bytes that should be saved for each resource, produced by solution.
+  # If this parameter is absent, the full content of each resource will be saved.
+  SaveOutputHead: 100
+  # SandboxHomePath is the path to directory for some sandbox specific files. This directory should be empty.
+  SandboxHomePath: "some path to empty directory"
+  # SandboxHomePath is the path to directory for cached files. This directory should be empty.
+  # The cache is reset at each invoker restart.
+  CachePath: "some cache path to empty directory"
+  # CompilerConfigsFolder is the path to directory, containing compiler configs (just like the folder configs/compiler)
+  CompilerConfigsFolder: "path to compiler configs"
+  # MasterPingInterval: 1s # The interval at which invoker pings master. By default, equal to 1s
+
+DB:
+  Dsn: # Use your postgres dsn on master server to connect to database.
+
+MasterConnection:
+  Address: # Public address of master server
+
+StorageConnection:
+  Address: # Public address of master server
