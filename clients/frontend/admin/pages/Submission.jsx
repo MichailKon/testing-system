@@ -89,71 +89,73 @@ export default function Submission() {
         </tr>
         </thead>
         <tbody>
-          <tr key={submission.id}>
-            <th scope="row">{submission.id}</th>
-            <td><Link to={`/admin/problem/${submission.problem_id}`}>{submission.problem_id}</Link></td>
-            <td>{submission.language}</td>
-            <td>{submission.score}</td>
-            <td>{SubmissionVerdict(submission)}</td>
-          </tr>
+        <tr key={submission.id}>
+          <th scope="row">{submission.id}</th>
+          <td><Link to={`/admin/problem/${submission.problem_id}`}>{submission.problem_id}</Link></td>
+          <td>{submission.language}</td>
+          <td>{submission.score}</td>
+          <td>{SubmissionVerdict(submission)}</td>
+        </tr>
         </tbody>
       </table>
+      <p>Время начала тестирования: {submission.created_at}</p>
+      <p>Время окончания тестирования: {submission.updated_at}</p>
       {RenderCompilationData(compilationData, submission, changeCompilationData)}
       {submission.group_results ? (
         <>
-        <h5 className="mb-3">Group results</h5>
-        <div className="row">
-          <div className="col-12 col-md-10 col-lg-8">
-            <table className="table mb-3">
-              <thead>
-              <tr>
-                <th scope="row">Name</th>
-                <th scope="row">Score</th>
-                <th scope="row">Passed</th>
-              </tr>
-              </thead>
-              <tbody>
-              {submission.group_results.map((group, index) => (
-                <tr key={index}>
-                  <td>{group.group_name}</td>
-                  <td>{group.points}</td>
-                  <td>{group.passed ? (
-                    <span className="text-success">Yes</span>
-                  ) : (
-                    <span className="text-danger">No</span>
-                  )}</td>
+          <h5 className="mb-3">Group results</h5>
+          <div className="row">
+            <div className="col-12 col-md-10 col-lg-8">
+              <table className="table mb-3">
+                <thead>
+                <tr>
+                  <th scope="row">Name</th>
+                  <th scope="row">Score</th>
+                  <th scope="row">Passed</th>
                 </tr>
-              ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                {submission.group_results.map((group, index) => (
+                  <tr key={index}>
+                    <td>{group.group_name}</td>
+                    <td>{group.points}</td>
+                    <td>{group.passed ? (
+                      <span className="text-success">Yes</span>
+                    ) : (
+                      <span className="text-danger">No</span>
+                    )}</td>
+                  </tr>
+                ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
         </>
       ) : null}
       {submission.test_results ? (
         <>
-        <h5 className="mb-3">Test results</h5>
-        <table className="table mb-3">
-          <thead>
-          <tr>
-            <th scope="row">#</th>
-            <th scope="row">Verdict</th>
-            <th scope="row">Points</th>
-            <th scope="row">Time</th>
-            <th scope="row">Memory</th>
-            <th scope="row">Wall time</th>
-            <th scope="row">Exit code</th>
-            <th scope="row">More info</th>
-          </tr>
-          </thead>
-          <tbody>
-          {
-            submission.test_results.map(testResult => (
-              RenderTest(tests[testResult.test_number - 1], testResult, changeTests)
-            ))
-          }
-          </tbody>
-        </table>
+          <h5 className="mb-3">Test results</h5>
+          <table className="table mb-3">
+            <thead>
+            <tr>
+              <th scope="row">#</th>
+              <th scope="row">Verdict</th>
+              <th scope="row">Points</th>
+              <th scope="row">Time</th>
+              <th scope="row">Memory</th>
+              <th scope="row">Wall time</th>
+              <th scope="row">Exit code</th>
+              <th scope="row">More info</th>
+            </tr>
+            </thead>
+            <tbody>
+            {
+              submission.test_results.map(testResult => (
+                RenderTest(tests[testResult.test_number - 1], testResult, changeTests)
+              ))
+            }
+            </tbody>
+          </table>
         </>
       ) : null}
     </div>

@@ -33,3 +33,9 @@ func (c *Connector) ResetCache() error {
 	r := c.connection.R()
 	return connector.ReceiveEmpty(r, "/invoker/reset_cache", resty.MethodPost)
 }
+
+func (c *Connector) StopJob(jobID string) error {
+	r := c.connection.R()
+	r.SetBody(jobID)
+	return connector.ReceiveEmpty(r, "/invoker/job/stop", resty.MethodPost)
+}

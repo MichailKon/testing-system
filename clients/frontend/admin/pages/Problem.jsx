@@ -61,10 +61,13 @@ export default function Problems() {
           <div className="mb-3">
             <Link to={`/admin/submissions?problem_id=${problem.id}`}>Submissions</Link>
           </div>
+          <div className="mb-3">
+            <Link to={`/admin/new/submission?problem_id=${problem.id}`}>Send submission</Link>
+          </div>
         </div>
         <hr className="mt-4 mb-4"/>
         <div className="px-4 px-sm-5 mx-2 pb-5">
-        {content}
+          {content}
         </div>
       </div>
     )

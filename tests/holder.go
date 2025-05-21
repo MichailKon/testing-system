@@ -43,13 +43,13 @@ func initTS(t *testing.T, sandbox string) *TSHolder {
 		dir: t.TempDir(),
 	}
 	h.storageDir = filepath.Join(h.dir, "storage")
-	require.NoError(t, os.CopyFS(h.storageDir, os.DirFS("testdata/storage")))
+	h.copyDir("testdata/storage", h.storageDir)
 
 	h.submitsDir = filepath.Join(h.dir, "submits")
-	require.NoError(t, os.CopyFS(h.submitsDir, os.DirFS("testdata/submits")))
+	h.copyDir("testdata/submits", h.submitsDir)
 
 	configDir := filepath.Join(h.dir, "configs")
-	require.NoError(t, os.CopyFS(configDir, os.DirFS("testdata/configs")))
+	h.copyDir("testdata/configs", configDir)
 
 	configPath := filepath.Join(configDir, "config.yaml")
 	h.initTSConfig(configPath, sandbox)
@@ -67,6 +67,10 @@ func initTS(t *testing.T, sandbox string) *TSHolder {
 	h.finishWait.Add(1)
 
 	return h
+}
+
+func (h *TSHolder) copyDir(src string, dst string) {
+	require.NoError(h.t, exec.Command("cp", "-r", src, dst).Run()) // Why go does not have analog???
 }
 
 func (h *TSHolder) initTSConfig(configPath string, sandbox string) {
@@ -96,6 +100,7 @@ func (h *TSHolder) initTSConfig(configPath string, sandbox string) {
 
 func (h *TSHolder) addProblems() {
 	h.addProblem(1)
+	h.addProblem(2)
 	// TODO: Add more
 }
 

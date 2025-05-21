@@ -1,0 +1,20 @@
+problem_id: 2
+language: cpp
+source_file: "source.cpp"
+
+required_result:
+  verdict: TL
+  score: 0
+  test_results:
+    - test_number: 1
+      verdict: OK
+    - test_number: 2
+      verdict: OK
+    - test_number: 3
+      verdict: OK
+    - test_number: 4
+      verdict: TL
+    - test_number: 5
+      verdict: SK
+    - test_number: 6
+      verdict: SK

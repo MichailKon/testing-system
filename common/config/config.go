@@ -17,7 +17,6 @@ type Config struct {
 	Invoker *InvokerConfig `yaml:"Invoker,omitempty"`
 	Master  *MasterConfig  `yaml:"Master,omitempty"`
 	Storage *StorageConfig `yaml:"Storage,omitempty"`
-	// TODO: Add instances here
 
 	DB DBConfig `yaml:"DB"`
 	// if instance is set up on server, leave connection empty
@@ -48,7 +47,13 @@ func fillInConfig(config *Config) {
 	}
 
 	fillInConnections(config)
-	fillInMasterConfig(config.Master)
-	fillInStorageConfig(config.Storage)
-	FillInInvokerConfig(config.Invoker)
+	if config.Master != nil {
+		fillInMasterConfig(config.Master)
+	}
+	if config.Storage != nil {
+		fillInStorageConfig(config.Storage)
+	}
+	if config.Invoker != nil {
+		FillInInvokerConfig(config.Invoker)
+	}
 }

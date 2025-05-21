@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"github.com/xorcare/pointer"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 	"testing_system/lib/customfields"
@@ -58,7 +59,20 @@ type TestGroup struct {
 	RequiredGroupNames []string              `json:"required_group_names" yaml:"required_group_names"`
 }
 
-type TestGroups []TestGroup
+func (g *TestGroup) Copy() *TestGroup {
+	group := *g
+	if g.TestScore != nil {
+		group.TestScore = pointer.Float64(*g.TestScore)
+	}
+	if g.GroupScore != nil {
+		group.GroupScore = pointer.Float64(*g.GroupScore)
+	}
+	group.RequiredGroupNames = make([]string, len(g.RequiredGroupNames))
+	copy(group.RequiredGroupNames, g.RequiredGroupNames)
+	return &group
+}
+
+type TestGroups []*TestGroup
 
 func (t TestGroups) Value() (driver.Value, error) {
 	return json.Marshal(t)

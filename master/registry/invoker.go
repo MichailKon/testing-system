@@ -296,13 +296,30 @@ func (i *Invoker) StatusForMaster() *masterconn.InvokerStatus {
 }
 
 func (i *Invoker) ResetCache() error {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
-	return i.connector.ResetCache()
+	err := i.connector.ResetCache()
+	if err != nil {
+		i.mutex.Lock()
+		defer i.mutex.Unlock()
+		logger.Warn("failed to reset cache on invoker %s, error: %v", i.address(), err)
+		i.markFailed()
+	}
+	return err
 }
 
 func (i *Invoker) ID() string {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 	return i.status.Address
+}
+
+func (i *Invoker) StopJob(jobID string) {
+	i.ts.Go(func() {
+		err := i.connector.StopJob(jobID)
+		if err != nil {
+			i.mutex.Lock()
+			defer i.mutex.Unlock()
+			logger.Warn("failed to stop job %s on invoker %s error: %v", jobID, i.address(), err)
+			i.markFailed()
+		}
+	})
 }
