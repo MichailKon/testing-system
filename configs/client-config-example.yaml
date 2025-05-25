@@ -1,0 +1,17 @@
+Address: # Enter address to run client.
+
+MasterConnection:
+  Address: # Address on which the testing system is started.
+
+StorageConnection:
+  Address: # Address on which the testing system is started.
+
+DB:
+  Dsn: # Use your postgres dsn to connect to database.
+
+ResourcesPath: # Path of folder "clients/resources" in testing system repository
+
+Admin: true # Use this parameter to set up admin frontend client, it will be available at path /admin
+TestingSystemAPI:
+  DefaultLoadFilesHead: 100 # Number of first bytes to load for each file that is served.
+

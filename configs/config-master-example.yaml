@@ -1,0 +1,24 @@
+Port: # enter the port to run the testing system
+# Host: "enter the host string value" # By default, Host equals to localhost
+
+Logger:
+  # LogPath: "path to save logs" # By default, logs are written to stdout and stderr
+  # LogLevel: 0. # By default LogLevel is 0.
+  # Possible log levels are: 0 (Trace), 1 (Debug), 2 (Info), 3 (Warn), 4 (Error)
+
+Master:
+  # InvokersPingInterval defines the interval at which invokers should be pinged.
+  InvokersPingInterval: 1s
+
+Storage:
+  # StoragePath defines the path to store all resources.
+  StoragePath: "some path to folder containing all the resources"
+
+DB:
+  Dsn: "postgresql://localhost:5432/ts" # Use your postgres dsn to connect to database.
+
+MasterConnection:
+  Address: "http://localhost:<port>" # Use the port that is defined in Port parameter for testing system.
+
+StorageConnection:
+  Address: "http://localhost:<port>" # Use the port that is defined in Port parameter for testing system.
