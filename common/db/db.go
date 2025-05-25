@@ -27,6 +27,7 @@ func NewDB(config config.DBConfig) (*gorm.DB, error) {
 	if err = db.AutoMigrate(&models.Submission{}); err != nil {
 		return nil, logger.Error("Can't migrate Submission: %v", err)
 	}
+	logger.Info("Configured DB successfully")
 	return db, err
 }
 

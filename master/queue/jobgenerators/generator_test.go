@@ -295,6 +295,70 @@ func TestICPCGenerator(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, sub)
 	})
+
+	t.Run("SK and WA verdict from invoker", func(t *testing.T) {
+		problem, submission := &models.Problem{
+			ProblemType: models.ProblemTypeICPC,
+			TestsNumber: 2,
+		}, fixtureSubmission(1)
+
+		g, err := NewGenerator(problem, submission, status)
+		require.NoError(t, err)
+		job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
+		sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
+			Job:     job,
+			Verdict: verdict.CD,
+		})
+		require.NoError(t, err)
+		require.Nil(t, sub)
+		job1 := nextJob(t, g, 1, invokerconn.TestJob, 1)
+		job2 := nextJob(t, g, 1, invokerconn.TestJob, 2)
+		sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+			Job:     job2,
+			Verdict: verdict.SK,
+		})
+		require.NoError(t, err)
+		require.Nil(t, sub)
+		sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+			Job:     job1,
+			Verdict: verdict.WA,
+		})
+		require.NoError(t, err)
+		require.Equal(t, verdict.WA, sub.Verdict)
+	})
+
+	t.Run("SK verdict from invoker", func(t *testing.T) {
+		problem, submission := &models.Problem{
+			ProblemType: models.ProblemTypeICPC,
+			TestsNumber: 2,
+		}, fixtureSubmission(1)
+
+		g, err := NewGenerator(problem, submission, status)
+		require.NoError(t, err)
+		job := nextJob(t, g, 1, invokerconn.CompileJob, 0)
+		sub, err := g.JobCompleted(&masterconn.InvokerJobResult{
+			Job:     job,
+			Verdict: verdict.CD,
+		})
+		require.NoError(t, err)
+		require.Nil(t, sub)
+		job1 := nextJob(t, g, 1, invokerconn.TestJob, 1)
+		job2 := nextJob(t, g, 1, invokerconn.TestJob, 2)
+		sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+			Job:     job1,
+			Verdict: verdict.SK,
+		})
+		require.NoError(t, err)
+		require.Nil(t, sub)
+		sub, err = g.JobCompleted(&masterconn.InvokerJobResult{
+			Job:     job2,
+			Verdict: verdict.WA,
+		})
+		require.NoError(t, err)
+		require.Equal(t, verdict.CF, sub.Verdict)
+		require.Equal(t, verdict.CF, sub.TestResults[0].Verdict)
+		require.Equal(t, verdict.SK, sub.TestResults[1].Verdict)
+	})
 }
 
 func TestIOIGenerator(t *testing.T) {
@@ -304,7 +368,7 @@ func TestIOIGenerator(t *testing.T) {
 			// type EachTest, but TestScore is nil
 			{
 				ProblemType: models.ProblemTypeIOI,
-				TestGroups: []models.TestGroup{
+				TestGroups: []*models.TestGroup{
 					{
 						Name:               "name",
 						FirstTest:          1,
@@ -319,7 +383,7 @@ func TestIOIGenerator(t *testing.T) {
 			// type Complete, but GroupScore is nil
 			{
 				ProblemType: models.ProblemTypeIOI,
-				TestGroups: []models.TestGroup{
+				TestGroups: []*models.TestGroup{
 					{
 						Name:               "name",
 						FirstTest:          1,
@@ -334,7 +398,7 @@ func TestIOIGenerator(t *testing.T) {
 			// type Min, but GroupScore is nil
 			{
 				ProblemType: models.ProblemTypeIOI,
-				TestGroups: []models.TestGroup{
+				TestGroups: []*models.TestGroup{
 					{
 						Name:               "name",
 						FirstTest:          1,
@@ -349,7 +413,7 @@ func TestIOIGenerator(t *testing.T) {
 			// cyclic groups
 			{
 				ProblemType: models.ProblemTypeIOI,
-				TestGroups: []models.TestGroup{
+				TestGroups: []*models.TestGroup{
 					{
 						Name:               "name1",
 						FirstTest:          1,
@@ -371,7 +435,7 @@ func TestIOIGenerator(t *testing.T) {
 			// test is not covered
 			{
 				ProblemType: models.ProblemTypeIOI,
-				TestGroups: []models.TestGroup{
+				TestGroups: []*models.TestGroup{
 					{
 						Name:               "name",
 						FirstTest:          1,
@@ -386,7 +450,7 @@ func TestIOIGenerator(t *testing.T) {
 			// test in several groups
 			{
 				ProblemType: models.ProblemTypeIOI,
-				TestGroups: []models.TestGroup{
+				TestGroups: []*models.TestGroup{
 					{
 						Name:               "name",
 						FirstTest:          1,
@@ -409,7 +473,7 @@ func TestIOIGenerator(t *testing.T) {
 			// the same group name
 			{
 				ProblemType: models.ProblemTypeIOI,
-				TestGroups: []models.TestGroup{
+				TestGroups: []*models.TestGroup{
 					{
 						Name:               "name",
 						FirstTest:          1,
@@ -432,7 +496,7 @@ func TestIOIGenerator(t *testing.T) {
 			// first test > last test
 			{
 				ProblemType: models.ProblemTypeIOI,
-				TestGroups: []models.TestGroup{
+				TestGroups: []*models.TestGroup{
 					{
 						Name:               "name1",
 						FirstTest:          1,
@@ -469,7 +533,7 @@ func TestIOIGenerator(t *testing.T) {
 	problemWithOneGroup := models.Problem{
 		ProblemType: models.ProblemTypeIOI,
 		TestsNumber: 10,
-		TestGroups: []models.TestGroup{
+		TestGroups: []*models.TestGroup{
 			{
 				Name:               "group1",
 				FirstTest:          1,
@@ -563,7 +627,7 @@ func TestIOIGenerator(t *testing.T) {
 			problem := models.Problem{
 				ProblemType: models.ProblemTypeIOI,
 				TestsNumber: 2,
-				TestGroups: []models.TestGroup{
+				TestGroups: []*models.TestGroup{
 					{
 						Name:               "group1",
 						FirstTest:          1,
@@ -753,11 +817,95 @@ func TestIOIGenerator(t *testing.T) {
 			})
 		})
 
+		t.Run("SK in second group", func(t *testing.T) {
+			gen := prepare()
+			job1 := nextJob(t, gen, 0, invokerconn.TestJob, 1)
+			job2 := nextJob(t, gen, 0, invokerconn.TestJob, 2)
+			sub, err := gen.JobCompleted(&masterconn.InvokerJobResult{
+				Job:     job2,
+				Verdict: verdict.SK,
+			})
+			require.Nil(t, sub)
+			require.NoError(t, err)
+			sub, err = gen.JobCompleted(&masterconn.InvokerJobResult{
+				Job:     job1,
+				Verdict: verdict.WA,
+			})
+			require.Equal(t, verdict.PT, sub.Verdict)
+			require.Equal(t, 0., sub.Score)
+			require.Equal(t, verdict.WA, sub.TestResults[0].Verdict)
+			require.Equal(t, verdict.SK, sub.TestResults[1].Verdict)
+		})
+
+		t.Run("SK in first group", func(t *testing.T) {
+			gen := prepare()
+			job1 := nextJob(t, gen, 0, invokerconn.TestJob, 1)
+			job2 := nextJob(t, gen, 0, invokerconn.TestJob, 2)
+			sub, err := gen.JobCompleted(&masterconn.InvokerJobResult{
+				Job:     job2,
+				Verdict: verdict.WA,
+			})
+			require.Nil(t, sub)
+			require.NoError(t, err)
+			sub, err = gen.JobCompleted(&masterconn.InvokerJobResult{
+				Job:     job1,
+				Verdict: verdict.SK,
+			})
+			require.Equal(t, verdict.CF, sub.Verdict)
+			require.Equal(t, 0., sub.Score)
+			require.Equal(t, verdict.CF, sub.TestResults[0].Verdict)
+			require.Equal(t, verdict.SK, sub.TestResults[1].Verdict)
+		})
+
+		t.Run("Required jobs", func(t *testing.T) {
+			problem := models.Problem{
+				ProblemType: models.ProblemTypeIOI,
+				TestsNumber: 3,
+				TestGroups: []*models.TestGroup{
+					{
+						Name:               "1",
+						FirstTest:          1,
+						LastTest:           2,
+						TestScore:          nil,
+						GroupScore:         pointer.Float64(100),
+						ScoringType:        models.TestGroupScoringTypeComplete,
+						RequiredGroupNames: make([]string, 0),
+					},
+					{
+						Name:               "2",
+						FirstTest:          3,
+						LastTest:           3,
+						TestScore:          nil,
+						GroupScore:         pointer.Float64(100),
+						ScoringType:        models.TestGroupScoringTypeComplete,
+						RequiredGroupNames: []string{"1"},
+					},
+				},
+			}
+			gen, err := NewGenerator(&problem, &models.Submission{}, status)
+			require.NoError(t, err)
+			job := nextJob(t, gen, 0, invokerconn.CompileJob, 0)
+			sub, err := gen.JobCompleted(&masterconn.InvokerJobResult{
+				Job:     job,
+				Verdict: verdict.CD,
+			})
+			require.Nil(t, sub)
+			require.NoError(t, err)
+			job1 := gen.NextJob()
+			require.NotNil(t, job1)
+			job2 := gen.NextJob()
+			require.NotNil(t, job2)
+			require.Equal(t, job2.RequiredJobIDs, []string{job1.ID})
+			job3 := gen.NextJob()
+			require.NotNil(t, job3)
+			require.Equal(t, job3.RequiredJobIDs, []string{job1.ID, job2.ID})
+		})
+
 		t.Run("Fail in group with >1 tests", func(t *testing.T) {
 			problem := models.Problem{
 				ProblemType: models.ProblemTypeIOI,
 				TestsNumber: 2,
-				TestGroups: []models.TestGroup{
+				TestGroups: []*models.TestGroup{
 					{
 						Name:               "group1",
 						FirstTest:          1,
@@ -810,7 +958,7 @@ func TestIOIGenerator(t *testing.T) {
 			problem := models.Problem{
 				ProblemType: models.ProblemTypeIOI,
 				TestsNumber: 4,
-				TestGroups: []models.TestGroup{
+				TestGroups: []*models.TestGroup{
 					{
 						Name:               "group1",
 						FirstTest:          1,
@@ -894,7 +1042,7 @@ func TestIOIGenerator(t *testing.T) {
 			problem := models.Problem{
 				ProblemType: models.ProblemTypeIOI,
 				TestsNumber: 3,
-				TestGroups: []models.TestGroup{
+				TestGroups: []*models.TestGroup{
 					{
 						Name:               "group1",
 						FirstTest:          1,
@@ -961,7 +1109,7 @@ func TestIOIGenerator(t *testing.T) {
 			return models.Problem{
 				ProblemType: models.ProblemTypeIOI,
 				TestsNumber: 3,
-				TestGroups: []models.TestGroup{
+				TestGroups: []*models.TestGroup{
 					{
 						Name:               "group1",
 						FirstTest:          1,

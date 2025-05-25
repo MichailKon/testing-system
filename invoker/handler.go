@@ -44,3 +44,22 @@ func (i *Invoker) resetCache(c *gin.Context) {
 	i.Storage.Reset()
 	connector.RespOK(c, nil)
 }
+
+func (i *Invoker) stopJob(c *gin.Context) {
+	jobIDBytes, err := c.GetRawData()
+	if err != nil {
+		connector.RespErr(c, http.StatusBadRequest, "Can not get job id, error: %s", err.Error())
+	}
+	jobID := string(jobIDBytes)
+
+	i.Mutex.Lock()
+
+	job, ok := i.ActiveJobs[jobID]
+	if ok {
+		if job.Type == invokerconn.TestJob {
+			job.stopFunc()
+		}
+	}
+	i.Mutex.Unlock()
+	connector.RespOK(c, nil)
+}

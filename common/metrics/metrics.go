@@ -21,6 +21,7 @@ type Collector struct {
 	InvokerExecutionWaitDuration     *prometheus.CounterVec
 	InvokerExecutionDuration         *prometheus.CounterVec
 	InvokerSendResultDuration        *prometheus.CounterVec
+	InvokerSkippedJobs               *prometheus.CounterVec
 
 	InvokerLifetimeDuration    *prometheus.GaugeVec
 	InvokerSandboxCount        *prometheus.GaugeVec

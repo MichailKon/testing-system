@@ -102,7 +102,11 @@ func (s *Sandbox) parseWriter(r *io.Writer, conf *sandbox.IORedirect) (func() er
 }
 
 func (s *Sandbox) Run(config *sandbox.ExecuteConfig) *sandbox.RunResult {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.WallTimeLimit))
+	initialCtx := context.Background()
+	if config.Ctx != nil {
+		initialCtx = config.Ctx
+	}
+	ctx, cancel := context.WithTimeout(initialCtx, time.Duration(config.WallTimeLimit))
 	defer cancel()
 	cmd := exec.CommandContext(
 		ctx,
@@ -146,13 +150,15 @@ func (s *Sandbox) Run(config *sandbox.ExecuteConfig) *sandbox.RunResult {
 		}
 	}
 
-	wallTimeLimit := false
-	cmd.Cancel = func() error {
-		wallTimeLimit = true
-		return cmd.Process.Kill()
-	}
-
 	err = cmd.Run()
+
+	skip := initialCtx.Err() != nil
+	wallTimeLimit := ctx.Err() != nil
+
+	if skip {
+		result.Verdict = verdict.SK
+		return result
+	}
 
 	if cmd.ProcessState == nil {
 		result.Err = fmt.Errorf("sandbox process state is nil, something wrong with sandbox, process error: %v", err)

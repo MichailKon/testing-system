@@ -55,6 +55,9 @@ func (i *ICPCGenerator) NextJob() *invokerconn.Job {
 	} else {
 		job.Type = invokerconn.TestJob
 		job.Test = i.firstTestToGive
+		for givenJobID := range i.givenJobs {
+			job.RequiredJobIDs = append(job.RequiredJobIDs, givenJobID)
+		}
 		i.firstTestToGive++
 	}
 
@@ -94,8 +97,14 @@ func (i *ICPCGenerator) updateSubmissionResult() (*models.Submission, error) {
 			}
 		}
 		switch result.Verdict {
-		case verdict.OK, verdict.SK:
+		case verdict.OK:
 			// skip
+		case verdict.SK:
+			if i.submission.Verdict == verdict.RU {
+				result.Verdict = verdict.CF
+				result.Error = "Invoker returned verdict SK, but no previous tests failed"
+				i.submission.Verdict = verdict.CF
+			}
 		default:
 			if i.submission.Verdict != verdict.RU {
 				logger.Panic("Trying to change bad verdict in ICPC problem")
@@ -143,7 +152,7 @@ func (i *ICPCGenerator) testJobCompleted(job *invokerconn.Job, result *mastercon
 	switch result.Verdict {
 	case verdict.OK:
 		// skip
-	case verdict.PT, verdict.WA, verdict.RT, verdict.ML, verdict.TL, verdict.WL, verdict.SE, verdict.CF:
+	case verdict.PT, verdict.WA, verdict.RT, verdict.ML, verdict.TL, verdict.WL, verdict.SE, verdict.CF, verdict.SK:
 		i.setFail()
 	default:
 		result.Verdict = verdict.CF

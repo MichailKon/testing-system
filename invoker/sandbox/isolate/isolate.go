@@ -2,6 +2,7 @@ package isolate
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -58,8 +59,8 @@ func (s *Sandbox) Dir() string {
 	return fmt.Sprintf("/var/local/lib/isolate/%d/box", s.id)
 }
 
-func (s *Sandbox) command() *exec.Cmd {
-	return exec.Command(isolateCommand, "--cg", fmt.Sprintf("--box-id=%d", s.id), "-s")
+func (s *Sandbox) command(ctx context.Context) *exec.Cmd {
+	return exec.CommandContext(ctx, isolateCommand, "--cg", fmt.Sprintf("--box-id=%d", s.id), "-s")
 }
 
 func (s *Sandbox) metaPath() string {
@@ -67,7 +68,7 @@ func (s *Sandbox) metaPath() string {
 }
 
 func (s *Sandbox) Init() error {
-	cmd := s.command()
+	cmd := s.command(context.Background())
 	cmd.Args = append(cmd.Args, "--init")
 	err := cmd.Run()
 	if err != nil {
@@ -82,7 +83,7 @@ func (s *Sandbox) Cleanup() {
 		logger.Error("Cleaning up uninitialized sandbox")
 		return
 	}
-	cmd := s.command()
+	cmd := s.command(context.Background())
 	cmd.Args = append(cmd.Args, "--cleanup")
 	err := cmd.Run()
 	if err != nil {
@@ -105,7 +106,19 @@ func (s *Sandbox) Run(config *sandbox.ExecuteConfig) *sandbox.RunResult {
 		Statistics: &masterconn.JobResultStatistics{},
 	}
 
+	skipped := false
+	cmd.Cancel = func() error {
+		skipped = true
+		return cmd.Process.Kill()
+	}
+
 	err := cmd.Run()
+
+	if skipped {
+		result.Verdict = verdict.SK
+		return result
+	}
+
 	if err != nil {
 		var exitErr *exec.ExitError
 		if !errors.As(err, &exitErr) {
@@ -119,7 +132,11 @@ func (s *Sandbox) Run(config *sandbox.ExecuteConfig) *sandbox.RunResult {
 }
 
 func (s *Sandbox) prepareRun(config *sandbox.ExecuteConfig) *exec.Cmd {
-	cmd := s.command()
+	ctx := context.Background()
+	if config.Ctx != nil {
+		ctx = config.Ctx
+	}
+	cmd := s.command(ctx)
 	cmd.Args = append(cmd.Args, "--run")
 
 	// We are changing workdir, just in case
